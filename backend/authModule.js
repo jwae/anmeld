@@ -1,4 +1,5 @@
 ﻿﻿const express = require("express");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const https = require("https");
@@ -1369,7 +1370,6 @@ function parseSchoolSourceCsv(csvText) {
   const headerCells = parseDelimitedLine(lines[0], delimiter).map((cell) => normalizeCsvHeaderKey(cell));
   const headerDefinitions = [
     { key: "db_host", aliases: ["db_host", "dbhost", "host"] },
-    { key: "db_port", aliases: ["db_port", "dbport", "port"] },
     { key: "db_name", aliases: ["db_name", "dbname", "datenbank"] },
     { key: "db_user", aliases: ["db_user", "dbuser", "user", "benutzer"] },
     { key: "db_passwd", aliases: ["db_passwd", "db_password_enc", "db_password", "passwort"] },
@@ -1392,7 +1392,6 @@ function parseSchoolSourceCsv(csvText) {
       row_no: rowIndex + 2,
       snr: String(cells[headerIndex.get("snr")] || "").trim(),
       db_host: String(cells[headerIndex.get("db_host")] || "").trim(),
-      db_port: String(cells[headerIndex.get("db_port")] || "").trim(),
       db_name: String(cells[headerIndex.get("db_name")] || "").trim(),
       db_user: String(cells[headerIndex.get("db_user")] || "").trim(),
       db_password_enc: String(cells[headerIndex.get("db_passwd")] || "").trim(),
@@ -1400,7 +1399,6 @@ function parseSchoolSourceCsv(csvText) {
   }).filter((entry) =>
     entry.snr
     || entry.db_host
-    || entry.db_port
     || entry.db_name
     || entry.db_user
     || entry.db_password_enc
@@ -1424,7 +1422,10 @@ function parseSchoolCsv(csvText) {
   const headerCells = parseDelimitedLine(lines[0], delimiter).map((cell) => normalizeCsvHeaderKey(cell));
   const snrIndex = findCsvHeaderIndex(headerCells, ["snr"]);
   const nameIndex = findCsvHeaderIndex(headerCells, ["name"]);
-  const cityIndex = findCsvHeaderIndex(headerCells, ["city", "ort"]);
+  const cityIndex = findCsvHeaderIndex(headerCells, ["city"]);
+  const ortIndex = findCsvHeaderIndex(headerCells, ["ort"]);
+  const plzIndex = findCsvHeaderIndex(headerCells, ["plz", "postleitzahl"]);
+  const strasseIndex = findCsvHeaderIndex(headerCells, ["strasse", "straße", "street"]);
 
   if (snrIndex < 0) {
     const error = new Error("Die CSV-Datei enthaelt nicht die erforderliche Spalte snr.");
@@ -1436,7 +1437,7 @@ function parseSchoolCsv(csvText) {
     error.statusCode = 400;
     throw error;
   }
-  if (cityIndex < 0) {
+  if (cityIndex < 0 && ortIndex < 0) {
     const error = new Error("Die CSV-Datei enthaelt nicht die erforderliche Spalte city oder ort.");
     error.statusCode = 400;
     throw error;
@@ -1446,14 +1447,302 @@ function parseSchoolCsv(csvText) {
 
   return lines.slice(1).map((line, rowIndex) => {
     const cells = parseDelimitedLine(line, delimiter);
+    const city = String(
+      cityIndex >= 0
+        ? cells[cityIndex] || ""
+        : ortIndex >= 0
+          ? cells[ortIndex] || ""
+          : "",
+    ).trim();
+    const ort = String(
+      ortIndex >= 0
+        ? cells[ortIndex] || ""
+        : city,
+    ).trim();
     return {
       row_no: rowIndex + 2,
       snr: String(cells[snrIndex] || "").trim(),
       name: String(cells[nameIndex] || "").trim(),
-      city: String(cells[cityIndex] || "").trim(),
+      city,
+      plz: plzIndex >= 0 ? String(cells[plzIndex] || "").trim() : "",
+      ort,
+      strasse: strasseIndex >= 0 ? String(cells[strasseIndex] || "").trim() : "",
       school_form: formIndex >= 0 ? String(cells[formIndex] || "").trim() : "",
     };
-  }).filter((entry) => entry.snr || entry.name || entry.city);
+  }).filter((entry) => entry.snr || entry.name || entry.city || entry.ort);
+}
+
+function parseAnmSchoolCsv(csvText) {
+  const normalizedText = String(csvText || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalizedText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    const error = new Error("Die CSV-Datei ist leer.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const delimiter = detectCsvDelimiter(lines[0]);
+  const headerCells = parseDelimitedLine(lines[0], delimiter).map((cell) => normalizeCsvHeaderKey(cell));
+  const requiredColumns = ["snr", "name", "plz", "ort", "strasse", "sf_id", "db_host", "db_name", "db_user", "db_password_enc", "is_active"];
+  const indices = {};
+
+  for (const column of requiredColumns) {
+    const index = findCsvHeaderIndex(headerCells, [column]);
+    if (index < 0) {
+      const error = new Error(`Die CSV-Datei enthaelt nicht die erforderliche Spalte ${column}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    indices[column] = index;
+  }
+
+  return lines.slice(1).map((line, rowIndex) => {
+    const cells = parseDelimitedLine(line, delimiter);
+    return {
+      row_no: rowIndex + 2,
+      snr: String(cells[indices.snr] || "").trim(),
+      name: String(cells[indices.name] || "").trim(),
+      plz: String(cells[indices.plz] || "").trim(),
+      ort: String(cells[indices.ort] || "").trim(),
+      strasse: String(cells[indices.strasse] || "").trim(),
+      sf_id: String(cells[indices.sf_id] || "").trim(),
+      db_host: String(cells[indices.db_host] || "").trim(),
+      db_name: String(cells[indices.db_name] || "").trim(),
+      db_user: String(cells[indices.db_user] || "").trim(),
+      db_password_enc: String(cells[indices.db_password_enc] || "").trim(),
+      is_active: String(cells[indices.is_active] || "").trim(),
+    };
+  }).filter((entry) =>
+    entry.snr
+    || entry.name
+    || entry.plz
+    || entry.ort
+    || entry.strasse
+    || entry.sf_id
+    || entry.db_host
+    || entry.db_name
+    || entry.db_user
+    || entry.db_password_enc
+    || entry.is_active
+  );
+}
+
+function parseCsvBoolean(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return { valid: true, value: 1 };
+  if (["1", "true", "ja", "j", "yes", "y", "aktiv"].includes(normalized)) return { valid: true, value: 1 };
+  if (["0", "false", "nein", "n", "no", "inaktiv"].includes(normalized)) return { valid: true, value: 0 };
+  return { valid: false, value: 0 };
+}
+
+function maskPassword(value) {
+  return String(value || "").trim() ? "******" : "";
+}
+
+async function resolveSchoolFormLookup(conn) {
+  const [tableRows] = await conn.query(
+    `
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name IN ('anm_kat_sf', 'school_form')
+    ORDER BY CASE WHEN table_name = 'anm_kat_sf' THEN 0 ELSE 1 END, table_name
+    `,
+  );
+  const tableName = String(tableRows?.[0]?.table_name || "").trim();
+  if (!tableName) {
+    return {
+      tableName: "",
+      ids: new Set(),
+      labels: new Map(),
+      shortLabels: new Map(),
+      codeToId: new Map(),
+    };
+  }
+
+  const [columnRows] = await conn.query(
+    `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = ?
+    ORDER BY ordinal_position
+    `,
+    [tableName],
+  );
+  const columnNames = (columnRows || []).map((row) => String(row?.column_name || "").trim());
+  const codeColumn = ["code", "sf", "sf_kurz", "label", "name"]
+    .find((column) => columnNames.includes(column)) || "";
+  const labelColumn = ["name", "label", "bezeichnung", "sf", "code", "sf_kurz"]
+    .find((column) => columnNames.includes(column)) || "";
+  const shortLabelColumn = ["sf_kurz", "sf", "code", "label", "name"]
+    .find((column) => columnNames.includes(column)) || "";
+
+  const selectColumns = ["sf_id"];
+  if (codeColumn) selectColumns.push(codeColumn);
+  if (labelColumn) selectColumns.push(labelColumn);
+  if (shortLabelColumn && shortLabelColumn !== labelColumn) selectColumns.push(shortLabelColumn);
+  const [rows] = await conn.query(`SELECT ${selectColumns.join(", ")} FROM ${tableName}`);
+  const ids = new Set();
+  const labels = new Map();
+  const shortLabels = new Map();
+  const codeToId = new Map();
+  const idToCode = new Map();
+  const normalizedCodeToCode = new Map();
+
+  for (const row of rows || []) {
+    const sfId = Number(row?.sf_id || 0);
+    if (!sfId) continue;
+    ids.add(sfId);
+    if (codeColumn) {
+      const codeValue = String(row?.[codeColumn] || "").trim();
+      if (codeValue) {
+        codeToId.set(codeValue.toLowerCase(), sfId);
+        idToCode.set(sfId, codeValue);
+        normalizedCodeToCode.set(codeValue.toLowerCase(), codeValue);
+      }
+    }
+    labels.set(sfId, labelColumn ? String(row?.[labelColumn] || "").trim() : String(sfId));
+    shortLabels.set(
+      sfId,
+      shortLabelColumn
+        ? String(row?.[shortLabelColumn] || "").trim()
+        : (labelColumn ? String(row?.[labelColumn] || "").trim() : String(sfId)),
+    );
+  }
+
+  return {
+    tableName,
+    ids,
+    labels,
+    shortLabels,
+    codeToId,
+    idToCode,
+    normalizedCodeToCode,
+  };
+}
+
+async function ensureAnmSchulenTable(conn) {
+  await conn.query(
+    `
+    CREATE TABLE IF NOT EXISTS anm_schulen (
+      snr CHAR(6) NOT NULL,
+      name VARCHAR(255) DEFAULT NULL,
+      plz VARCHAR(20) DEFAULT NULL,
+      ort VARCHAR(100) DEFAULT NULL,
+      strasse VARCHAR(255) DEFAULT NULL,
+      sf_id VARCHAR(32) DEFAULT NULL,
+      db_host VARCHAR(255) DEFAULT NULL,
+      db_name VARCHAR(255) DEFAULT NULL,
+      db_user VARCHAR(255) DEFAULT NULL,
+      db_password_enc TEXT DEFAULT NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (snr),
+      KEY idx_anm_schulen_is_active (is_active),
+      KEY idx_anm_schulen_sf_id (sf_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `,
+  );
+
+  const [columns] = await conn.query("SHOW COLUMNS FROM anm_schulen");
+  const columnNames = new Set((columns || []).map((column) => String(column?.Field || "").trim().toLowerCase()));
+
+  if (!columnNames.has("is_active")) {
+    await conn.query("ALTER TABLE anm_schulen ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
+    if (columnNames.has("aktiv")) {
+      await conn.query("UPDATE anm_schulen SET is_active = aktiv WHERE aktiv IS NOT NULL");
+    }
+  }
+
+  const [sfColumnRows] = await conn.query("SHOW COLUMNS FROM anm_schulen LIKE 'sf_id'");
+  const sfColumnType = String(sfColumnRows?.[0]?.Type || "").trim().toLowerCase();
+  if (sfColumnType && !sfColumnType.startsWith("varchar")) {
+    await conn.query("ALTER TABLE anm_schulen MODIFY COLUMN sf_id VARCHAR(32) DEFAULT NULL");
+  }
+}
+
+function normalizeComparableImportValue(value) {
+  return String(value ?? "").trim();
+}
+
+function createSchoolImportPreviewRows(rows, existingRowsBySnr, schoolFormLookup = { ids: new Set(), labels: new Map(), codeToId: new Map() }) {
+  const seenSnrs = new Map();
+  for (const row of rows) {
+    const snr = String(row?.snr || "").trim();
+    if (!snr) continue;
+    seenSnrs.set(snr, (seenSnrs.get(snr) || 0) + 1);
+  }
+
+  return rows.map((row) => {
+    const snr = String(row?.snr || "").trim();
+    const name = String(row?.name || "").trim();
+    const sfIdText = String(row?.sf_id || "").trim();
+    const normalizedSfCode = sfIdText ? String(schoolFormLookup.normalizedCodeToCode?.get(sfIdText.toLowerCase()) || "") : "";
+    const resolvedSfId = normalizedSfCode ? Number(schoolFormLookup.codeToId?.get(normalizedSfCode.toLowerCase()) || 0) : 0;
+    const aktivInfo = parseCsvBoolean(row?.is_active);
+    const errors = [];
+
+    if (!snr) errors.push("SNR fehlt");
+    if (!name) errors.push("Name fehlt");
+    if (snr && Number(seenSnrs.get(snr) || 0) > 1) errors.push("SNR doppelt in CSV");
+    if (sfIdText && !resolvedSfId) {
+      errors.push("sf_id unbekannt");
+    }
+    if (!aktivInfo.valid) errors.push("is_active ungueltig");
+
+    const existingRow = snr ? (existingRowsBySnr.get(snr) || null) : null;
+    const exists = Boolean(existingRow);
+    const isValid = errors.length === 0;
+    const normalizedTargetSfCode = normalizedSfCode || "";
+    const hasChanges = existingRow ? (
+      normalizeComparableImportValue(existingRow.name) !== name
+      || normalizeComparableImportValue(existingRow.plz) !== normalizeComparableImportValue(row?.plz)
+      || normalizeComparableImportValue(existingRow.ort) !== normalizeComparableImportValue(row?.ort)
+      || normalizeComparableImportValue(existingRow.strasse) !== normalizeComparableImportValue(row?.strasse)
+      || normalizeComparableImportValue(existingRow.sf_id) !== normalizedTargetSfCode
+      || normalizeComparableImportValue(existingRow.db_host) !== normalizeComparableImportValue(row?.db_host)
+      || normalizeComparableImportValue(existingRow.db_name) !== normalizeComparableImportValue(row?.db_name)
+      || normalizeComparableImportValue(existingRow.db_user) !== normalizeComparableImportValue(row?.db_user)
+      || normalizeComparableImportValue(existingRow.db_password_enc) !== normalizeComparableImportValue(row?.db_password_enc)
+      || Number(existingRow.is_active ? 1 : 0) !== Number(aktivInfo.valid ? aktivInfo.value : 0)
+    ) : false;
+    const status = !isValid
+      ? "Fehler"
+      : !exists
+        ? "Neu"
+        : hasChanges
+          ? "Aenderung"
+          : "Unveraendert";
+    return {
+      row_no: Number(row?.row_no || 0),
+      snr,
+      name,
+      plz: String(row?.plz || "").trim(),
+      ort: String(row?.ort || "").trim(),
+      strasse: String(row?.strasse || "").trim(),
+      sf_id: normalizedSfCode || null,
+      sf_code: sfIdText,
+      school_form_name: resolvedSfId && schoolFormLookup.labels.has(resolvedSfId) ? String(schoolFormLookup.labels.get(resolvedSfId) || "").trim() : "",
+      db_host: String(row?.db_host || "").trim(),
+      db_name: String(row?.db_name || "").trim(),
+      db_user: String(row?.db_user || "").trim(),
+      db_password_masked: maskPassword(row?.db_password_enc),
+      is_active: aktivInfo.valid ? aktivInfo.value : String(row?.is_active || "").trim(),
+      exists,
+      selected: status === "Neu" || status === "Aenderung",
+      status,
+      errors,
+      raw: {
+        db_password_enc: String(row?.db_password_enc || "").trim(),
+      },
+    };
+  });
 }
 
 function resolveSexId(value) {
@@ -1861,6 +2150,7 @@ function extractToken(req) {
 function createAuthModule(poolProvider) {
   const router = express.Router();
   const revokedTokens = new Map();
+  const schoolImportPreviewSessions = new Map();
 
   function getPool() {
     const pool = typeof poolProvider === "function" ? poolProvider() : poolProvider;
@@ -1881,6 +2171,16 @@ function createAuthModule(poolProvider) {
   }, 5 * 60 * 1000);
   revokedCleanupTimer.unref?.();
 
+  const previewCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [token, preview] of schoolImportPreviewSessions.entries()) {
+      if (Number(preview?.expires_at || 0) <= now) {
+        schoolImportPreviewSessions.delete(token);
+      }
+    }
+  }, 5 * 60 * 1000);
+  previewCleanupTimer.unref?.();
+
   function isRevoked(token) {
     const expiresAt = revokedTokens.get(token);
     if (!expiresAt) return false;
@@ -1899,6 +2199,33 @@ function createAuthModule(poolProvider) {
     } catch {
       revokedTokens.set(token, Date.now() + 60 * 60 * 1000);
     }
+  }
+
+  function createSchoolImportPreviewToken() {
+    return crypto.randomUUID();
+  }
+
+  function storeSchoolImportPreview(rows) {
+    const token = createSchoolImportPreviewToken();
+    const expiresAt = Date.now() + (15 * 60 * 1000);
+    schoolImportPreviewSessions.set(token, {
+      rows,
+      expires_at: expiresAt,
+    });
+    return {
+      token,
+      expires_at: expiresAt,
+    };
+  }
+
+  function getSchoolImportPreview(token) {
+    const preview = schoolImportPreviewSessions.get(String(token || "").trim());
+    if (!preview) return null;
+    if (Number(preview.expires_at || 0) <= Date.now()) {
+      schoolImportPreviewSessions.delete(String(token || "").trim());
+      return null;
+    }
+    return preview;
   }
 
   async function loadUser(username) {
@@ -2171,6 +2498,9 @@ function createAuthModule(poolProvider) {
         s.snr,
         s.name,
         s.city,
+        s.plz,
+        s.ort,
+        s.strasse,
         s.school_form_id,
         sf.code AS school_form_code,
         sf.name AS school_form_name
@@ -2184,6 +2514,9 @@ function createAuthModule(poolProvider) {
       snr: String(row.snr || "").trim(),
       name: toNullableText(row.name, 255),
       city: toNullableText(row.city, 100),
+      plz: toNullableText(row.plz, 20),
+      ort: toNullableText(row.ort, 100),
+      strasse: toNullableText(row.strasse, 255),
       school_form_id: row.school_form_id ? Number(row.school_form_id) : null,
       school_form_code: toNullableText(row.school_form_code, 32),
       school_form_name: toNullableText(row.school_form_name, 255),
@@ -2471,7 +2804,7 @@ function createAuthModule(poolProvider) {
       fetchAdminGroups(conn),
       fetchAdminUsers(conn),
       fetchAdminSchools(conn),
-      fetchAdminSchoolSources(conn),
+      fetchAdminAnmSchools(conn),
       fetchAdminSnapshots(conn),
       fetchAdminTerms(conn),
     ]);
@@ -2946,6 +3279,52 @@ function createAuthModule(poolProvider) {
     return res.status(500).json({ error: technicalMessage });
   }
 
+  async function fetchAdminAnmSchools(conn) {
+    await ensureAnmSchulenTable(conn);
+    const schoolFormLookup = await resolveSchoolFormLookup(conn);
+    const [rows] = await conn.query(
+      `
+      SELECT
+        a.snr,
+        a.name,
+        a.plz,
+        a.ort,
+        a.strasse,
+        a.sf_id,
+        a.db_host,
+        a.db_name,
+        a.db_user,
+        a.db_password_enc,
+        a.is_active,
+        a.created_at,
+        a.updated_at
+      FROM anm_schulen a
+      ORDER BY a.ort, a.name, a.snr
+      `,
+    );
+
+    return (rows || []).map((row) => ({
+      source_id: String(row.snr || "").trim(),
+      snr: String(row.snr || "").trim(),
+      school_name: toNullableText(row.name, 255),
+      name: toNullableText(row.name, 255),
+      plz: toNullableText(row.plz, 20),
+      ort: toNullableText(row.ort, 100),
+      strasse: toNullableText(row.strasse, 255),
+      sf_id: toNullableText(row.sf_id, 32),
+      db_host: toNullableText(row.db_host, 255),
+      db_name: toNullableText(row.db_name, 255),
+      db_user: toNullableText(row.db_user, 255),
+      db_password_enc: String(row.db_password_enc || ""),
+      is_active: Number(row.is_active) === 1,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      school_form_code: null,
+      school_form_name: row.sf_id ? toNullableText(schoolFormLookup.labels.get(Number(schoolFormLookup.codeToId.get(String(row.sf_id || "").trim().toLowerCase()) || 0)) || "", 255) : null,
+      school_form_sf: row.sf_id ? toNullableText(schoolFormLookup.shortLabels.get(Number(schoolFormLookup.codeToId.get(String(row.sf_id || "").trim().toLowerCase()) || 0)) || "", 50) : null,
+    }));
+  }
+
   async function updateLastLogin(userId) {
     try {
       await getPool().query(
@@ -3393,6 +3772,343 @@ function createAuthModule(poolProvider) {
     }
   });
 
+  async function handleSchoolImportPreview(req, res) {
+    const conn = await getPool().getConnection();
+    try {
+      await ensureAnmSchulenTable(conn);
+
+      const csvText = String(req.body?.csv_text || "");
+      const parsedRows = parseAnmSchoolCsv(csvText);
+      const snrs = [...new Set(parsedRows.map((row) => String(row?.snr || "").trim()).filter(Boolean))];
+      const existingRowsBySnr = new Map();
+      const schoolFormLookup = await resolveSchoolFormLookup(conn);
+
+      if (snrs.length) {
+        const placeholders = snrs.map(() => "?").join(", ");
+        const [existingRows] = await conn.query(
+          `SELECT snr, name, plz, ort, strasse, sf_id, db_host, db_name, db_user, db_password_enc, is_active FROM anm_schulen WHERE snr IN (${placeholders})`,
+          snrs,
+        );
+        for (const row of existingRows || []) {
+          const snr = String(row?.snr || "").trim();
+          if (!snr) continue;
+          existingRowsBySnr.set(snr, {
+            snr,
+            name: String(row?.name || "").trim(),
+            plz: String(row?.plz || "").trim(),
+            ort: String(row?.ort || "").trim(),
+            strasse: String(row?.strasse || "").trim(),
+            sf_id: String(row?.sf_id || "").trim(),
+            db_host: String(row?.db_host || "").trim(),
+            db_name: String(row?.db_name || "").trim(),
+            db_user: String(row?.db_user || "").trim(),
+            db_password_enc: String(row?.db_password_enc || "").trim(),
+            is_active: Number(row?.is_active || 0) === 1,
+          });
+        }
+      }
+
+      const previewRows = createSchoolImportPreviewRows(parsedRows, existingRowsBySnr, schoolFormLookup);
+      const session = storeSchoolImportPreview(previewRows);
+      const validRows = previewRows.filter((row) => row.status !== "Fehler");
+      const invalidRows = previewRows.filter((row) => row.status === "Fehler");
+
+      return res.json({
+        preview_token: session.token,
+        expires_at: new Date(session.expires_at).toISOString(),
+        summary: {
+          total_rows: previewRows.length,
+          valid_rows: validRows.length,
+          invalid_rows: invalidRows.length,
+          selected_rows: validRows.filter((row) => row.selected).length,
+        },
+        rows: previewRows.map((row) => ({
+          row_no: row.row_no,
+          snr: row.snr,
+          name: row.name,
+          plz: row.plz,
+          ort: row.ort,
+          strasse: row.strasse,
+          sf_id: row.sf_id,
+          sf_code: row.sf_code,
+          school_form_name: row.school_form_name,
+          db_host: row.db_host,
+          db_name: row.db_name,
+          db_user: row.db_user,
+          db_password_masked: row.db_password_masked,
+          is_active: row.is_active,
+          exists: row.exists,
+          selected: row.selected,
+          status: row.status,
+          errors: row.errors,
+        })),
+      });
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die CSV-Vorschau fuer Schulen ist fehlgeschlagen.");
+    } finally {
+      conn.release();
+    }
+  }
+
+  async function handleSchoolImport(req, res) {
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      await ensureAnmSchulenTable(conn);
+
+      const previewToken = String(req.body?.preview_token || "").trim();
+      const preview = getSchoolImportPreview(previewToken);
+      if (!preview) {
+        const error = new Error("Die Vorschau ist abgelaufen oder nicht mehr vorhanden. Bitte die CSV-Datei erneut laden.");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const selectedRowNos = Array.isArray(req.body?.selected_row_nos)
+        ? req.body.selected_row_nos.map((value) => Number(value || 0)).filter((value) => value > 0)
+        : [];
+      const selectedRowSet = new Set(selectedRowNos);
+      const previewRows = Array.isArray(preview.rows) ? preview.rows : [];
+      const importRows = previewRows.filter((row) => selectedRowSet.has(Number(row?.row_no || 0)) && row?.status !== "Fehler");
+
+      if (!selectedRowSet.size) {
+        const error = new Error("Bitte mindestens eine gueltige Zeile fuer den Import auswaehlen.");
+        error.statusCode = 400;
+        throw error;
+      }
+      if (!importRows.length) {
+        const error = new Error("Es wurden keine gueltigen Vorschau-Zeilen fuer den Import ausgewaehlt.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const schoolFormLookup = await resolveSchoolFormLookup(conn);
+      let createdCount = 0;
+      let updatedCount = 0;
+      let runtimeErrorCount = 0;
+      let skippedCount = 0;
+
+      for (const row of importRows) {
+        const requestedSfCode = String(row?.sf_id || row?.sf_code || "").trim();
+        const sfCode = requestedSfCode
+          ? String(schoolFormLookup.normalizedCodeToCode.get(requestedSfCode.toLowerCase()) || "")
+          : "";
+        if (requestedSfCode && !sfCode) {
+          runtimeErrorCount += 1;
+          skippedCount += 1;
+          continue;
+        }
+        const aktiv = Number(row?.is_active || 0) === 1 ? 1 : 0;
+        const password = String(row?.raw?.db_password_enc || "").trim();
+        const [existingRows] = await conn.query(
+          "SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1",
+          [row.snr],
+        );
+        const exists = Array.isArray(existingRows) && existingRows.length > 0;
+
+        if (exists) {
+          await conn.query(
+            `
+            UPDATE anm_schulen
+            SET name = ?, plz = ?, ort = ?, strasse = ?, sf_id = ?, db_host = ?, db_name = ?, db_user = ?, db_password_enc = ?, is_active = ?
+            WHERE snr = ?
+            `,
+            [row.name, row.plz, row.ort, row.strasse, sfCode || null, row.db_host, row.db_name, row.db_user, password, aktiv, row.snr],
+          );
+          updatedCount += 1;
+        } else {
+          await conn.query(
+            `
+            INSERT INTO anm_schulen (snr, name, plz, ort, strasse, sf_id, db_host, db_name, db_user, db_password_enc, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [row.snr, row.name, row.plz, row.ort, row.strasse, sfCode || null, row.db_host, row.db_name, row.db_user, password, aktiv],
+          );
+          createdCount += 1;
+        }
+      }
+
+      await conn.commit();
+      schoolImportPreviewSessions.delete(previewToken);
+
+      const totalRows = previewRows.length;
+      const invalidCount = previewRows.filter((row) => row.status === "Fehler").length + runtimeErrorCount;
+      skippedCount += totalRows - previewRows.filter((row) => row.status !== "Fehler").length;
+      const bootstrap = await fetchAdminBootstrap();
+
+      return res.status(201).json({
+        ...bootstrap,
+        summary: {
+          total_rows: totalRows,
+          created_count: createdCount,
+          updated_count: updatedCount,
+          imported_count: createdCount + updatedCount,
+          skipped_count: skippedCount,
+          error_count: invalidCount,
+        },
+      });
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      return adminErrorResponse(res, error, "Der Import der Schulen ist fehlgeschlagen.");
+    } finally {
+      conn.release();
+    }
+  }
+
+  router.post("/schulen/import/vorschau", authenticateToken, requireAdmin, handleSchoolImportPreview);
+  router.post("/schulen/import", authenticateToken, requireAdmin, handleSchoolImport);
+
+  router.post("/admin/anm-schools", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      await ensureAnmSchulenTable(conn);
+
+      const snr = toRequiredText(req.body?.snr, "SNR", 6);
+      const name = toRequiredText(req.body?.name, "Name", 255);
+      const plz = toNullableText(req.body?.plz, 20);
+      const ort = toNullableText(req.body?.ort, 100);
+      const strasse = toNullableText(req.body?.strasse, 255);
+      const requestedSfId = toNullableText(req.body?.sf_id, 32);
+      let sfId = requestedSfId;
+      if (requestedSfId) {
+        const schoolFormLookup = await resolveSchoolFormLookup(conn);
+        sfId = String(schoolFormLookup.normalizedCodeToCode.get(String(requestedSfId).toLowerCase()) || "");
+        if (!sfId) {
+          const error = new Error(`Schulform-Code '${requestedSfId}' wurde nicht gefunden.`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+      const dbHost = toNullableText(req.body?.db_host, 255);
+      const dbName = toNullableText(req.body?.db_name, 255);
+      const dbUser = toNullableText(req.body?.db_user, 255);
+      const dbPasswordEnc = String(req.body?.db_password_enc || "").slice(0, 4000);
+      const isActive = toFlag(req.body?.is_active, 1);
+
+      const [existingRows] = await conn.query("SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1", [snr]);
+      if (Array.isArray(existingRows) && existingRows.length) {
+        const error = new Error("Fuer diese SNR existiert bereits ein Eintrag.");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      await conn.query(
+        `
+        INSERT INTO anm_schulen (snr, name, plz, ort, strasse, sf_id, db_host, db_name, db_user, db_password_enc, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [snr, name, plz, ort, strasse, sfId, dbHost, dbName, dbUser, dbPasswordEnc, isActive],
+      );
+
+      await conn.commit();
+      return res.status(201).json(await fetchAdminBootstrap());
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      return adminErrorResponse(res, error, "Die Schule konnte nicht angelegt werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.patch("/admin/anm-schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      await ensureAnmSchulenTable(conn);
+
+      const targetSnr = toRequiredText(req.params.snr, "SNR", 6);
+      const snr = toRequiredText(req.body?.snr, "SNR", 6);
+      const name = toRequiredText(req.body?.name, "Name", 255);
+      const plz = toNullableText(req.body?.plz, 20);
+      const ort = toNullableText(req.body?.ort, 100);
+      const strasse = toNullableText(req.body?.strasse, 255);
+      const requestedSfId = toNullableText(req.body?.sf_id, 32);
+      let sfId = requestedSfId;
+      if (requestedSfId) {
+        const schoolFormLookup = await resolveSchoolFormLookup(conn);
+        sfId = String(schoolFormLookup.normalizedCodeToCode.get(String(requestedSfId).toLowerCase()) || "");
+        if (!sfId) {
+          const error = new Error(`Schulform-Code '${requestedSfId}' wurde nicht gefunden.`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+      const dbHost = toNullableText(req.body?.db_host, 255);
+      const dbName = toNullableText(req.body?.db_name, 255);
+      const dbUser = toNullableText(req.body?.db_user, 255);
+      const dbPasswordEnc = String(req.body?.db_password_enc || "");
+      const isActive = toFlag(req.body?.is_active, 1);
+
+      const [currentRows] = await conn.query("SELECT snr, db_password_enc FROM anm_schulen WHERE snr = ? LIMIT 1", [targetSnr]);
+      const current = Array.isArray(currentRows) ? currentRows[0] : null;
+      if (!current) {
+        const error = new Error("Die Schule wurde nicht gefunden.");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (snr !== targetSnr) {
+        const [duplicateRows] = await conn.query("SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1", [snr]);
+        if (Array.isArray(duplicateRows) && duplicateRows.length) {
+          const error = new Error("Fuer diese SNR existiert bereits ein Eintrag.");
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
+      await conn.query(
+        `
+        UPDATE anm_schulen
+        SET snr = ?, name = ?, plz = ?, ort = ?, strasse = ?, sf_id = ?, db_host = ?, db_name = ?, db_user = ?, db_password_enc = ?, is_active = ?
+        WHERE snr = ?
+        `,
+        [snr, name, plz, ort, strasse, sfId, dbHost, dbName, dbUser, dbPasswordEnc.trim() ? dbPasswordEnc.slice(0, 4000) : String(current.db_password_enc || ""), isActive, targetSnr],
+      );
+
+      await conn.commit();
+      return res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      return adminErrorResponse(res, error, "Die Schule konnte nicht aktualisiert werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.delete("/admin/anm-schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await ensureAnmSchulenTable(conn);
+      const snr = toRequiredText(req.params.snr, "SNR", 6);
+      const [existingRows] = await conn.query("SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1", [snr]);
+      if (!Array.isArray(existingRows) || !existingRows.length) {
+        const error = new Error("Die Schule wurde nicht gefunden.");
+        error.statusCode = 404;
+        throw error;
+      }
+      await conn.query("DELETE FROM anm_schulen WHERE snr = ?", [snr]);
+      return res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Schule konnte nicht geloescht werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.delete("/admin/anm-schools", authenticateToken, requireAdmin, async (_req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await ensureAnmSchulenTable(conn);
+      await conn.query("DELETE FROM anm_schulen");
+      return res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Schulen konnten nicht geloescht werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
   router.post("/admin/schools/import-csv", authenticateToken, requireAdmin, async (req, res) => {
     const conn = await getPool().getConnection();
     try {
@@ -3415,6 +4131,7 @@ function createAuthModule(poolProvider) {
       const duplicateSnrs = new Set();
       const seenSnrs = new Set();
       const preparedRows = [];
+      const skippedEntries = [];
 
       for (const row of rows) {
         const schoolId = String(row.snr || "").trim();
@@ -3429,6 +4146,9 @@ function createAuthModule(poolProvider) {
 
         const name = String(row.name || "").trim();
         const city = String(row.city || "").trim();
+        const plz = String(row.plz || "").trim();
+        const ort = String(row.ort || "").trim();
+        const strasse = String(row.strasse || "").trim();
         const schoolForm = String(row.school_form || "").trim();
 
         if (!name || !city) {
@@ -3442,16 +4162,13 @@ function createAuthModule(poolProvider) {
             `
             SELECT school_form_id
             FROM school_form
-            WHERE code = ? OR name = ? OR sf_kurz = ?
+            WHERE code = ? OR name = ? OR sf_kurz = ? OR sf = ?
             LIMIT 1
             `,
-            [schoolForm, schoolForm, schoolForm]
+            [schoolForm, schoolForm, schoolForm, schoolForm]
           );
           if (formRows && formRows.length > 0) {
             schoolFormId = formRows[0].school_form_id;
-          } else {
-            invalidRows.push(`Zeile ${row.row_no}: Schulform "${schoolForm}" wurde nicht in school_form gefunden.`);
-            continue;
           }
         }
 
@@ -3460,7 +4177,11 @@ function createAuthModule(poolProvider) {
           snr: schoolId,
           name,
           city,
+          plz,
+          ort,
+          strasse,
           school_form_id: schoolFormId,
+          school_form_supplied: Boolean(schoolFormId),
         });
       }
 
@@ -3477,7 +4198,7 @@ function createAuthModule(poolProvider) {
       const existingEntries = [];
       for (const row of preparedRows) {
         const [existingRows] = await conn.query(
-          "SELECT snr, name, city, school_form_id FROM school WHERE snr = ? LIMIT 1",
+          "SELECT snr, name, city, plz, ort, strasse, school_form_id FROM school WHERE snr = ? LIMIT 1",
           [row.snr]
         );
         const existing = existingRows?.[0] || null;
@@ -3486,6 +4207,9 @@ function createAuthModule(poolProvider) {
             snr: String(existing.snr || "").trim(),
             name: row.name,
             city: row.city,
+            plz: row.plz,
+            ort: row.ort,
+            strasse: row.strasse,
             school_form_id: existing.school_form_id,
           });
         }
@@ -3513,35 +4237,42 @@ function createAuthModule(poolProvider) {
         );
         const existing = existingRows?.[0] || null;
         if (existing) {
+          const targetSchoolFormId = row.school_form_supplied ? row.school_form_id : existing.school_form_id;
           await conn.query(
             `
             UPDATE school
-            SET name = ?, city = ?, school_form_id = ?
+            SET name = ?, city = ?, plz = ?, ort = ?, strasse = ?, school_form_id = ?
             WHERE snr = ?
             `,
-            [row.name, row.city, row.school_form_id, row.snr]
+            [row.name, row.city, row.plz, row.ort, row.strasse, targetSchoolFormId, row.snr]
           );
           updatedCount += 1;
           updatedEntries.push({
             snr: row.snr,
             name: row.name,
             city: row.city,
+            plz: row.plz,
+            ort: row.ort,
+            strasse: row.strasse,
           });
           continue;
         }
 
         await conn.query(
           `
-          INSERT INTO school (snr, name, city, school_form_id)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO school (snr, name, city, plz, ort, strasse, school_form_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
           `,
-          [row.snr, row.name, row.city, row.school_form_id]
+          [row.snr, row.name, row.city, row.plz, row.ort, row.strasse, row.school_form_id]
         );
         createdCount += 1;
         createdEntries.push({
           snr: row.snr,
           name: row.name,
           city: row.city,
+          plz: row.plz,
+          ort: row.ort,
+          strasse: row.strasse,
         });
       }
 
@@ -3601,17 +4332,9 @@ function createAuthModule(poolProvider) {
         const dbName = String(row.db_name || "").trim();
         const dbUser = String(row.db_user || "").trim();
         const dbPasswordEnc = String(row.db_password_enc || "").trim();
-        const dbPortRaw = String(row.db_port || "").trim();
-        let dbPort = 3306;
 
         if (!dbHost || !dbName || !dbUser || !dbPasswordEnc) {
           invalidRows.push(`Zeile ${row.row_no}: Unvollstaendige Daten fuer ${schoolId}.`);
-          continue;
-        }
-        try {
-          dbPort = parseOptionalSchoolSourcePort(row.db_port);
-        } catch {
-          invalidRows.push(`Zeile ${row.row_no}: Ungueltiger Port fuer ${schoolId}.`);
           continue;
         }
 
@@ -3621,7 +4344,11 @@ function createAuthModule(poolProvider) {
         );
         const school = schoolRows?.[0] || null;
         if (!school) {
-          invalidRows.push(`Zeile ${row.row_no}: Schulnummer ${schoolId} ist nicht in school vorhanden.`);
+          skippedEntries.push({
+            row_no: Number(row.row_no || 0),
+            snr: schoolId,
+            reason: "SNR nicht in school gefunden",
+          });
           continue;
         }
 
@@ -3630,7 +4357,6 @@ function createAuthModule(poolProvider) {
           snr: schoolId,
           school_name: String(school.name || "").trim(),
           db_host: dbHost,
-          db_port: dbPort,
           db_name: dbName,
           db_user: dbUser,
           db_password_enc: dbPasswordEnc,
@@ -3655,12 +4381,13 @@ function createAuthModule(poolProvider) {
         );
         const existing = existingRows?.[0] || null;
         if (existing) {
+          const targetPort = Number(existing.db_port || 0) > 0 ? Number(existing.db_port) : 3306;
           existingEntries.push({
             source_id: Number(existing.source_id || 0),
             snr: String(existing.snr || "").trim(),
             school_name: row.school_name,
             db_host: String(existing.db_host || "").trim(),
-            db_port: Number(existing.db_port || 0),
+            db_port: targetPort,
             db_name: String(existing.db_name || "").trim(),
             db_user: String(existing.db_user || "").trim(),
             is_active: Number(existing.is_active || 0),
@@ -3690,20 +4417,21 @@ function createAuthModule(poolProvider) {
         );
         const existing = existingRows?.[0] || null;
         if (existing) {
+          const targetPort = Number(existing.db_port || 0) > 0 ? Number(existing.db_port) : 3306;
           await conn.query(
             `
             UPDATE school_source_db
             SET db_host = ?, db_port = ?, db_name = ?, db_user = ?, db_password_enc = ?, is_active = 1
             WHERE source_id = ?
             `,
-            [row.db_host, row.db_port, row.db_name, row.db_user, row.db_password_enc, Number(existing.source_id || 0)],
+            [row.db_host, targetPort, row.db_name, row.db_user, row.db_password_enc, Number(existing.source_id || 0)],
           );
           updatedCount += 1;
           updatedEntries.push({
             snr: row.snr,
             school_name: row.school_name,
             db_host: row.db_host,
-            db_port: row.db_port,
+            db_port: targetPort,
             db_name: row.db_name,
             db_user: row.db_user,
           });
@@ -3723,14 +4451,14 @@ function createAuthModule(poolProvider) {
           )
           VALUES (?, ?, ?, ?, ?, ?, 1)
           `,
-          [row.snr, row.db_host, row.db_port, row.db_name, row.db_user, row.db_password_enc],
+          [row.snr, row.db_host, 3306, row.db_name, row.db_user, row.db_password_enc],
         );
         createdCount += 1;
         createdEntries.push({
           snr: row.snr,
           school_name: row.school_name,
           db_host: row.db_host,
-          db_port: row.db_port,
+          db_port: 3306,
           db_name: row.db_name,
           db_user: row.db_user,
         });
@@ -3738,14 +4466,16 @@ function createAuthModule(poolProvider) {
 
       await conn.commit();
       const bootstrap = await fetchAdminBootstrap();
-      return res.status(201).json({
-        ...bootstrap,
-        created_count: createdCount,
-        updated_count: updatedCount,
-        imported_count: createdCount + updatedCount,
-        created_entries: createdEntries,
-        updated_entries: updatedEntries,
-      });
+        return res.status(201).json({
+          ...bootstrap,
+          created_count: createdCount,
+          updated_count: updatedCount,
+          imported_count: createdCount + updatedCount,
+          skipped_count: skippedEntries.length,
+          created_entries: createdEntries,
+          updated_entries: updatedEntries,
+          skipped_entries: skippedEntries,
+        });
     } catch (error) {
       await conn.rollback().catch(() => {});
       return adminErrorResponse(res, error, "Der CSV-Import der Schulserver-Quellen ist fehlgeschlagen.");
@@ -6389,7 +7119,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  return { router, authenticateToken, requireDashboardPermission };
+  return { router, authenticateToken, requireAdmin, requireDashboardPermission };
 }
 
 module.exports = { createAuthModule };

@@ -7,11 +7,18 @@ const YAML = require("yamljs");
 const {
   createAuthModule,
 } = require("./authModule");
+const createAnmeldeverfahrenRouter = require("./routes/anmeldeverfahren");
+const createAnmelderundenRouter = require("./routes/anmelderunden");
+const createAbgleichRouter = require("./routes/abgleich");
+const createImporteRouter = require("./routes/importe");
+const createKapazitaetenRoutes = require("./routes/kapazitaeten");
 require("dotenv").config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || "10mb";
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 
 // --- Swagger UI Setup ---
 const swaggerDocument = YAML.load(path.join(__dirname, "openapi.yaml"));
@@ -244,6 +251,7 @@ async function autoConfigurePoolFromEnv() {
 const {
   router: authRouter,
   authenticateToken,
+  requireAdmin,
   requireDashboardPermission,
 } = createAuthModule(getPool);
 
@@ -309,6 +317,18 @@ app.post("/api/connection/test", async (req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api", ensureDatabaseConfigured, authenticateToken);
+app.use("/api/anmeldeverfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api", createAnmelderundenRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api/abgleich", createAbgleichRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api/importe", createImporteRouter({ authenticateToken, requireAdmin, getPool }));
+
+// Dynamischer Pool-Proxy fuer die Kapazitaeten-Routen
+const poolProxy = {
+  query: (...args) => currentPool.query(...args),
+  execute: (...args) => currentPool.execute(...args),
+  getConnection: (...args) => currentPool.getConnection(...args),
+};
+app.use("/api", createKapazitaetenRoutes(poolProxy));
 
 /**
  * GET /api/meta/schools?termId=123&snapshotDate=YYYY-MM-DD
@@ -358,7 +378,7 @@ app.get("/api/meta/schools", async (req, res) => {
 
     const [rows] = await currentPool.query(
       `
-      SELECT DISTINCT s.snr, s.name, s.city
+      SELECT DISTINCT s.snr, s.name, s.city, s.plz, s.ort, s.strasse
       FROM school s
       JOIN snapshot sp ON sp.snr = s.snr
       JOIN term t ON t.term_id = sp.term_id
