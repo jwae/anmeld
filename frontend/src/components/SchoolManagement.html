@@ -7,8 +7,8 @@
     <section class="user-management-panel school-management-form-card">
       <div class="user-management-panel-head">
         <div class="school-management-form-title-block">
-          <h3>{{ selectedManagementSchoolSourceId ? "Schulserver-Quelle aendern" : "Neue Schule hinzufuegen" }}</h3>
-          <p>Pro Schule wird genau eine Quelle fuer den Snapshot-Abruf gepflegt.</p>
+          <h3>{{ selectedManagementSchoolSourceId ? "Schule bearbeiten" : "Neue Schule hinzufuegen" }}</h3>
+          <p>Die Verwaltung arbeitet hier direkt auf der Tabelle <code>anm_schulen</code>.</p>
         </div>
         <div class="school-management-form-actions">
           <button
@@ -40,60 +40,66 @@
 
       <div class="user-management-form-grid school-management-form-grid">
         <label class="field-block">
-          <span class="field-label">Schule</span>
-          <div class="school-management-school-picker">
-            <button
-              class="school-management-school-select"
-              type="button"
-              @click="openSchoolSelectionModal"
-              :disabled="managementSaving"
-            >
-              <span v-if="selectedSchoolForSource">
-                {{ selectedSchoolForSource.snr }} - {{ selectedSchoolForSource.name || "Ohne Name" }}
-              </span>
-              <span v-else>Schule waehlen</span>
-            </button>
-          </div>
+          <span class="field-label">SNR</span>
+          <input v-model="schoolSourceForm.snr" maxlength="6" :disabled="managementSaving" />
         </label>
 
         <label class="field-block">
-          <span class="field-label">Server (https://Server:Port)</span>
+          <span class="field-label">Name</span>
+          <input v-model="schoolSourceForm.name" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">PLZ</span>
+          <input v-model="schoolSourceForm.plz" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">Ort</span>
+          <input v-model="schoolSourceForm.ort" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">Strasse</span>
+          <input v-model="schoolSourceForm.strasse" :disabled="managementSaving" />
+        </label>
+      </div>
+
+      <div class="user-management-form-grid school-management-form-grid">
+        <label class="field-block">
+          <span class="field-label">Schulform (sf_id)</span>
+          <input v-model="schoolSourceForm.sf_id" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">db_host</span>
           <input v-model="schoolSourceForm.db_host" :disabled="managementSaving" />
-          
         </label>
 
         <label class="field-block">
-          <span class="field-label">Datenbank</span>
+          <span class="field-label">db_name</span>
           <input v-model="schoolSourceForm.db_name" :disabled="managementSaving" />
         </label>
 
         <label class="field-block">
-          <span class="field-label">DB-Benutzer</span>
+          <span class="field-label">db_user</span>
           <input v-model="schoolSourceForm.db_user" :disabled="managementSaving" />
         </label>
 
         <label class="field-block">
-          <span class="field-label">{{ selectedManagementSchoolSourceId ? "Neues Passwort (optional)" : "Passwort" }}</span>
+          <span class="field-label">db_password_enc</span>
           <input v-model="schoolSourceForm.db_password_enc" type="password" :disabled="managementSaving" />
         </label>
       </div>
 
       <label class="user-management-checkbox">
         <input v-model="schoolSourceForm.is_active" type="checkbox" :disabled="managementSaving" />
-        <span>Quelle aktiv</span>
+        <span>is_active</span>
       </label>
 
       <div class="user-management-inline-actions">
         <button class="btn-primary" type="button" @click="saveManagementSchoolSource" :disabled="managementSaving">
           {{ managementSaving ? "Speichere..." : (selectedManagementSchoolSourceId ? "Aenderungen speichern" : "Schule hinzufuegen") }}
-        </button>
-        <button
-          class="btn-secondary"
-          type="button"
-          @click="testManagementSchoolSource"
-          :disabled="managementSaving || !canTestSchoolSource"
-        >
-          Zugangsdaten pruefen
         </button>
         <div class="school-management-inline-actions-right">
           <button
@@ -115,7 +121,7 @@
             class="btn-secondary school-management-delete-all"
             type="button"
             @click="deleteAllManagementSchools"
-            :disabled="managementSaving || !managementSchools.length"
+            :disabled="managementSaving || !managementSchoolSources.length"
           >
             Alle Schulen loeschen
           </button>
@@ -141,41 +147,8 @@
     <section class="user-management-list-card school-management-table-card">
       <div class="user-management-panel-head">
         <div>
-          <h3>Liste der Schulserver</h3>
-          <p>Mit SNR, gekuerztem Schulnamen, Ort, Host und Status.</p>
-        </div>
-        <div class="school-management-table-head-actions">
-          <input
-            ref="schoolImportInput"
-            type="file"
-            accept=".csv,text/csv"
-            class="school-management-import-input"
-            @change="handleSchoolImportFileSelected"
-          />
-          <button
-            class="btn-secondary school-management-table-head-action"
-            type="button"
-            @click="testAllManagementSchoolSources"
-            :disabled="managementSaving"
-          >
-            Verbindungen testen
-          </button>
-          <button
-            class="btn-secondary school-management-table-head-action"
-            type="button"
-            @click="openSchoolImportPicker"
-            :disabled="managementSaving"
-          >
-            Schulserver importieren
-          </button>
-          <button
-            class="btn-secondary school-management-table-head-action school-management-delete-all"
-            type="button"
-            @click="deleteAllManagementSchoolSources"
-            :disabled="managementSaving || !managementSchoolSources.length"
-          >
-            Alle Schulserver loeschen
-          </button>
+          <h3>Liste der Schulen</h3>
+          <p>Anzeige der Eintraege aus <code>anm_schulen</code>.</p>
         </div>
       </div>
 
@@ -185,59 +158,47 @@
             <tr>
               <th>Nr.</th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('snr')">SNR <span v-if="sortIndicatorBadge('snr')" class="school-management-sort-indicator">{{ sortIndicatorBadge("snr") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('school_name')">Schulname <span v-if="sortIndicatorBadge('school_name')" class="school-management-sort-indicator">{{ sortIndicatorBadge("school_name") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('city')">Ort <span v-if="sortIndicatorBadge('city')" class="school-management-sort-indicator">{{ sortIndicatorBadge("city") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('name')">Name <span v-if="sortIndicatorBadge('name')" class="school-management-sort-indicator">{{ sortIndicatorBadge("name") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('plz')">PLZ <span v-if="sortIndicatorBadge('plz')" class="school-management-sort-indicator">{{ sortIndicatorBadge("plz") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('ort')">Ort <span v-if="sortIndicatorBadge('ort')" class="school-management-sort-indicator">{{ sortIndicatorBadge("ort") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('strasse')">Strasse <span v-if="sortIndicatorBadge('strasse')" class="school-management-sort-indicator">{{ sortIndicatorBadge("strasse") }}</span></button></th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('school_form_sf')">SF <span v-if="sortIndicatorBadge('school_form_sf')" class="school-management-sort-indicator">{{ sortIndicatorBadge("school_form_sf") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_host')">Host <span v-if="sortIndicatorBadge('db_host')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_host") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_name')">Datenbank <span v-if="sortIndicatorBadge('db_name')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_name") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_user')">DB-Benutzer <span v-if="sortIndicatorBadge('db_user')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_user") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('is_active')">Status <span v-if="sortIndicatorBadge('is_active')" class="school-management-sort-indicator">{{ sortIndicatorBadge("is_active") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('server_status')">Online <span v-if="sortIndicatorBadge('server_status')" class="school-management-sort-indicator">{{ sortIndicatorBadge("server_status") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_status')">DB <span v-if="sortIndicatorBadge('db_status')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_status") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_host')">db_host <span v-if="sortIndicatorBadge('db_host')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_host") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_name')">db_name <span v-if="sortIndicatorBadge('db_name')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_name") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_user')">db_user <span v-if="sortIndicatorBadge('db_user')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_user") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_password_enc')">db_password_enc <span v-if="sortIndicatorBadge('db_password_enc')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_password_enc") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('is_active')">Aktiv <span v-if="sortIndicatorBadge('is_active')" class="school-management-sort-indicator">{{ sortIndicatorBadge("is_active") }}</span></button></th>
               <th>Aktionen</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="(source, index) in sortedManagementSchoolSources"
-              :key="`table-school-source-${source.source_id}`"
+              :key="`table-school-source-${source.snr}`"
               :class="{ 'school-management-row-active': source.is_active }"
             >
               <td>{{ index + 1 }}</td>
               <td>{{ source.snr }}</td>
-              <td class="school-management-name" :title="source.school_name || 'Ohne Name'">{{ formatSchoolSourceName(source.school_name) }}</td>
-              <td>{{ source.city || "-" }}</td>
+              <td class="school-management-name" :title="source.name || source.school_name || 'Ohne Name'">{{ formatSchoolSourceName(source.name || source.school_name) }}</td>
+              <td>{{ source.plz || "-" }}</td>
+              <td>{{ source.ort || "-" }}</td>
+              <td>{{ source.strasse || "-" }}</td>
               <td>{{ source.school_form_sf || "-" }}</td>
               <td>{{ source.db_host }}</td>
               <td>{{ source.db_name }}</td>
               <td>{{ source.db_user }}</td>
+              <td :title="source.db_password_enc || '-'">{{ formatSchoolSourceName(source.db_password_enc) }}</td>
               <td>
                 <span class="user-management-state" :class="{ 'is-inactive': !source.is_active }">
-                  {{ source.is_active ? "aktiv" : "inaktiv" }}
+                  {{ source.is_active ? "Aktiv" : "Inaktiv" }}
                 </span>
-              </td>
-              <td>
-                <span
-                  class="school-status-dot"
-                  :class="statusDotClass(getServerStatus(source))"
-                  :title="statusDotLabel(getServerStatus(source), 'Online')"
-                  :aria-label="statusDotLabel(getServerStatus(source), 'Online')"
-                ></span>
-              </td>
-              <td>
-                <span
-                  class="school-status-dot"
-                  :class="statusDotClass(getDatabaseStatus(source))"
-                  :title="statusDotLabel(getDatabaseStatus(source), 'Datenbank')"
-                  :aria-label="statusDotLabel(getDatabaseStatus(source), 'Datenbank')"
-                ></span>
               </td>
               <td>
                 <div class="school-management-actions">
                   <button
                     class="btn-secondary"
                     type="button"
-                    @click="editManagementSchoolSource(source.source_id)"
+                    @click="editManagementSchoolSource(source.snr)"
                     :disabled="managementSaving"
                     title="Schule aendern"
                     aria-label="Schule aendern"
@@ -254,15 +215,12 @@
                   >
                     <i class="bi bi-trash" aria-hidden="true"></i>
                   </button>
-                  <button class="btn-secondary" type="button" @click="toggleManagementSchoolSourceActive(source)" :disabled="managementSaving">
-                    {{ source.is_active ? "Deaktivieren" : "Aktivieren" }}
-                  </button>
                 </div>
               </td>
             </tr>
             <tr v-if="!sortedManagementSchoolSources.length">
               <td colspan="13" class="school-management-table-empty">
-                Noch keine Dashboard-Schulen angelegt.
+                Noch keine Schulen in anm_schulen vorhanden.
               </td>
             </tr>
           </tbody>
@@ -301,7 +259,7 @@
           </label>
         </div>
 
-        <div class="school-management-modal-list">
+        <div class="school-management-modal-list school-management-modal-list-preview">
           <table v-if="filteredAvailableSchoolsForSource.length" class="school-management-modal-table">
             <thead>
               <tr>
@@ -341,47 +299,29 @@
         <div class="school-management-modal-head">
           <div>
             <h3>CSV-Vorschau (Schulen)</h3>
-            <p>Die Datei <strong>{{ schoolTableImportFileName }}</strong> enthaelt {{ schoolTableImportPreviewData.length }} gueltige Zeile(n).</p>
+            <p>Die Datei <strong>{{ schoolTableImportFileName }}</strong> enthaelt {{ schoolTableImportSummary.total_rows }} gelesene Zeile(n).</p>
+            <p>{{ schoolTableImportSummary.valid_rows }} gueltig, {{ schoolTableImportSummary.invalid_rows }} fehlerhaft, {{ schoolTableImportSummary.selected_rows }} ausgewaehlt.</p>
           </div>
           <button class="btn-secondary" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
             Schliessen
           </button>
         </div>
 
-        <div class="school-management-import-preview-options">
-          <label
-            class="school-management-import-overwrite-toggle"
-            :title="schoolTableImportOverwriteExisting
-              ? 'Ein = Importiere alle Schulen mit Haekchen und ueberschreibe vorhandene'
-              : 'Aus = Importiere nur neue Schulen mit Haekchen'"
-          >
-            <input
-              v-model="schoolTableImportOverwriteExisting"
-              type="checkbox"
-              class="school-management-import-overwrite-toggle-input"
-              :disabled="managementSaving"
-            />
-            <span class="school-management-import-overwrite-toggle-switch" aria-hidden="true"></span>
-            <span class="school-management-import-overwrite-toggle-label">Daten ueberschreiben</span>
-          </label>
-        </div>
-
-        <transition name="feedback-fade" mode="out-in">
-          <div
-            v-if="localFeedbackError"
-            class="feedback-panel feedback-panel-error school-management-modal-feedback"
-          >
-            <p class="error">{{ localFeedbackError }}</p>
-          </div>
-          <div
-            v-else-if="localFeedbackNotice"
-            class="feedback-panel feedback-panel-success school-management-modal-feedback"
-          >
-            <p>{{ localFeedbackNotice }}</p>
-          </div>
-        </transition>
-
-        <div class="school-management-modal-list">
+        <div class="school-management-modal-list school-management-modal-list-preview">
+          <transition name="feedback-fade" mode="out-in">
+            <div
+              v-if="localFeedbackError"
+              class="feedback-panel feedback-panel-error school-management-modal-feedback"
+            >
+              <p class="error">{{ localFeedbackError }}</p>
+            </div>
+            <div
+              v-else-if="localFeedbackNotice"
+              class="feedback-panel feedback-panel-success school-management-modal-feedback"
+            >
+              <p>{{ localFeedbackNotice }}</p>
+            </div>
+          </transition>
           <table class="school-management-modal-table">
             <thead>
               <tr>
@@ -396,11 +336,20 @@
                   </button>
                 </th>
                 <th>Zeile</th>
+                <th>Status</th>
+                <th>Fehler</th>
                 <th>SNR</th>
                 <th>Name</th>
+                <th>PLZ</th>
                 <th>Ort</th>
-                <th>Schulform</th>
-                <th>Vorhanden</th>
+                <th>Strasse</th>
+                <th>SF-ID</th>
+                <th>SF-ID</th>
+                <th>Host</th>
+                <th>DB</th>
+                <th>User</th>
+                <th>Passwort</th>
+                <th>Aktiv</th>
               </tr>
             </thead>
             <tbody>
@@ -408,20 +357,32 @@
                 v-for="row in schoolTableImportPreviewData"
                 :key="`school-table-import-preview-${row.row_no}-${row.snr}`"
                 class="school-management-modal-row school-management-import-preview-row"
+                :class="{ 'is-invalid': row.status === 'Fehler' }"
               >
                 <td>
-                  <input v-model="row.selected" type="checkbox" :disabled="managementSaving" />
+                  <input v-model="row.selected" type="checkbox" :disabled="managementSaving || row.status === 'Fehler'" @change="refreshSchoolTableImportSelectionSummary" />
                 </td>
                 <td>{{ row.row_no }}</td>
-                <td>{{ row.snr || "-" }}</td>
-                <td :title="row.name || '-'">{{ row.name || "-" }}</td>
-                <td>{{ row.city || "-" }}</td>
-                <td>{{ row.school_form || "-" }}</td>
                 <td>
-                  <span class="user-management-state" :class="row.exists ? 'is-active' : 'is-inactive'">
-                    {{ row.exists ? 'Ja' : 'Neu' }}
+                  <span class="user-management-state" :class="row.status === 'Fehler' ? 'is-inactive' : (row.exists ? 'is-active' : 'is-inactive')">
+                    {{ row.status }}
                   </span>
                 </td>
+                <td :title="Array.isArray(row.errors) ? row.errors.join(', ') : ''">
+                  {{ Array.isArray(row.errors) && row.errors.length ? row.errors.join(", ") : "-" }}
+                </td>
+                <td>{{ row.snr || "-" }}</td>
+                <td :title="row.name || '-'">{{ row.name || "-" }}</td>
+                <td>{{ row.plz || "-" }}</td>
+                <td>{{ row.ort || "-" }}</td>
+                <td :title="row.strasse || '-'">{{ row.strasse || "-" }}</td>
+                <td>{{ row.sf_code || "-" }}</td>
+                <td>{{ row.sf_id || "-" }}</td>
+                <td :title="row.db_host || '-'">{{ row.db_host || "-" }}</td>
+                <td>{{ row.db_name || "-" }}</td>
+                <td>{{ row.db_user || "-" }}</td>
+                <td>{{ row.db_password_masked || "-" }}</td>
+                <td>{{ Number(row.is_active) === 1 ? "Ja" : "Nein" }}</td>
               </tr>
             </tbody>
           </table>
@@ -435,7 +396,7 @@
             class="btn-primary"
             type="button"
             @click="confirmSchoolTableImport"
-            :disabled="managementSaving || !schoolTableImportPreviewData.some((row) => row?.selected)"
+            :disabled="managementSaving || !schoolTableImportPreviewData.some((row) => row?.selected && row?.status !== 'Fehler')"
           >
             Import starten
           </button>
@@ -451,7 +412,8 @@
       <section class="school-management-modal school-management-import-preview-modal" role="dialog" aria-modal="true" aria-label="CSV-Vorschau">
         <div class="school-management-modal-head">
           <div>
-            <h3>CSV-Vorschau (Schulserver-Quellen)</h3>
+            <h3>Zugangsdaten für Schulserver importieren.</h3>
+            <p>Es werden nur Zugangsdaten für schon vorhandene Schulen mit SNr. importiert.</p>
             <p>Die Datei <strong>{{ schoolImportFileName }}</strong> enthaelt {{ schoolImportPreviewData.length }} gueltige Zeile(n).</p>
           </div>
           <button class="btn-secondary" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
@@ -477,22 +439,21 @@
           </label>
         </div>
 
-        <transition name="feedback-fade" mode="out-in">
-          <div
-            v-if="localFeedbackError"
-            class="feedback-panel feedback-panel-error school-management-modal-feedback"
-          >
-            <p class="error">{{ localFeedbackError }}</p>
-          </div>
-          <div
-            v-else-if="localFeedbackNotice"
-            class="feedback-panel feedback-panel-success school-management-modal-feedback"
-          >
-            <p>{{ localFeedbackNotice }}</p>
-          </div>
-        </transition>
-
         <div class="school-management-modal-list">
+          <transition name="feedback-fade" mode="out-in">
+            <div
+              v-if="localFeedbackError"
+              class="feedback-panel feedback-panel-error school-management-modal-feedback"
+            >
+              <p class="error">{{ localFeedbackError }}</p>
+            </div>
+            <div
+              v-else-if="localFeedbackNotice"
+              class="feedback-panel feedback-panel-success school-management-modal-feedback"
+            >
+              <p>{{ localFeedbackNotice }}</p>
+            </div>
+          </transition>
           <table class="school-management-modal-table">
             <thead>
               <tr>
@@ -583,17 +544,19 @@
           <section class="school-management-import-info-card">
             <h4>Schulen</h4>
             <p>Pflichtspalten:</p>
-            <pre class="school-management-import-info-code">SNR;Name;Ort;Schulform</pre>
-            <p>`Ort` kann auch als `city` kommen, `Schulform` auch als `school_form`.</p>
+            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf_id;db_host;db_name;db_user;db_password_enc;is_active</pre>
+            <p>Pflichtwerte pro Zeile: `snr` und `name`.</p>
+            <p>Vor dem Import wird jede Zeile geprueft und als `Neu`, `Aenderung` oder `Fehler` markiert.</p>
             <p>Beispiel:</p>
-            <pre class="school-management-import-info-code">123456;Goethe-Gymnasium;Koeln;GY</pre>
+            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf_id;db_host;db_name;db_user;db_password_enc;is_active
+123456;Goethe-Gymnasium;50667;Koeln;Domkloster 4;3;https://svws.example.de;svwsdb;svws_user;***;1</pre>
           </section>
 
           <section class="school-management-import-info-card">
             <h4>Schulserver</h4>
             <p>Pflichtspalten:</p>
             <pre class="school-management-import-info-code">snr;db_host;db_name;db_user;db_passwd</pre>
-            <p>`db_password_enc` wird ebenfalls akzeptiert. `db_port` bleibt als Legacy-Spalte optional.</p>
+            <p>`db_password_enc` wird ebenfalls akzeptiert. Ein eigener `db_port` wird nicht mehr eingelesen.</p>
             <p>Beispiel:</p>
             <pre class="school-management-import-info-code">123456;https://server.example.de:8443;svwsdb;svws_user;geheim</pre>
           </section>
@@ -620,16 +583,16 @@
         </div>
 
         <div class="school-management-danger-summary">
-          <strong>{{ managementSchools.length }} Schule(n)</strong>
-          <span>werden zusammen mit ihren Verknuepfungen entfernt.</span>
+          <strong>{{ managementSchoolSources.length }} Schule(n)</strong>
+          <span>werden aus <code>anm_schulen</code> entfernt.</span>
         </div>
 
         <div class="school-management-danger-list">
           <p>Folgen dieser Aktion:</p>
           <ul>
-            <li>Alle Eintraege aus `school` werden geloescht.</li>
-            <li>Alle Schulserver-Quellen werden entfernt.</li>
-            <li>Alle zugehoerigen Snapshots werden mit geloescht.</li>
+            <li>Alle Eintraege aus `anm_schulen` werden geloescht.</li>
+            <li>Die Tabellen `school` und `school_source_db` bleiben unberuehrt.</li>
+            <li>Snapshots werden dabei nicht geloescht.</li>
           </ul>
         </div>
 
@@ -653,7 +616,7 @@
         <div class="school-management-modal-head">
           <div>
             <h3>{{ importResultDialogTitle }}</h3>
-            <p>Ergebnis des CSV-Imports fuer Schulserver-Quellen.</p>
+            <p>Ergebnis des CSV-Imports fuer den Bereich Schulen.</p>
           </div>
           <button class="btn-secondary" type="button" @click="closeImportResultDialog">
             Schliessen

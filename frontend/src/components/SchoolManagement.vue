@@ -31,7 +31,7 @@ const selectedManagementSchoolSourceId = ref<string>("");
 const localFeedbackError = ref<string>("");
 const localFeedbackNotice = ref<string>("");
 let localFeedbackTimeoutId: any = null;
-const sortKey = ref<string>("school_name");
+const sortKey = ref<string>("name");
 const sortDirection = ref<string>("asc");
 const schoolSelectionModalOpen = ref<boolean>(false);
 const helpOverlayOpen = ref<boolean>(false);
@@ -42,18 +42,29 @@ const schoolImportPreviewModalOpen = ref<boolean>(false);
 const schoolImportPreviewData = ref<any[]>([]);
 const schoolImportRawCsv = ref<string>("");
 const schoolImportFileName = ref<string>("");
-const schoolImportOverwriteExisting = ref<boolean>(false);
+const schoolImportOverwriteExisting = ref<boolean>(true);
 const schoolTableImportPreviewModalOpen = ref<boolean>(false);
 const schoolTableImportPreviewData = ref<any[]>([]);
 const schoolTableImportFileName = ref<string>("");
 const schoolTableImportRawCsv = ref<string>("");
 const schoolTableImportOverwriteExisting = ref<boolean>(false);
+const schoolTableImportPreviewToken = ref<string>("");
+const schoolTableImportSummary = ref({
+  total_rows: 0,
+  valid_rows: 0,
+  invalid_rows: 0,
+  selected_rows: 0,
+});
 const deleteAllSchoolsConfirmOpen = ref<boolean>(false);
 const importInfoOverlayOpen = ref<boolean>(false);
 const schoolSourceForm = reactive({
   snr: "",
+  name: "",
+  plz: "",
+  ort: "",
+  strasse: "",
+  sf_id: "",
   db_host: "",
-  db_port: 3306,
   db_name: "",
   db_user: "",
   db_password_enc: "",
@@ -66,10 +77,10 @@ const schoolSelectionFilters = reactive({
 });
 const currentTestStatusBySourceId = reactive<Record<number, { server_status: string; db_status: string }>>({});
 const helpOverlayItems: string[] = [
-  "Hier werden die Schulserver-Quellen fuer den Snapshot-Abruf gepflegt.",
-  "Neue Schulen lassen sich oben anlegen, bestehende Eintraege in der Tabelle aendern, aktivieren oder loeschen.",
-  "Verbindungen testen prueft alle aktiven Schulen und faerbt danach die Punkte bei Online und DB.",
-  "Im Feld Server wird der komplette SVWS-Zielhost eingetragen, bei Bedarf inklusive Protokoll und Port, z. B. https://svws.example.de:8443.",
+  "Hier werden die Eintraege aus anm_schulen gepflegt.",
+  "Neue Schulen lassen sich oben anlegen, bestehende Eintraege in der Tabelle bearbeiten oder loeschen.",
+  "Die Liste zeigt SNR, Name, Adresse, Schulform sowie die hinterlegten DB-Felder.",
+  "Der CSV-Import arbeitet ebenfalls direkt gegen anm_schulen.",
 ];
 
 function normalizeSchoolSourcePort(value: unknown): number {
@@ -192,20 +203,24 @@ function formatImportPreviewSchoolName(value: string | null | undefined): string
 function buildSchoolSourcePayload(source: any) {
   return {
     snr: String(source?.snr || "").trim(),
+    name: String(source?.name || "").trim(),
+    plz: String(source?.plz || "").trim(),
+    ort: String(source?.ort || "").trim(),
+    strasse: String(source?.strasse || "").trim(),
+    sf_id: String(source?.sf_id || "").trim(),
     db_host: String(source?.db_host || "").trim(),
-    db_port: normalizeSchoolSourcePort(source?.db_port),
     db_name: String(source?.db_name || "").trim(),
     db_user: String(source?.db_user || "").trim(),
     db_password_enc: String(source?.db_password_enc || "").trim(),
-    is_active: true,
+    is_active: Boolean(source?.is_active),
   };
 }
 
 async function persistSchoolSource(payload: any, sourceId?: string | number | null) {
   const hasSourceId = Boolean(String(sourceId || "").trim());
   const url = hasSourceId
-    ? `/api/auth/admin/school-sources/${sourceId}`
-    : "/api/auth/admin/school-sources";
+    ? `/api/auth/admin/anm-schools/${encodeURIComponent(String(sourceId))}`
+    : "/api/auth/admin/anm-schools";
   const method = hasSourceId ? "patch" : "post";
   return (apiClient as any)[method](url, payload, {
     headers: managementAuthHeaders(),
@@ -296,8 +311,12 @@ function clearObsoleteCurrentStatuses(sources: any[]) {
 
 function resetSchoolSourceForm() {
   schoolSourceForm.snr = "";
+  schoolSourceForm.name = "";
+  schoolSourceForm.plz = "";
+  schoolSourceForm.ort = "";
+  schoolSourceForm.strasse = "";
+  schoolSourceForm.sf_id = "";
   schoolSourceForm.db_host = "";
-  schoolSourceForm.db_port = 3306;
   schoolSourceForm.db_name = "";
   schoolSourceForm.db_user = "";
   schoolSourceForm.db_password_enc = "";
@@ -466,17 +485,15 @@ function selectSchoolForSource(school: any) {
 }
 
 function validateManagementSchoolSourceForm(): string {
-  if (!schoolSourceForm.snr) return "Bitte eine Schule auswaehlen.";
-  if (!String(schoolSourceForm.db_host || "").trim()) return "Server (https://Server:Port) ist erforderlich.";
-  if (!String(schoolSourceForm.db_name || "").trim()) return "Datenbank ist erforderlich.";
-  if (!String(schoolSourceForm.db_user || "").trim()) return "DB-Benutzer ist erforderlich.";
+  if (!String(schoolSourceForm.snr || "").trim()) return "SNR ist erforderlich.";
+  if (!String(schoolSourceForm.name || "").trim()) return "Name ist erforderlich.";
 
   const schoolId = String(schoolSourceForm.snr || "").trim();
   const duplicate = props.managementSchoolSources.some((source) =>
     String(source.snr || "").trim() === schoolId &&
-    String(source.source_id) !== String(selectedManagementSchoolSourceId.value || ""),
+    String(source.snr || "").trim() !== String(selectedManagementSchoolSourceId.value || "").trim(),
   );
-  if (duplicate) return "Fuer diese Schule existiert bereits eine Schulserver-Quelle.";
+  if (duplicate) return "Fuer diese SNR existiert bereits eine Schule.";
 
   return "";
 }
@@ -491,12 +508,16 @@ watch(selectedManagementSchoolSourceId, (sourceId) => {
     return;
   }
 
-  const source = props.managementSchoolSources.find((entry) => String(entry.source_id) === String(sourceId));
+  const source = props.managementSchoolSources.find((entry) => String(entry.snr || "").trim() === String(sourceId || "").trim());
   if (!source) return;
 
   schoolSourceForm.snr = source.snr ? String(source.snr) : "";
+  schoolSourceForm.name = source.name || source.school_name || "";
+  schoolSourceForm.plz = source.plz || "";
+  schoolSourceForm.ort = source.ort || "";
+  schoolSourceForm.strasse = source.strasse || "";
+  schoolSourceForm.sf_id = source.sf_id ? String(source.sf_id) : "";
   schoolSourceForm.db_host = source.db_host || "";
-  schoolSourceForm.db_port = normalizeSchoolSourcePort(source.db_port);
   schoolSourceForm.db_name = source.db_name || "";
   schoolSourceForm.db_user = source.db_user || "";
   schoolSourceForm.db_password_enc = "";
@@ -507,17 +528,19 @@ watch(
   () => props.managementSchoolSources,
   (sources) => {
     if (!selectedManagementSchoolSourceId.value) return;
-    const source = sources.find(
-      (entry) => String(entry.source_id) === String(selectedManagementSchoolSourceId.value),
-    );
+    const source = sources.find((entry) => String(entry.snr || "").trim() === String(selectedManagementSchoolSourceId.value || "").trim());
     if (!source) {
       resetSchoolSourceForm();
       return;
     }
 
     schoolSourceForm.snr = source.snr ? String(source.snr) : "";
+    schoolSourceForm.name = source.name || source.school_name || "";
+    schoolSourceForm.plz = source.plz || "";
+    schoolSourceForm.ort = source.ort || "";
+    schoolSourceForm.strasse = source.strasse || "";
+    schoolSourceForm.sf_id = source.sf_id ? String(source.sf_id) : "";
     schoolSourceForm.db_host = source.db_host || "";
-    schoolSourceForm.db_port = normalizeSchoolSourcePort(source.db_port);
     schoolSourceForm.db_name = source.db_name || "";
     schoolSourceForm.db_user = source.db_user || "";
     schoolSourceForm.is_active = !!source.is_active;
@@ -574,23 +597,19 @@ async function saveManagementSchoolSource() {
       ? (resp.data || {})
       : await fetchManagementBootstrap();
 
-    if (!selectedManagementSchoolSourceId.value && !resp.data?.created_source) {
-      throw new Error("Die neue Schulserver-Quelle wurde vom Server nicht bestaetigt.");
-    }
-
     emit("bootstrap-updated", bootstrap);
     emitFeedback(
       "",
       selectedManagementSchoolSourceId.value
-        ? "Schulserver-Quelle aktualisiert."
-        : "Schulserver-Quelle angelegt.",
+        ? "Schule aktualisiert."
+        : "Schule angelegt.",
     );
     resetSchoolSourceForm();
   } catch (e: any) {
     emitFeedback(
       e?.response?.data?.error ||
       e?.message ||
-      "Die Schulserver-Quelle konnte nicht gespeichert werden.",
+      "Die Schule konnte nicht gespeichert werden.",
       "",
     );
   } finally {
@@ -600,26 +619,26 @@ async function saveManagementSchoolSource() {
 
 async function deleteManagementSchoolSource(source: any) {
   if (!source) return;
-  if (!window.confirm(`Schulserver-Quelle fuer "${source.school_name || source.snr}" wirklich loeschen?`)) return;
+  if (!window.confirm(`Schule "${source.name || source.school_name || source.snr}" wirklich loeschen?`)) return;
 
   managementSaving.value = true;
   emitFeedback("", "");
 
   try {
-    const resp = await apiClient.delete(`/api/auth/admin/school-sources/${source.source_id}`, {
+    const resp = await apiClient.delete(`/api/auth/admin/anm-schools/${encodeURIComponent(String(source.snr || ""))}`, {
       headers: managementAuthHeaders(),
     });
     const bootstrap = Array.isArray(resp.data?.school_sources)
       ? (resp.data || {})
       : await fetchManagementBootstrap();
     emit("bootstrap-updated", bootstrap);
-    emitFeedback("", "Schulserver-Quelle geloescht.");
+    emitFeedback("", "Schule geloescht.");
     resetSchoolSourceForm();
   } catch (e: any) {
     emitFeedback(
       e?.response?.data?.error ||
       e?.message ||
-      "Die Schulserver-Quelle konnte nicht geloescht werden.",
+      "Die Schule konnte nicht geloescht werden.",
       "",
     );
   } finally {
@@ -630,31 +649,29 @@ async function deleteManagementSchoolSource(source: any) {
 async function deleteAllManagementSchoolSources() {
   const totalSources = props.managementSchoolSources.length;
   if (!totalSources) {
-    emitFeedback("Es sind keine Dashboard-Schulen zum Loeschen vorhanden.", "");
+    emitFeedback("Es sind keine Schulen zum Loeschen vorhanden.", "");
     return;
   }
-  if (!window.confirm(`Wirklich alle ${totalSources} Dashboard-Schulen loeschen?`)) return;
+  if (!window.confirm(`Wirklich alle ${totalSources} Schulen loeschen?`)) return;
 
   managementSaving.value = true;
   emitFeedback("", "");
 
   try {
-    for (const source of props.managementSchoolSources) {
-      const sourceId = Number(source?.source_id || 0);
-      if (!sourceId) continue;
-      await apiClient.delete(`/api/auth/admin/school-sources/${sourceId}`, {
-        headers: managementAuthHeaders(),
-      });
-    }
-    const bootstrap = await fetchManagementBootstrap();
+    const resp = await apiClient.delete("/api/auth/admin/anm-schools", {
+      headers: managementAuthHeaders(),
+    });
+    const bootstrap = Array.isArray(resp.data?.school_sources)
+      ? (resp.data || {})
+      : await fetchManagementBootstrap();
     emit("bootstrap-updated", bootstrap);
-    emitFeedback("", `${totalSources} Dashboard-Schule(n) geloescht.`);
+    emitFeedback("", `${totalSources} Schule(n) geloescht.`);
     resetSchoolSourceForm();
   } catch (e: any) {
     emitFeedback(
       e?.response?.data?.error ||
       e?.message ||
-      "Die Dashboard-Schulen konnten nicht geloescht werden.",
+      "Die Schulen konnten nicht geloescht werden.",
       "",
     );
   } finally {
@@ -663,7 +680,7 @@ async function deleteAllManagementSchoolSources() {
 }
 
 async function deleteAllManagementSchools() {
-  const totalSchools = props.managementSchools.length;
+  const totalSchools = props.managementSchoolSources.length;
   if (!totalSchools) {
     emitFeedback("Es sind keine Schulen zum Loeschen vorhanden.", "");
     return;
@@ -676,7 +693,7 @@ function closeDeleteAllSchoolsConfirm() {
 }
 
 async function confirmDeleteAllManagementSchools() {
-  const totalSchools = props.managementSchools.length;
+  const totalSchools = props.managementSchoolSources.length;
   if (!totalSchools) {
     closeDeleteAllSchoolsConfirm();
     emitFeedback("Es sind keine Schulen zum Loeschen vorhanden.", "");
@@ -687,10 +704,10 @@ async function confirmDeleteAllManagementSchools() {
   emitFeedback("", "");
 
   try {
-    const resp = await apiClient.delete("/api/auth/admin/schools", {
+    const resp = await apiClient.delete("/api/auth/admin/anm-schools", {
       headers: managementAuthHeaders(),
     });
-    const bootstrap = Array.isArray(resp.data?.schools)
+    const bootstrap = Array.isArray(resp.data?.school_sources)
       ? (resp.data || {})
       : await fetchManagementBootstrap();
     closeDeleteAllSchoolsConfirm();
@@ -712,7 +729,6 @@ async function confirmDeleteAllManagementSchools() {
 async function testManagementSchoolSource() {
   const draftPayload = {
     db_host: String(schoolSourceForm.db_host || "").trim(),
-    db_port: normalizeSchoolSourcePort(schoolSourceForm.db_port),
     db_name: String(schoolSourceForm.db_name || "").trim(),
     db_user: String(schoolSourceForm.db_user || "").trim(),
     db_password_enc: String(schoolSourceForm.db_password_enc || ""),
@@ -801,7 +817,6 @@ async function handleSchoolImportFileSelected(event: Event) {
     const { lines, headers, parseLine } = parseCsvRows(csvText);
     const snrIdx = findCsvHeaderIndex(headers, ["snr"]);
     const hostIdx = findCsvHeaderIndex(headers, ["db_host", "dbhost", "host"]);
-    const portIdx = findCsvHeaderIndex(headers, ["db_port", "dbport", "port"]);
     const nameIdx = findCsvHeaderIndex(headers, ["db_name", "dbname", "datenbank"]);
     const userIdx = findCsvHeaderIndex(headers, ["db_user", "dbuser", "user", "benutzer"]);
     const passwordIdx = findCsvHeaderIndex(headers, ["db_passwd", "db_password_enc", "db_password", "passwort"]);
@@ -819,7 +834,6 @@ async function handleSchoolImportFileSelected(event: Event) {
         snr,
         school_name: schoolName,
         db_host: hostIdx >= 0 ? cells[hostIdx] || "" : "",
-        db_port: portIdx >= 0 ? cells[portIdx] || "" : "3306",
         db_name: nameIdx >= 0 ? cells[nameIdx] || "" : "",
         db_user: userIdx >= 0 ? cells[userIdx] || "" : "",
         db_password_enc: passwordIdx >= 0 ? cells[passwordIdx] || "" : "",
@@ -830,6 +844,7 @@ async function handleSchoolImportFileSelected(event: Event) {
 
     if (!schoolImportPreviewData.value.length) throw new Error("Keine importierbaren Zeilen gefunden.");
 
+    schoolImportOverwriteExisting.value = true;
     schoolImportPreviewModalOpen.value = true;
   } catch (e: any) {
     emitFeedback(e?.message || "Fehler beim Lesen der CSV-Datei.", "");
@@ -847,28 +862,53 @@ async function handleSchoolTableImportFileSelected(event: Event) {
     schoolTableImportFileName.value = file.name;
     const csvText = await readCsvFileText(file);
     schoolTableImportRawCsv.value = csvText;
+    const response = await apiClient.post(
+      "/api/schulen/import/vorschau",
+      { csv_text: csvText },
+      { headers: managementAuthHeaders() },
+    );
+    schoolTableImportPreviewToken.value = String(response.data?.preview_token || "").trim();
+    schoolTableImportPreviewData.value = Array.isArray(response.data?.rows) ? response.data.rows : [];
+    schoolTableImportSummary.value = {
+      total_rows: Number(response.data?.summary?.total_rows || 0),
+      valid_rows: Number(response.data?.summary?.valid_rows || 0),
+      invalid_rows: Number(response.data?.summary?.invalid_rows || 0),
+      selected_rows: Number(response.data?.summary?.selected_rows || 0),
+    };
+    if (!schoolTableImportPreviewData.value.length) throw new Error("Keine importierbaren Zeilen gefunden.");
+    refreshSchoolTableImportSelectionSummary();
+    schoolTableImportPreviewModalOpen.value = true;
+    return;
     const { lines, headers, parseLine } = parseCsvRows(csvText);
     const snrIdx = findCsvHeaderIndex(headers, ["snr"]);
     const nameIdx = findCsvHeaderIndex(headers, ["name"]);
-    const cityIdx = findCsvHeaderIndex(headers, ["ort", "city"]);
+    const cityIdx = findCsvHeaderIndex(headers, ["city"]);
+    const ortIdx = findCsvHeaderIndex(headers, ["ort"]);
+    const plzIdx = findCsvHeaderIndex(headers, ["plz", "postleitzahl"]);
+    const strasseIdx = findCsvHeaderIndex(headers, ["strasse", "straße", "street"]);
     const schoolFormIdx = findCsvHeaderIndex(headers, ["schulform", "school_form"]);
 
-    if (snrIdx < 0 || nameIdx < 0 || cityIdx < 0 || schoolFormIdx < 0) {
-      throw new Error("Die CSV-Datei muss die Spalten 'SNR', 'Name', 'Ort/city' und 'schulform/school_form' enthalten.");
+    if (snrIdx < 0 || nameIdx < 0 || (cityIdx < 0 && ortIdx < 0)) {
+      throw new Error("Die CSV-Datei muss die Spalten 'SNR', 'Name' und 'Ort/city' enthalten.");
     }
 
     schoolTableImportPreviewData.value = lines.slice(1).map((line, index) => {
       const cells = parseLine(line);
+      const city = cityIdx >= 0 ? cells[cityIdx] || "" : ortIdx >= 0 ? cells[ortIdx] || "" : "";
+      const ort = ortIdx >= 0 ? cells[ortIdx] || "" : city;
       return {
         row_no: index + 2,
         snr: cells[snrIdx] || "",
         name: cells[nameIdx] || "",
-        city: cells[cityIdx] || "",
-        school_form: cells[schoolFormIdx] || "",
+        city,
+        plz: plzIdx >= 0 ? cells[plzIdx] || "" : "",
+        ort,
+        strasse: strasseIdx >= 0 ? cells[strasseIdx] || "" : "",
+        school_form: schoolFormIdx >= 0 ? cells[schoolFormIdx] || "" : "",
         exists: props.managementSchools.some((school) => String(school?.snr || "").trim() === String(cells[snrIdx] || "").trim()),
         selected: true,
       };
-    }).filter((row) => row.snr || row.name || row.city || row.school_form);
+    }).filter((row) => row.snr || row.name || row.city || row.ort);
 
     if (!schoolTableImportPreviewData.value.length) {
       throw new Error("Keine importierbaren Zeilen gefunden.");
@@ -876,7 +916,7 @@ async function handleSchoolTableImportFileSelected(event: Event) {
 
     schoolTableImportPreviewModalOpen.value = true;
   } catch (e: any) {
-    emitFeedback(e?.message || "Fehler beim Lesen der Schul-CSV-Datei.", "");
+    emitFeedback(e?.response?.data?.error || e?.message || "Fehler beim Lesen der Schul-CSV-Datei.", "");
   } finally {
     if (input) input.value = "";
   }
@@ -888,13 +928,33 @@ function closeSchoolTableImportPreview() {
   schoolTableImportFileName.value = "";
   schoolTableImportRawCsv.value = "";
   schoolTableImportOverwriteExisting.value = false;
+  schoolTableImportPreviewToken.value = "";
+  schoolTableImportSummary.value = {
+    total_rows: 0,
+    valid_rows: 0,
+    invalid_rows: 0,
+    selected_rows: 0,
+  };
+}
+
+function refreshSchoolTableImportSelectionSummary() {
+  schoolTableImportSummary.value = {
+    ...schoolTableImportSummary.value,
+    selected_rows: schoolTableImportPreviewData.value.filter((row) => !!row?.selected && row?.status !== "Fehler").length,
+  };
 }
 
 function selectAllSchoolTableImportRows() {
-  const shouldSelectAll = schoolTableImportPreviewData.value.some((row) => !row?.selected);
+  const validRows = schoolTableImportPreviewData.value.filter((row) => row?.status !== "Fehler");
+  const shouldSelectAll = validRows.some((row) => !row?.selected);
   for (const row of schoolTableImportPreviewData.value) {
+    if (row?.status === "Fehler") {
+      row.selected = false;
+      continue;
+    }
     row.selected = shouldSelectAll;
   }
+  refreshSchoolTableImportSelectionSummary();
 }
 
 async function confirmSchoolTableImport() {
@@ -905,6 +965,44 @@ async function confirmSchoolTableImport() {
     const selectedPreviewRows = schoolTableImportPreviewData.value.filter((row) => !!row?.selected);
     if (!selectedPreviewRows.length) {
       throw new Error("Bitte mindestens eine Zeile fuer den Import auswaehlen.");
+    }
+    {
+      const validSelectedRows = schoolTableImportPreviewData.value.filter((row) => !!row?.selected && row?.status !== "Fehler");
+      if (!validSelectedRows.length) {
+        throw new Error("Bitte mindestens eine gueltige Zeile fuer den Import auswaehlen.");
+      }
+
+      const response = await apiClient.post(
+        "/api/schulen/import",
+        {
+          preview_token: schoolTableImportPreviewToken.value,
+          selected_row_nos: validSelectedRows.map((row) => Number(row?.row_no || 0)).filter((rowNo) => rowNo > 0),
+        },
+        { headers: managementAuthHeaders() },
+      );
+
+      const bootstrap = Array.isArray(response.data?.schools)
+        ? (response.data || {})
+        : await fetchManagementBootstrap();
+      emit("bootstrap-updated", bootstrap);
+
+      const summary = response.data?.summary || {};
+      const resultLines = [
+        `CSV-Datei: ${schoolTableImportFileName.value}`,
+        `Gelesene Datensaetze: ${Number(summary.total_rows || 0)}`,
+        `Neu importiert: ${Number(summary.created_count || 0)}`,
+        `Aktualisiert: ${Number(summary.updated_count || 0)}`,
+        `Uebersprungen: ${Number(summary.skipped_count || 0)}`,
+        `Fehlerhaft: ${Number(summary.error_count || 0)}`,
+      ];
+
+      closeSchoolTableImportPreview();
+      openImportResultDialog("CSV-Import (Schulen) abgeschlossen", resultLines.join("\n"));
+      emitFeedback(
+        "",
+        `${Number(summary.imported_count || 0)} Schule(n) importiert. Neu: ${Number(summary.created_count || 0)}, aktualisiert: ${Number(summary.updated_count || 0)}.`,
+      );
+      return;
     }
 
     const rowsForImport = schoolTableImportOverwriteExisting.value
@@ -990,7 +1088,7 @@ function cancelSchoolImport() {
   schoolImportPreviewData.value = [];
   schoolImportRawCsv.value = "";
   schoolImportFileName.value = "";
-  schoolImportOverwriteExisting.value = false;
+  schoolImportOverwriteExisting.value = true;
 }
 
 function selectAllSchoolImportRows() {
@@ -1016,15 +1114,29 @@ async function confirmSchoolImport() {
     if (!rowsForImport.length) {
       throw new Error("Mit deaktiviertem Ueberschreiben koennen nur neue ausgewaehlte Schulen importiert werden.");
     }
+    const skippedEntries = rowsForImport.filter((row) => !String(row?.school_name || "").trim());
+    const importableRows = rowsForImport.filter((row) => String(row?.school_name || "").trim());
+    if (!importableRows.length) {
+      const skippedList = skippedEntries
+        .map((row) => `Zeile ${Number(row?.row_no || 0)}: Schulnummer ${String(row?.snr || "").trim() || "-" } wurde in school nicht gefunden und uebersprungen.`)
+        .join("\n");
+      openImportResultDialog("CSV-Import (Schulserver) abgeschlossen", skippedList || "Keine importierbaren Schulserver-Zeilen gefunden.");
+      emitFeedback("", `${skippedEntries.length} Zeile(n) wurden uebersprungen, weil die SNR in school nicht vorhanden ist.`);
+      schoolImportPreviewModalOpen.value = false;
+      return;
+    }
     const createdEntries: any[] = [];
     const updatedEntries: any[] = [];
     let lastResponse: any = null;
 
-    for (const row of rowsForImport) {
-      const payload = buildSchoolSourcePayload(row);
+    for (const row of importableRows) {
       const existingSource = props.managementSchoolSources.find(
-        (source) => String(source?.snr || "").trim() === payload.snr,
+        (source) => String(source?.snr || "").trim() === String(row?.snr || "").trim(),
       );
+      const payload = buildSchoolSourcePayload({
+        ...row,
+        db_port: existingSource?.db_port ?? 3306,
+      });
       lastResponse = await persistSchoolSource(payload, existingSource?.source_id || null);
       if (existingSource?.source_id) {
         updatedEntries.push(payload);
@@ -1045,6 +1157,9 @@ async function confirmSchoolImport() {
       `Neu angelegt: ${createdEntries.length}`,
       `Aktualisiert: ${updatedEntries.length}`,
     ];
+    if (skippedEntries.length) {
+      resultLines.push(`Uebersprungen: ${skippedEntries.length}`);
+    }
     if (createdEntries.length) {
       resultLines.push("");
       resultLines.push("Neu angelegt:");
@@ -1059,8 +1174,18 @@ async function confirmSchoolImport() {
         resultLines.push(`${String(entry?.snr || "").trim()} | ${String(entry?.db_host || "").trim()} | ${String(entry?.db_name || "").trim()}`);
       }
     }
+    if (skippedEntries.length) {
+      resultLines.push("");
+      resultLines.push("Uebersprungen:");
+      for (const row of skippedEntries) {
+        resultLines.push(`Zeile ${Number(row?.row_no || 0)} | ${String(row?.snr || "").trim() || "-"} | SNR nicht in school gefunden`);
+      }
+    }
     openImportResultDialog("CSV-Import (Schulserver) abgeschlossen", resultLines.join("\n"));
-    emitFeedback("", `${createdEntries.length + updatedEntries.length} Schulserver-Quelle(n) importiert. Neu: ${createdEntries.length}, aktualisiert: ${updatedEntries.length}.`);
+    emitFeedback(
+      "",
+      `${createdEntries.length + updatedEntries.length} Schulserver-Quelle(n) importiert. Neu: ${createdEntries.length}, aktualisiert: ${updatedEntries.length}.${skippedEntries.length ? ` Uebersprungen: ${skippedEntries.length}.` : ""}`,
+    );
   } catch (e: any) {
     emitFeedback(e?.response?.data?.error || e?.message || "Der CSV-Import der Schulserver-Quellen ist fehlgeschlagen.", "");
   } finally {
@@ -1068,7 +1193,7 @@ async function confirmSchoolImport() {
     schoolImportRawCsv.value = "";
     schoolImportFileName.value = "";
     if (!schoolImportPreviewModalOpen.value) {
-      schoolImportOverwriteExisting.value = false;
+      schoolImportOverwriteExisting.value = true;
     }
   }
 }

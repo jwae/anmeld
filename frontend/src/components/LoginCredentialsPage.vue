@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import UserSessionCard from "./UserSessionCard.vue";
+import AnmeldeverfahrenView from "../views/AnmeldeverfahrenView.vue";
+import ImporteView from "../views/ImporteView.vue";
+import AbgleichView from "../views/AbgleichView.vue";
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -12,9 +15,28 @@ const props = defineProps<{
   connectedHost?: string;
   connectedPort?: string | number;
   connectedDatabase?: string;
+  token?: string;
 }>();
 
-const activeCredentialsMenu = ref<"gs" | "sek1">("gs");
+const activeCredentialsMenu = ref<"verfahren" | "importe" | "abgleich" | "roadmap">("verfahren");
+const currentContext = ref<{ verfahren: string; runde: string }>({
+  verfahren: "Kein Verfahren ausgewaehlt",
+  runde: "Keine Runde ausgewaehlt",
+});
+const selectedVerfahrenId = ref<number | null>(null);
+const selectedRundenId = ref<number | null>(null);
+
+function handleContextUpdate(payload: { verfahren: string; runde: string }) {
+  currentContext.value = {
+    verfahren: String(payload?.verfahren || "Kein Verfahren ausgewaehlt"),
+    runde: String(payload?.runde || "Keine Runde ausgewaehlt"),
+  };
+}
+
+function handleSelectionUpdate(payload: { verfahrenId: number | null; rundeId: number | null }) {
+  selectedVerfahrenId.value = payload?.verfahrenId ?? null;
+  selectedRundenId.value = payload?.rundeId ?? null;
+}
 </script>
 
 <template src="./LoginCredentialsPage.html"></template>

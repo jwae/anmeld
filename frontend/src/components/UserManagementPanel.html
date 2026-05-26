@@ -29,13 +29,13 @@
 
     <transition name="feedback-fade" mode="out-in">
       <div
-        v-if="managementError && (!isManagementSessionActive || activeManagementTab === 'schools' || activeManagementTab === 'snapshot-sj' || activeManagementTab === 'snapshots' || activeManagementTab === 'db-contents')"
+        v-if="managementError && (!isManagementSessionActive || activeManagementTab === 'schools')"
         class="feedback-panel feedback-panel-error"
       >
         <p class="error">{{ managementError }}</p>
       </div>
       <div
-        v-else-if="managementNotice && (!isManagementSessionActive || activeManagementTab === 'schools' || activeManagementTab === 'snapshot-sj' || activeManagementTab === 'snapshots' || activeManagementTab === 'db-contents')"
+        v-else-if="managementNotice && (!isManagementSessionActive || activeManagementTab === 'schools')"
         class="feedback-panel feedback-panel-success"
       >
         <p>{{ managementNotice }}</p>
@@ -156,39 +156,15 @@
         </button>
         <button
           class="user-management-tab"
-          :class="{ 'is-active': activeManagementTab === 'snapshots' }"
+          :class="{ 'is-active': activeManagementTab === 'catalogs' }"
           type="button"
           role="tab"
-          title="Vorhandene Snapshot-Staende anzeigen und loeschen."
-          :aria-selected="activeManagementTab === 'snapshots' ? 'true' : 'false'"
-          @click="activeManagementTab = 'snapshots'"
+          title="Platzhalter fuer kuenftige Katalog-Verwaltung."
+          :aria-selected="activeManagementTab === 'catalogs' ? 'true' : 'false'"
+          @click="activeManagementTab = 'catalogs'"
         >
-          <i class="bi bi-calendar3" aria-hidden="true"></i>
-          <span>Snapshot verwalten</span>
-        </button>
-        <button
-          class="user-management-tab"
-          :class="{ 'is-active': activeManagementTab === 'snapshot-sj' }"
-          type="button"
-          role="tab"
-          title="Schuljahresbezogene Snapshots vorbereiten und importieren."
-          :aria-selected="activeManagementTab === 'snapshot-sj' ? 'true' : 'false'"
-          @click="activeManagementTab = 'snapshot-sj'"
-        >
-          <i class="bi bi-camera" aria-hidden="true"></i>
-          <span>Snapshots</span>
-        </button>
-        <button
-          class="user-management-tab"
-          :class="{ 'is-active': activeManagementTab === 'db-contents' }"
-          type="button"
-          role="tab"
-          title="Inhalte der Tabellen snapshot_student und snapshot_teacher anzeigen."
-          :aria-selected="activeManagementTab === 'db-contents' ? 'true' : 'false'"
-          @click="activeManagementTab = 'db-contents'"
-        >
-          <i class="bi bi-table" aria-hidden="true"></i>
-          <span>DB Inhalte</span>
+          <i class="bi bi-journal-text" aria-hidden="true"></i>
+          <span>Kataloge</span>
         </button>
       </div>
 
@@ -445,36 +421,20 @@
           @feedback="handleSchoolManagementFeedback"
         />
       </div>
-      <div v-else-if="activeManagementTab === 'snapshot-sj'" class="user-management-tab-panel" role="tabpanel">
-        <SnapshotSchoolYearManagement
-          :management-token="effectiveManagementToken"
-          :is-management-session-active="isManagementSessionActive"
-          :school-sources="managementSchoolSources"
-          :snapshots="managementSnapshots"
-          :terms="managementTerms"
-          @bootstrap-updated="applyManagementBootstrap"
-          @feedback="handleSnapshotManagementFeedback"
-        />
-      </div>
-      <div v-else-if="activeManagementTab === 'db-contents'" class="user-management-tab-panel" role="tabpanel">
-        <DbContentsManagement
-          :management-token="effectiveManagementToken"
-          :is-management-session-active="isManagementSessionActive"
-          :snapshots="managementSnapshots"
-          @feedback="handleSnapshotManagementFeedback"
-        />
-      </div>
-      <div v-else class="user-management-tab-panel" role="tabpanel">
-        <SnapshotManagement
-          :management-token="effectiveManagementToken"
-          :is-management-session-active="isManagementSessionActive"
-          :snapshots="managementSnapshots"
-          :schools="managementSchools"
-          :school-sources="managementSchoolSources"
-          :terms="managementTerms"
-          @bootstrap-updated="applyManagementBootstrap"
-          @feedback="handleSnapshotManagementFeedback"
-        />
+      <div v-else-if="activeManagementTab === 'catalogs'" class="user-management-tab-panel" role="tabpanel">
+        <div class="user-management-grid user-management-grid-single">
+          <section class="user-management-panel">
+            <div class="user-management-panel-head">
+              <div>
+                <h3>Kataloge</h3>
+                <p>Dieser Bereich ist vorbereitet und wird spaeter mit Funktionen befuellt.</p>
+              </div>
+            </div>
+            <div class="user-management-empty">
+              <p>Aktuell ist fuer Kataloge noch keine Funktion hinterlegt.</p>
+            </div>
+          </section>
+        </div>
       </div>
     </template>
   </section>

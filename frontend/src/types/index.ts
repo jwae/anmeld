@@ -6,6 +6,9 @@ export interface School {
   snr: string;
   name: string;
   city: string;
+  plz?: string;
+  ort?: string;
+  strasse?: string;
 }
 
 export interface Snapshot {
@@ -138,4 +141,35 @@ export interface ConnectionResponse {
   host: string;
   port: number;
   database: string;
+}
+
+export type AnmeldeStatus = "geplant" | "aktiv" | "abgeschlossen";
+
+export interface Anmeldeverfahren {
+  id: number;
+  schuljahr: string;
+  bezeichnung: string;
+  status: AnmeldeStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Anmelderunde {
+  id: number;
+  verfahren_id: number;
+  runden_nummer: number;
+  bezeichnung: string;
+  startdatum: string | null;
+  enddatum: string | null;
+  status: AnmeldeStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BeteiligteSchule {
+  snr: string;
+  name: string;
+  ort: string;
+  schulform: string;
+  selected: boolean;
 }

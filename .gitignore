@@ -23,7 +23,7 @@ Info/
 db-stats-manager/
 .gemini/
 db-stats-manager.skill
-GEMINI.md
+gemini.md
 backend/.env
 *.log
 ~$*

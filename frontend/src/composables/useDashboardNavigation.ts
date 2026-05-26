@@ -32,6 +32,11 @@ const dashboardLabelsFallback: Record<string, string> = {
   classes: "Klassenstärken",
 };
 
+const dashboardLabelsOverride: Record<string, string> = {
+  schuelerzahlen: "1 Verfahren auswählen",
+  klassenstaerken: "Schulen Kapazitäten",
+};
+
 const normalizeDashboardKey = (key: string): string => String(key || "")
   .trim()
   .toLowerCase();
@@ -56,6 +61,8 @@ export function useDashboardNavigation() {
   const dashboardLabel = (key: string): string => {
     const resolved = resolveDashboardKey(key);
     return (
+      dashboardLabelsOverride[resolved] ||
+      dashboardLabelsOverride[normalizeDashboardKey(key)] ||
       authStore.dashboardNames?.[resolved] ||
       authStore.dashboardNames?.[normalizeDashboardKey(key)] ||
       dashboardLabelsFallback[resolved] ||

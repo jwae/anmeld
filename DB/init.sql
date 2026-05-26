@@ -1,14 +1,85 @@
-CREATE DATABASE IF NOT EXISTS `stats`
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+-- anmeld.anm_kat_anmeldestatus definition
 
-CREATE USER IF NOT EXISTS 'stats_user'@'%' IDENTIFIED BY 'stats_password';
-GRANT ALL PRIVILEGES ON `stats`.* TO 'stats_user'@'%';
-FLUSH PRIVILEGES;
+-- anmeld.anm_kat_anmeldestatus definition
 
-USE `stats`;
+CREATE TABLE `anm_kat_anmeldestatus` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `sortierung` int(11) NOT NULL DEFAULT 0,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- stats.app_dashboard definition
+
+-- anmeld.anm_kat_empfehlung definition
+
+CREATE TABLE `anm_kat_empfehlung` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `sortierung` int(11) NOT NULL DEFAULT 0,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_kat_fallgrund definition
+
+CREATE TABLE `anm_kat_fallgrund` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `sortierung` int(11) NOT NULL DEFAULT 0,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_kat_fallstatus definition
+
+CREATE TABLE `anm_kat_fallstatus` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `sortierung` int(11) NOT NULL DEFAULT 0,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_kat_sf definition
+
+CREATE TABLE `anm_kat_sf` (
+  `sf_id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `sf` varchar(100) DEFAULT NULL,
+  `sf_kurz` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`sf_id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_verfahren definition
+
+CREATE TABLE `anm_verfahren` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `schuljahr` varchar(20) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'geplant',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_verfahren_schuljahr` (`schuljahr`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.app_dashboard definition
 
 CREATE TABLE `app_dashboard` (
   `dashboard_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -18,11 +89,10 @@ CREATE TABLE `app_dashboard` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`dashboard_id`),
   UNIQUE KEY `dashboard_key` (`dashboard_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=560 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1028 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
-
--- stats.app_group definition
+-- anmeld.app_group definition
 
 CREATE TABLE `app_group` (
   `group_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -35,20 +105,20 @@ CREATE TABLE `app_group` (
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
--- stats.class definition
+-- anmeld.class definition
 
 CREATE TABLE `class` (
   `class_id` bigint(20) NOT NULL AUTO_INCREMENT,
   `jahrgang` varchar(5) NOT NULL,
-  `parallel` char(1) NOT NULL,
+  `parallel` varchar(5) NOT NULL,
   `class_code` varchar(10) NOT NULL,
   `bemerkung` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`class_id`),
-  UNIQUE KEY `uq_jahrgang_parallel_class_code` (`jahrgang`,`parallel`,`class_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=287 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `uq_jahrgang_parallel` (`jahrgang`,`parallel`)
+) ENGINE=InnoDB AUTO_INCREMENT=333 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.education_track definition
+-- anmeld.education_track definition
 
 CREATE TABLE `education_track` (
   `education_track_id` smallint(6) NOT NULL AUTO_INCREMENT,
@@ -67,7 +137,7 @@ CREATE TABLE `education_track` (
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.nation definition
+-- anmeld.nation definition
 
 CREATE TABLE `nation` (
   `nation_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -79,7 +149,7 @@ CREATE TABLE `nation` (
 ) ENGINE=InnoDB AUTO_INCREMENT=410 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.religion definition
+-- anmeld.religion definition
 
 CREATE TABLE `religion` (
   `religion_id` smallint(6) NOT NULL AUTO_INCREMENT,
@@ -91,7 +161,7 @@ CREATE TABLE `religion` (
 ) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.school_form definition
+-- anmeld.school_form definition
 
 CREATE TABLE `school_form` (
   `school_form_id` smallint(6) NOT NULL AUTO_INCREMENT,
@@ -101,16 +171,16 @@ CREATE TABLE `school_form` (
   `sf_kurz` varchar(2) NOT NULL,
   PRIMARY KEY (`school_form_id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.school_source_db definition
+-- anmeld.school_source_db definition
 
 CREATE TABLE `school_source_db` (
   `source_id` int(11) NOT NULL AUTO_INCREMENT,
   `source_name` varchar(100) DEFAULT NULL COMMENT 'Freie Bezeichnung der Quelle',
   `db_host` varchar(255) NOT NULL,
-  `db_port` int(11) NOT NULL DEFAULT 3306,
+  `db_port` int(11) DEFAULT NULL COMMENT '24.05.2026: Port wird nicht mehr verwednet\r\nAlle Daten stehen in db_host.',
   `db_name` varchar(255) NOT NULL,
   `db_user` varchar(255) NOT NULL,
   `db_password_enc` text NOT NULL COMMENT 'Verschluesselt gespeichertes Passwort',
@@ -125,10 +195,10 @@ CREATE TABLE `school_source_db` (
   UNIQUE KEY `uq_school_source_db_school_new` (`snr`),
   KEY `idx_school_source_db_active` (`is_active`),
   KEY `idx_school_source_db_snr` (`snr`)
-) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=72 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.sex definition
+-- anmeld.sex definition
 
 CREATE TABLE `sex` (
   `sex_id` tinyint(4) NOT NULL,
@@ -138,7 +208,7 @@ CREATE TABLE `sex` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.snaps definition
+-- anmeld.snaps definition
 
 CREATE TABLE `snaps` (
   `snap_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -150,10 +220,10 @@ CREATE TABLE `snaps` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`snap_id`),
   KEY `idx_snaps_term_date` (`term_id`,`snapshot_date`)
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 
--- stats.support_focus definition
+-- anmeld.support_focus definition
 
 CREATE TABLE `support_focus` (
   `support_focus_id` smallint(6) NOT NULL AUTO_INCREMENT,
@@ -164,7 +234,7 @@ CREATE TABLE `support_focus` (
 ) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.term definition
+-- anmeld.term definition
 
 CREATE TABLE `term` (
   `term_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -176,7 +246,7 @@ CREATE TABLE `term` (
 ) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.test_source_students definition
+-- anmeld.test_source_students definition
 
 CREATE TABLE `test_source_students` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -192,7 +262,126 @@ CREATE TABLE `test_source_students` (
 ) ENGINE=InnoDB AUTO_INCREMENT=34531 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.app_group_dashboard definition
+-- anmeld.anm_runde definition
+
+CREATE TABLE `anm_runde` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runden_nummer` int(11) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `startdatum` date DEFAULT NULL,
+  `enddatum` date DEFAULT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'geplant',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_runde_verfahren_nummer` (`verfahren_id`,`runden_nummer`),
+  CONSTRAINT `fk_anm_runde_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_schueler definition
+
+CREATE TABLE `anm_schueler` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `schueler_id` varchar(50) NOT NULL,
+  `schueler_nr` varchar(50) DEFAULT NULL,
+  `schul_nr` varchar(50) DEFAULT NULL,
+  `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL,
+  `quelle` enum('Pool','Anmeldung') NOT NULL,
+  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
+  `anmeldestatus` enum('Neuaufnahme','Warteliste','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
+  `empfehlung` varchar(50) DEFAULT NULL,
+  `vorname` varchar(100) DEFAULT NULL,
+  `nachname` varchar(100) DEFAULT NULL,
+  `geburtsdatum` date DEFAULT NULL,
+  `foerderbedarf` varchar(100) DEFAULT NULL,
+  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
+  `bemerkung` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
+  KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
+  KEY `idx_schueler_id` (`schueler_id`),
+  KEY `idx_schul_nr` (`schul_nr`),
+  KEY `idx_abgleich_status` (`abgleich_status`),
+  KEY `idx_anmeldestatus` (`anmeldestatus`),
+  KEY `idx_empfehlung` (`empfehlung`),
+  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_schueler_pool definition
+
+CREATE TABLE `anm_schueler_pool` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `vorname` varchar(100) NOT NULL,
+  `nachname` varchar(100) NOT NULL,
+  `geburtsdatum` date DEFAULT NULL,
+  `adresse` varchar(255) DEFAULT NULL,
+  `erzieher` varchar(255) DEFAULT NULL,
+  `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
+  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
+  `empfehlung_id` bigint(20) DEFAULT NULL,
+  `notiz` text DEFAULT NULL,
+  `quelle` varchar(50) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_anm_schueler_empfehlung` (`empfehlung_id`),
+  KEY `idx_anm_schueler_name` (`nachname`,`vorname`),
+  KEY `idx_anm_schueler_geburtsdatum` (`geburtsdatum`),
+  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=900023 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_schulen definition
+
+CREATE TABLE `anm_schulen` (
+  `snr` varchar(50) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `plz` varchar(20) DEFAULT NULL,
+  `ort` varchar(100) DEFAULT NULL,
+  `strasse` varchar(255) DEFAULT NULL,
+  `sf_id` varchar(32) DEFAULT NULL,
+  `db_host` varchar(500) DEFAULT NULL,
+  `db_name` varchar(255) DEFAULT NULL,
+  `db_user` varchar(255) DEFAULT NULL,
+  `db_password_enc` text DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_test_at` datetime DEFAULT NULL,
+  `last_test_status` varchar(50) DEFAULT NULL,
+  `last_import_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`snr`),
+  KEY `fk_anm_schulen_sf` (`sf_id`),
+  CONSTRAINT `fk_anm_schulen_sf` FOREIGN KEY (`sf_id`) REFERENCES `anm_kat_sf` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_verfahren_schule definition
+
+CREATE TABLE `anm_verfahren_schule` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `snr` varchar(50) NOT NULL,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  `bemerkung` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_verfahren_schule` (`verfahren_id`,`snr`),
+  KEY `fk_anm_verfahren_schule_schule` (`snr`),
+  CONSTRAINT `fk_anm_verfahren_schule_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`),
+  CONSTRAINT `fk_anm_verfahren_schule_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.app_group_dashboard definition
 
 CREATE TABLE `app_group_dashboard` (
   `group_id` int(10) unsigned NOT NULL,
@@ -205,7 +394,7 @@ CREATE TABLE `app_group_dashboard` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
--- stats.app_user definition
+-- anmeld.app_user definition
 
 CREATE TABLE `app_user` (
   `user_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -223,15 +412,18 @@ CREATE TABLE `app_user` (
   UNIQUE KEY `email` (`email`),
   KEY `fk_user_group` (`group_id`),
   CONSTRAINT `fk_user_group` FOREIGN KEY (`group_id`) REFERENCES `app_group` (`group_id`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
--- stats.school definition
+-- anmeld.school definition
 
 CREATE TABLE `school` (
   `snr` char(6) NOT NULL,
   `name` varchar(255) DEFAULT NULL,
   `city` varchar(100) DEFAULT NULL,
+  `plz` varchar(20) DEFAULT NULL,
+  `ort` varchar(100) DEFAULT NULL,
+  `strasse` varchar(255) DEFAULT NULL,
   `school_form_id` smallint(6) DEFAULT NULL,
   `is_enabled_for_snapshots` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`snr`),
@@ -242,7 +434,7 @@ CREATE TABLE `school` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.school_source_import_run definition
+-- anmeld.school_source_import_run definition
 
 CREATE TABLE `school_source_import_run` (
   `import_run_id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -264,7 +456,7 @@ CREATE TABLE `school_source_import_run` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.snapshot definition
+-- anmeld.snapshot definition
 
 CREATE TABLE `snapshot` (
   `snapshot_id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -284,10 +476,10 @@ CREATE TABLE `snapshot` (
   CONSTRAINT `fk_snapshot_school_snr` FOREIGN KEY (`snr`) REFERENCES `school` (`snr`),
   CONSTRAINT `fk_snapshot_snap_id` FOREIGN KEY (`snap_id`) REFERENCES `snaps` (`snap_id`) ON UPDATE CASCADE,
   CONSTRAINT `fk_snapshot_term` FOREIGN KEY (`term_id`) REFERENCES `term` (`term_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1564 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1598 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.snapshot_student definition
+-- anmeld.snapshot_student definition
 
 CREATE TABLE `snapshot_student` (
   `snapshot_id` bigint(20) NOT NULL,
@@ -295,11 +487,11 @@ CREATE TABLE `snapshot_student` (
   `class_id` bigint(20) NOT NULL,
   `school_form_id` smallint(6) DEFAULT NULL COMMENT 'Schulform',
   `education_track_id` smallint(6) DEFAULT NULL COMMENT 'Bildungsgang',
-  `ef` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Erstfoerderung',
+  `ef` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Erstförderung',
   `religion_id` smallint(6) DEFAULT NULL COMMENT 'Konfession',
-  `special_needs` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Foerderbedarf',
-  `support_focus1_id` smallint(6) DEFAULT NULL COMMENT 'FO1',
-  `support_focus2_id` smallint(6) DEFAULT NULL COMMENT 'FO2',
+  `special_needs` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Förderbedarf',
+  `support_focus1_id` smallint(6) DEFAULT NULL COMMENT 'FÖ1',
+  `support_focus2_id` smallint(6) DEFAULT NULL COMMENT 'FÖ2',
   `target_different` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Zieldifferent',
   `sex_id` tinyint(4) DEFAULT NULL,
   `nation_id` int(11) DEFAULT NULL,
@@ -333,7 +525,7 @@ CREATE TABLE `snapshot_student` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.snapshot_teacher definition
+-- anmeld.snapshot_teacher definition
 
 CREATE TABLE `snapshot_teacher` (
   `snapshot_teacher_id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -351,10 +543,76 @@ CREATE TABLE `snapshot_teacher` (
   CONSTRAINT `fk_st_nation` FOREIGN KEY (`nation_id`) REFERENCES `nation` (`nation_id`),
   CONSTRAINT `fk_st_sex` FOREIGN KEY (`sex_id`) REFERENCES `sex` (`sex_id`),
   CONSTRAINT `fk_st_snapshot` FOREIGN KEY (`snapshot_id`) REFERENCES `snapshot` (`snapshot_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9163 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10142 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- stats.school_source_import_log definition
+-- anmeld.anm_abgleich_protokoll definition
+
+CREATE TABLE `anm_abgleich_protokoll` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `snr` varchar(50) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `abrufzeitpunkt` datetime NOT NULL DEFAULT current_timestamp(),
+  `status` varchar(50) NOT NULL,
+  `anzahl_datensaetze` int(11) NOT NULL DEFAULT 0,
+  `fehlermeldung` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_anm_abgleich_protokoll_snr` (`snr`),
+  KEY `idx_anm_abgleich_protokoll_runde` (`runde_id`),
+  CONSTRAINT `fk_anm_abgleich_protokoll_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_anm_abgleich_protokoll_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
+) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_kapazitaet definition
+
+CREATE TABLE `anm_kapazitaet` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `snr` varchar(50) NOT NULL,
+  `jahrgang` varchar(20) NOT NULL,
+  `maximale_klassen` int(11) DEFAULT NULL,
+  `maximale_schueler_pro_klasse` int(11) DEFAULT NULL,
+  `gesamtkapazitaet` int(11) NOT NULL DEFAULT 0,
+  `reservierte_plaetze` int(11) NOT NULL DEFAULT 0,
+  `bemerkung` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_kapazitaet` (`verfahren_id`,`snr`,`jahrgang`),
+  KEY `idx_anm_kapazitaet_snr` (`snr`),
+  CONSTRAINT `fk_anm_kapazitaet_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`),
+  CONSTRAINT `fk_anm_kapazitaet_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_schueler_anmeldung definition
+
+CREATE TABLE `anm_schueler_anmeldung` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `snr` varchar(50) NOT NULL,
+  `schueler_schul_id` varchar(100) NOT NULL,
+  `vorname` varchar(100) NOT NULL,
+  `nachname` varchar(100) NOT NULL,
+  `geburtsdatum` date DEFAULT NULL,
+  `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
+  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_schueler_anmeldung` (`verfahren_id`,`runde_id`,`snr`,`schueler_schul_id`),
+  KEY `runde_id` (`runde_id`),
+  KEY `snr` (`snr`),
+  CONSTRAINT `1` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `2` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `3` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
+) ENGINE=InnoDB AUTO_INCREMENT=228 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.school_source_import_log definition
 
 CREATE TABLE `school_source_import_log` (
   `import_log_id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -368,6 +626,115 @@ CREATE TABLE `school_source_import_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- anmeld.anm_anmeldung definition
+
+CREATE TABLE `anm_anmeldung` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `schueler_pool_id` bigint(20) DEFAULT NULL,
+  `schueler_anmeldung_id` bigint(20) DEFAULT NULL,
+  `snr` varchar(50) NOT NULL,
+  `schueler_schul_id` varchar(100) DEFAULT NULL,
+  `anmeldestatus_id` bigint(20) NOT NULL,
+  `anmeldedatum` date DEFAULT NULL,
+  `importiert_am` datetime NOT NULL DEFAULT current_timestamp(),
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_anm_anmeldung_runde` (`runde_id`),
+  KEY `fk_anm_anmeldung_status` (`anmeldestatus_id`),
+  KEY `idx_anm_anmeldung_snr` (`snr`),
+  KEY `idx_anm_anmeldung_schueler_schul_id` (`schueler_schul_id`),
+  KEY `idx_anm_anmeldung_schueler_pool_id` (`schueler_pool_id`),
+  KEY `idx_anm_anmeldung_verfahren_runde` (`verfahren_id`,`runde_id`),
+  KEY `fk_anm_anmeldung_schueler_anmeldung` (`schueler_anmeldung_id`),
+  CONSTRAINT `fk_anm_anmeldung_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_anm_anmeldung_schueler` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
+  CONSTRAINT `fk_anm_anmeldung_schueler_anmeldung` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
+  CONSTRAINT `fk_anm_anmeldung_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`),
+  CONSTRAINT `fk_anm_anmeldung_status` FOREIGN KEY (`anmeldestatus_id`) REFERENCES `anm_kat_anmeldestatus` (`id`),
+  CONSTRAINT `fk_anm_anmeldung_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=126 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_merkzettel definition
+
+CREATE TABLE `anm_merkzettel` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `schueler_pool_id` bigint(20) DEFAULT NULL,
+  `schueler_anmeldung_id` bigint(20) DEFAULT NULL,
+  `titel` varchar(255) NOT NULL,
+  `notiz` text NOT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'offen',
+  `erstellt_von` varchar(100) DEFAULT NULL,
+  `erledigt_am` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_anm_merkzettel_verfahren` (`verfahren_id`),
+  KEY `idx_anm_merkzettel_schueler` (`schueler_pool_id`),
+  KEY `fk_anm_merkzettel_schueler_anmeldung` (`schueler_anmeldung_id`),
+  CONSTRAINT `fk_anm_merkzettel_schueler` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
+  CONSTRAINT `fk_anm_merkzettel_schueler_anmeldung` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
+  CONSTRAINT `fk_anm_merkzettel_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_offener_fall definition
+
+CREATE TABLE `anm_offener_fall` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `schueler_pool_id` bigint(20) NOT NULL,
+  `schueler_anmeldung_id` bigint(20) DEFAULT NULL,
+  `fallgrund_id` bigint(20) DEFAULT NULL,
+  `fallstatus_id` bigint(20) NOT NULL,
+  `zugewiesene_snr` varchar(50) DEFAULT NULL,
+  `bemerkung` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_anm_offener_fall_grund` (`fallgrund_id`),
+  KEY `fk_anm_offener_fall_status` (`fallstatus_id`),
+  KEY `idx_anm_offener_fall_verfahren` (`verfahren_id`),
+  KEY `idx_anm_offener_fall_schueler` (`schueler_pool_id`),
+  KEY `idx_anm_offener_fall_zugewiesene_snr` (`zugewiesene_snr`),
+  KEY `fk_anm_offener_fall_schueler_anmeldung` (`schueler_anmeldung_id`),
+  CONSTRAINT `fk_anm_offener_fall_grund` FOREIGN KEY (`fallgrund_id`) REFERENCES `anm_kat_fallgrund` (`id`),
+  CONSTRAINT `fk_anm_offener_fall_schueler` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
+  CONSTRAINT `fk_anm_offener_fall_schueler_anmeldung` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
+  CONSTRAINT `fk_anm_offener_fall_schule` FOREIGN KEY (`zugewiesene_snr`) REFERENCES `anm_schulen` (`snr`),
+  CONSTRAINT `fk_anm_offener_fall_status` FOREIGN KEY (`fallstatus_id`) REFERENCES `anm_kat_fallstatus` (`id`),
+  CONSTRAINT `fk_anm_offener_fall_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_schueler_abgleich definition
+
+CREATE TABLE `anm_schueler_abgleich` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) DEFAULT NULL,
+  `schueler_pool_id` bigint(20) DEFAULT NULL,
+  `schueler_anmeldung_id` bigint(20) DEFAULT NULL,
+  `abgleich_status` varchar(50) NOT NULL,
+  `abgleich_art` varchar(50) NOT NULL DEFAULT 'AUTOMATISCH',
+  `bemerkung` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `verfahren_id` (`verfahren_id`),
+  KEY `runde_id` (`runde_id`),
+  KEY `schueler_pool_id` (`schueler_pool_id`),
+  KEY `schueler_anmeldung_id` (`schueler_anmeldung_id`),
+  CONSTRAINT `1` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `2` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `3` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
+  CONSTRAINT `4` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`schueler_pool_id` is not null or `schueler_anmeldung_id` is not null)
+) ENGINE=InnoDB AUTO_INCREMENT=28780 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- -----------------------------------------------------
 -- Stammdaten / Kataloge
 -- -----------------------------------------------------
@@ -690,186 +1057,21 @@ INSERT INTO `school_form` VALUES
 (15,'30','Berufskolleg','BK','BK'),
 (16,'83','Schule für Kranke','S','S');
 
-INSERT INTO `school` VALUES
-('100011','Städt. Gesamtschule','Haan',8,0),
-('100012','Städt. Gemeinschaftsgrundschule','Leverkusen',1,0),
-('100014','Kolibri-Schule','Herne',1,0),
-('100015','Städt. Wim-Wenders-Gymnasium','Düsseldorf',13,0),
-('100016','Kupferstädter Gesamtschule','Stolberg (Rhld.)',8,0),
-('100017','Städt. Gem. Grundschule','Hürth',1,0),
-('100019','Joseph Beuys Gesamtschule','Kleve',8,0),
-('100052','Comenius-Gesamtschule','Neuss',8,0),
-('100128','Grundschule Vulkanstraße','Krefeld',1,0),
-('100137','Kompass-Grundschule','Krefeld',1,0),
-('100157','Grundschule Westparkstraße','Krefeld',1,0),
-('100223','Grundschule Am Ringerberg','Mönchengladbach',1,0),
-('100226','Grundschule Wilhelm-Strauß-Straße','Mönchengladbach',1,0),
-('102880','Schule an Haus Rath','Krefeld',1,0),
-('102891','Edith-Stein-Schule','Krefeld',1,0),
-('102908','Sollbrüggenschule','Krefeld',1,0),
-('102921','Grundschule Königshof','Krefeld',1,0),
-('102945','Josefschule','Krefeld',1,0),
-('102957','St. Michael Schule','Krefeld',1,0),
-('102970','Schönwasserschule','Krefeld',1,0),
-('102982','Johansenschule','Krefeld',1,0),
-('102994','Jahnschule','Krefeld',1,0),
-('103020','Mosaikschule','Krefeld',1,0),
-('103068','Grundschule am Stadtpark Fischeln','Krefeld',1,0),
-('103070','Mariannenschule','Krefeld',1,0),
-('103081','Städt. Gem. Grundschule','Krefeld',1,0),
-('103100','Heinrichsschule','Krefeld',1,0),
-('103111','Südschule','Krefeld',1,0),
-('103123','Paul Gerhardt Schule','Krefeld',1,0),
-('103135','Geschwister Scholl Schule','Krefeld',1,0),
-('103147','Pestalozzi Schule','Krefeld',1,0),
-('103159','Lindenschule','Krefeld',1,0),
-('103160','Brüder-Grimm-Schule','Krefeld',1,0),
-('103172','Grotenburg Schule','Krefeld',1,0),
-('103184','Buchenschule','Krefeld',1,0),
-('103196','Bismarckschule','Krefeld',1,0),
-('103202','Forstwaldschule','Krefeld',1,0),
-('103410','Städt. Gem. Grundschule Neuwerk','Mönchengladbach',1,0),
-('103421','Brückenschule','Mönchengladbach',1,0),
-('103433','Städt. Kath. Grundschule','Mönchengladbach',1,0),
-('103445','Gemeinschaftsgrundschule Hardt','Mönchengladbach',1,0),
-('103500','Städt. Kath. Grundschule Ohler','Mönchengladbach',1,0),
-('103512','Städt. Kath. Grundschule Uedding','Mönchengladbach',1,0),
-('103524','Städt. Kath. Grundschule Venn','Mönchengladbach',1,0),
-('103536','Will-Sommer-Grundschule','Mönchengladbach',1,0),
-('103561','Anton-Heinen-Schule','Mönchengladbach',1,0),
-('103573','Carl-Sonnenschein-Schule','Mönchengladbach',1,0),
-('103627','Städt. Kath. Grundschule Untereicken','Mönchengladbach',1,0),
-('103639','Franz-Wamich-Schule','Mönchengladbach',1,0),
-('103652','Annaschule','Mönchengladbach',1,0),
-('103676','Städt. Gem. Grundschule Pesch','Mönchengladbach',1,0),
-('103690','Städt. Kath. Grundschule Holt','Mönchengladbach',1,0),
-('103720','Städt. Gem. Grundschule Schulstraße','Mönchengladbach',1,0),
-('103731','Gemeinschaftsgrundschule Eicken','Mönchengladbach',1,0),
-('103755','Vitusschule Gemeinschaftsgrundschule','Mönchengladbach',1,0),
-('104103','Albert-Schweitzer-Schule','Neuss',1,0),
-('104115','Münsterschule','Neuss',1,0),
-('104127','St. Martinus Schule','Neuss',1,0),
-('104139','Pestalozzischule','Neuss',1,0),
-('104140','St. Konrad Schule','Neuss',1,0),
-('104164','Adolf Clarenbach Schule','Neuss',1,0),
-('104188','Die Brücke','Neuss',1,0),
-('104190','Friedrich-von-Bodelschwingh Schule','Neuss',1,0),
-('104206','Martin-Luther-Schule','Neuss',1,0),
-('104220','Leoschule','Neuss',1,0),
-('104231','Kreuzschule','Neuss',1,0),
-('104243','Karl-Kreiner-Schule','Neuss',1,0),
-('104279','Görresschule','Neuss',1,0),
-('104280','Burgunderschule','Neuss',1,0),
-('104292','St. Hubertus Schule','Neuss',1,0),
-('104310','Dreikönigenschule','Neuss',1,0),
-('105004','Kath. Grundschule Bell','Mönchengladbach',1,0),
-('105041','Städt. Kath. Grundschule','Mönchengladbach',1,0),
-('105065','Gem. Grundschule Waisenhausstraße','Mönchengladbach',1,0),
-('105089','Astrid-Lindgren-Schule','Mönchengladbach',1,0),
-('105090','Gem. Grundschule Mülfort-Dohr','Mönchengladbach',1,0),
-('105107','Erich Kästner-Schule','Mönchengladbach',1,0),
-('105119','Hermann-Gmeiner-Schule','Mönchengladbach',1,0),
-('105120','Städt. Ev. Grundschule','Mönchengladbach',1,0),
-('105132','Gemeinschaftsgrundschule Heyden','Mönchengladbach',1,0),
-('105144','Städtische Gemeinschaftsgrundschule','Mönchengladbach',1,0),
-('105156','Gemeinschaftsgrundschule Hockstein','Mönchengladbach',1,0),
-('105170','Grundschule Giesenkirchen','Mönchengladbach',1,0),
-('105181','Schule im Burgbongert','Mönchengladbach',1,0),
-('105193','Städt. Kath. Grundschule Meerkamp','Mönchengladbach',1,0),
-('107694','St.-Stephanus-Schule','Neuss',1,0),
-('107700','Martinus-Schule Holzheim','Neuss',1,0),
-('107773','Richard-Schirrmann-Schule','Neuss',1,0),
-('107785','Gem. Grundschule Wickrath','Mönchengladbach',1,0),
-('107797','Gem. Grundschule Beckrath','Mönchengladbach',1,0),
-('108133','Geschwister-Scholl-Schule','Neuss',1,0),
-('108145','St. Andreas-Schule','Neuss',1,0),
-('108157','St. Peter-Schule','Neuss',1,0),
-('108236','Grundschule An der Burg','Krefeld',1,0),
-('108248','Gemeinschaftsgrundschule Hüls','Krefeld',1,0),
-('137716','Städt. Kath. Hauptschule Neuwerk','Mönchengladbach',2,0),
-('137728','Anna Schiller-Schule','Mönchengladbach',2,0),
-('137807','Heinrich-Lersch-Schule','Mönchengladbach',2,0),
-('138344','Comenius-Schule','Mönchengladbach',2,0),
-('138368','Städt. Gem. Hauptschule Kirschhecke','Mönchengladbach',2,0),
-('138393','Gemeinschaftshauptschule Dohr','Mönchengladbach',2,0),
-('152407','Friedrich-von-Bodelschwingh-Schule','Krefeld',4,0),
-('152419','LVR-Förderschule Krefeld','Krefeld',4,0),
-('152470','Schule am Uerdinger Rundweg, Städtische','Krefeld',4,0),
-('152511','LVR-Förderschule Mönchengladbach','Mönchengladbach',4,0),
-('158975','Realschule Horkesgath','Krefeld',5,0),
-('158999','Freiherr-vom-Stein-Schule','Krefeld',5,0),
-('159001','Albert-Schweitzer-Schule','Krefeld',5,0),
-('159050','Städt. Realschule Volksgarten','Mönchengladbach',5,0),
-('159062','Geschwister-Scholl-Realschule','Mönchengladbach',5,0),
-('159207','Realschule an der Niers','Mönchengladbach',5,0),
-('159566','Realschule Wickrath','Mönchengladbach',5,0),
-('163843','Weiterbildungskolleg der Stadt Krefeld','Krefeld',14,0),
-('164914','Gymnasium Horkesgath','Krefeld',13,0),
-('164926','Gymnasium Fabritianum','Krefeld',13,0),
-('164940','Hannah-Arendt-Gymnasium','Krefeld',13,0),
-('164951','Gymnasium am Stadtpark Uerdingen','Krefeld',13,0),
-('164975','Maria-Sibylla-Merian-Gymnasium','Krefeld',13,0),
-('164987','Gymnasium Am Moltkeplatz','Krefeld',13,0),
-('164999','Ricarda-Huch-Gymnasium','Krefeld',13,0),
-('165049','Gymnasium Am Geroweiher','Mönchengladbach',13,0),
-('165050','Städt. Mathematisches,','Mönchengladbach',13,0),
-('165062','Stiftisches Humanistisches Gymnasium','Mönchengladbach',13,0),
-('165086','Gymnasium Rheindahlen','Mönchengladbach',13,0),
-('165130','Städt. Quirinus-Gymnasium','Neuss',13,0),
-('165141','Städt. Nelly-Sachs-Gymnasium','Neuss',13,0),
-('165165','Alexander-von-Humboldt-Gymnasium','Neuss',13,0),
-('165189','Marie-Curie-Gymnasium','Neuss',13,0),
-('165293','Städt. Hugo-Junkers-Gymnasium','Mönchengladbach',13,0),
-('165300','Gymnasium an der Gartenstraße','Mönchengladbach',13,0),
-('165311','Städt. Gymnasium Odenkirchen','Mönchengladbach',13,0),
-('165785','Städt. Gymnasium Norf','Neuss',13,0),
-('172182','Berufskolleg Vera Beckers','Krefeld',15,0),
-('172194','Berufskolleg Glockenspitz','Krefeld',15,0),
-('172200','Berufskolleg Uerdingen','Krefeld',15,0),
-('172212','Berufskolleg Kaufmannsschule','Krefeld',15,0),
-('172455','Berufskolleg Volksgartenstraße','Mönchengladbach',15,0),
-('172467','Berufskolleg Platz der Republik','Mönchengladbach',15,0),
-('172686','Berufskolleg für Technik und Informatik','Neuss',15,0),
-('172698','Berufsbildungszentrum Weingartstraße','Neuss',15,0),
-('172972','Maria-Lenssen-Berufskolleg','Mönchengladbach',15,0),
-('172996','Berufskolleg Rheydt-Mülfort','Mönchengladbach',15,0),
-('173009','Berufskolleg Rheydt-Mülfort','Mönchengladbach',15,0),
-('183702','Herman-van-Veen-Schule','Mönchengladbach',4,0),
-('183880','Gebrüder Grimm Schule','Neuss',1,0),
-('184639','Schule am Rheydter Bach','Mönchengladbach',4,0),
-('184688','Franz-Meyers-Gymnasium','Mönchengladbach',13,0),
-('185036','Christophorusschule','Krefeld',16,0),
-('185917','Schule am Nordpark, Förderschule des','Neuss',4,0),
-('186168','Michael-Ende-Schule','Neuss',4,0),
-('186259','Städt. Montessori-Grundschule','Mönchengladbach',1,0),
-('186582','Franz-Stollwerck-Förderschule, Städt.','Krefeld',4,0),
-('189145','Städtische Gesamtschule Espenstraße','Mönchengladbach',8,0),
-('189273','Gesamtschule Kaiserplatz','Krefeld',8,0),
-('189832','Gesamtschule Volksgarten','Mönchengladbach',8,0),
-('189868','Janusz-Korczak-Gesamtschule','Neuss',8,0),
-('190020','Robert-Jungk-Gesamtschule','Krefeld',8,0),
-('190962','Theodor-Schwann-Kolleg','Neuss',14,0),
-('190998','Gesamtschule Hardt','Mönchengladbach',8,0),
-('191024','Kurt-Tucholsky-Gesamtschule','Krefeld',8,0),
-('191486','Gesamtschule an der Erft','Neuss',8,0),
-('192594','Erich-Kästner-Förderschule,Städt.Förder-','Krefeld',4,0),
-('193082','Regenbogenschule','Krefeld',1,0),
-('193276','Herbert-Karrenberg-Schule','Neuss',4,0),
-('193355','Gesamtschule Rheydt-Mülfort','Mönchengladbach',8,0),
-('194293','Rita-Süssmuth-Realschule','Neuss',5,0),
-('194360','Joseph-Beuys-Schule, Förderschule des','Neuss',4,0),
-('194761','LVR-Luise-Leven-Schule','Krefeld',4,0),
-('194864','Hans-Jonas-Gesamtschule Neuwerk','Mönchengladbach',8,0),
-('194918','Gemeinschaftsgrundschule Krähenfeld','Krefeld',1,0),
-('195340','Städt. Gemeinschaftsgrundschule Kyburg','Neuss',1,0),
-('196174','Gesamtschule Nordstadt','Neuss',8,0),
-('196186','Theo-Hespers-Gesamtschule','Mönchengladbach',8,0),
-('198262','Gesamtschule Uerdingen','Krefeld',8,0),
-('198894','Gesamtschule Norf','Neuss',8,0),
-('199357','Grundschule Allerheiligen','Neuss',1,0),
-('199540','Förderzentrum Mönchengladbach-Nord,FÖ.d.','Mönchengladbach',4,0),
-('199552','Förderzentrum Mönchengladbach-Süd,FÖ.d.','Mönchengladbach',4,0),
-('199941','Gesamtschule am Botanischen Garten','Krefeld',8,0);
+INSERT INTO `school` (`snr`, `name`, `city`, `plz`, `ort`, `strasse`, `school_form_id`, `is_enabled_for_snapshots`) VALUES
+('100011','Städt. Gesamtschule','Haan','42781','Haan','Walder Straße 15',8,0),
+('100012','Städt. Gemeinschaftsgrundschule','Leverkusen','51373','Leverkusen','Bismarckstraße 200',1,0),
+('100014','Kolibri-Schule','Herne','44625','Herne','Kolibriweg 8',1,0),
+('100015','Städt. Wim-Wenders-Gymnasium','Düsseldorf','40227','Düsseldorf','Schmiedestraße 25',13,0),
+('100016','Kupferstädter Gesamtschule','Stolberg (Rhld.)','52222','Stolberg (Rhld.)','Kupfermeisterstraße 12',8,0),
+('100017','Städt. Gem. Grundschule','Hürth','50354','Hürth','Bonnstraße 172',1,0),
+('100019','Joseph Beuys Gesamtschule','Kleve','47533','Kleve','Hoffmannallee 15',8,0),
+('100052','Comenius-Gesamtschule','Neuss','41460','Neuss','Weberstraße 90',8,0),
+('100128','Grundschule Vulkanstraße','Krefeld','47803','Krefeld','Vulkanstraße 10',1,0),
+('100137','Kompass-Grundschule','Krefeld','47809','Krefeld','Kompassweg 4',1,0),
+('100157','Grundschule Westparkstraße','Krefeld','47803','Krefeld','Westparkstraße 21',1,0),
+('100223','Grundschule Am Ringerberg','Mönchengladbach','41065','Mönchengladbach','Am Ringerberg 12',1,0),
+('100226','Grundschule Wilhelm-Strauß-Straße','Mönchengladbach','41236','Mönchengladbach','Wilhelm-Strauß-Straße 18',1,0),
+('102880','Schule an Haus Rath','Krefeld','47802','Krefeld','Rather Straße 100',1,0);
 
 INSERT INTO `sex` VALUES
 (3,'3','männlich'),

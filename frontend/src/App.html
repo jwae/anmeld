@@ -37,6 +37,7 @@
       :connected-host="connectedHost || host"
       :connected-port="connectedPort || port"
       :connected-database="connectedDatabase || database"
+      :token="pendingLogin?.token || ''"
       @close="showLoginCredentialsPage = false"
     />
   </template>

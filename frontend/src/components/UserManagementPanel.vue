@@ -2,10 +2,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { authStore } from "../authStore";
 import apiClient from "../services/apiClient";
-import DbContentsManagement from "./DbContentsManagement.vue";
 import SchoolManagement from "./SchoolManagement.vue";
-import SnapshotSchoolYearManagement from "./SnapshotSchoolYearManagement.vue";
-import SnapshotManagement from "./SnapshotManagement.vue";
 import type { User } from "../types";
 
 const props = defineProps<{
@@ -565,11 +562,6 @@ async function deleteManagementUser(user: any) {
 }
 
 function handleSchoolManagementFeedback(feedback: any) {
-  managementError.value = String(feedback?.error || "");
-  managementNotice.value = String(feedback?.notice || "");
-}
-
-function handleSnapshotManagementFeedback(feedback: any) {
   managementError.value = String(feedback?.error || "");
   managementNotice.value = String(feedback?.notice || "");
 }
