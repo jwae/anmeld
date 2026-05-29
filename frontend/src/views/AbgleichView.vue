@@ -18,6 +18,29 @@ type SchuelerRow = {
   anmeldestatus: string;
 };
 
+type SummaryStats = {
+  gesamt: number;
+  schulen: number;
+  neuaufnahme: number;
+  warteliste: number;
+  abgelehnt: number;
+  ohne: number;
+  foerderbedarf: number;
+  zieldifferent: number;
+};
+
+type SchoolOverviewRow = {
+  schulnummer: string;
+  schule: string;
+  kapazitaet: number;
+  gesamt: number;
+  neuaufnahme: number;
+  warteliste: number;
+  ohne: number;
+  foerderbedarf: number;
+  zieldifferent: number;
+};
+
 const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
@@ -31,6 +54,7 @@ const props = defineProps<{
 const loading = ref(false);
 const errorMessage = ref("");
 const schuelerRows = ref<SchuelerRow[]>([]);
+const schoolOverviewRows = ref<SchoolOverviewRow[]>([]);
 
 const search = ref("");
 const schuleFilter = ref("alle");
@@ -40,6 +64,21 @@ const zieldifferentFilter = ref("alle");
 const herkunftFilter = ref("alle");
 const sortKey = ref<keyof SchuelerRow>("nachname");
 const sortDirection = ref<"asc" | "desc">("asc");
+
+function createEmptySummary(): SummaryStats {
+  return {
+    gesamt: 0,
+    schulen: 0,
+    neuaufnahme: 0,
+    warteliste: 0,
+    abgelehnt: 0,
+    ohne: 0,
+    foerderbedarf: 0,
+    zieldifferent: 0,
+  };
+}
+
+const summary = ref<SummaryStats>(createEmptySummary());
 
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
@@ -105,63 +144,9 @@ const filteredRows = computed(() => {
   });
 });
 
-const summary = computed(() => {
-  const rows = filteredRows.value;
-  return {
-    gesamt: rows.length,
-    schulen: new Set(rows.map((row) => normalizeText(row.schule)).filter(Boolean)).size,
-    neuaufnahme: rows.filter((row) => normalizeStatus(row.anmeldestatus) === "Neuaufnahme").length,
-    warteliste: rows.filter((row) => normalizeStatus(row.anmeldestatus) === "Warteliste").length,
-    abgelehnt: rows.filter((row) => normalizeStatus(row.anmeldestatus) === "Abgelehnt").length,
-    ohne: rows.filter((row) => normalizeStatus(row.anmeldestatus) === "Ohne").length,
-    foerderbedarf: rows.filter((row) => hasPositiveFoerderbedarf(row.foerderbedarf)).length,
-    zieldifferent: rows.filter((row) => isZieldifferent(row.zieldifferent)).length,
-  };
-});
-
 const schoolOverview = computed(() => {
-  const grouped = new Map<string, {
-    schulnummer: string;
-    schule: string;
-    gesamt: number;
-    neuaufnahme: number;
-    warteliste: number;
-    abgelehnt: number;
-    ohne: number;
-    foerderbedarf: number;
-    zieldifferent: number;
-  }>();
-
-  for (const row of filteredRows.value) {
-    const key = normalizeText(row.schule) || normalizeText(row.schulnummer) || "Ohne Schule";
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        schulnummer: normalizeText(row.schulnummer),
-        schule: normalizeText(row.schule) || "Ohne Schule",
-        gesamt: 0,
-        neuaufnahme: 0,
-        warteliste: 0,
-        abgelehnt: 0,
-        ohne: 0,
-        foerderbedarf: 0,
-        zieldifferent: 0,
-      });
-    }
-
-    const entry = grouped.get(key)!;
-    const status = normalizeStatus(row.anmeldestatus);
-    entry.gesamt += 1;
-    if (status === "Neuaufnahme") entry.neuaufnahme += 1;
-    if (status === "Warteliste") entry.warteliste += 1;
-    if (status === "Abgelehnt") entry.abgelehnt += 1;
-    if (status === "Ohne") entry.ohne += 1;
-    if (hasPositiveFoerderbedarf(row.foerderbedarf)) entry.foerderbedarf += 1;
-    if (isZieldifferent(row.zieldifferent)) entry.zieldifferent += 1;
-  }
-
-  return Array.from(grouped.values()).sort((a, b) =>
-    a.schule.localeCompare(b.schule, "de", { sensitivity: "base" }),
-  );
+  if (schuleFilter.value === "alle") return schoolOverviewRows.value;
+  return schoolOverviewRows.value.filter((row) => normalizeText(row.schule) === schuleFilter.value);
 });
 
 const sortedRows = computed(() => {
@@ -190,6 +175,8 @@ function sortMarker(key: keyof SchuelerRow) {
 async function loadData() {
   if (!props.verfahrenId || !props.rundeId) {
     schuelerRows.value = [];
+    schoolOverviewRows.value = [];
+    summary.value = createEmptySummary();
     return;
   }
 
@@ -198,9 +185,16 @@ async function loadData() {
     errorMessage.value = "";
     const response = await abgleichService.getSchuelerUebersicht(props.verfahrenId, props.rundeId, props.token);
     schuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
+    schoolOverviewRows.value = Array.isArray(response?.schoolOverview) ? response.schoolOverview : [];
+    summary.value = {
+      ...createEmptySummary(),
+      ...(response?.summary || {}),
+    };
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Abgleichsansicht konnte nicht geladen werden.";
     schuelerRows.value = [];
+    schoolOverviewRows.value = [];
+    summary.value = createEmptySummary();
   } finally {
     loading.value = false;
   }
@@ -237,6 +231,25 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
     </div>
 
     <template v-else>
+      <section class="summary-card">
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">1</p>
+            <h3>Zusammenfassung</h3>
+          </div>
+          <span class="summary-context">{{ context.verfahren }} | {{ context.runde }} | Datenquelle: anm_schueler</span>
+        </div>
+        <div class="summary-grid">
+          <div class="metric-card"><span>Schueler gesamt</span><strong>{{ summary.gesamt }}</strong></div>
+          <div class="metric-card"><span>Schulen</span><strong>{{ summary.schulen }}</strong></div>
+          <div class="metric-card"><span>Neuaufnahme</span><strong>{{ summary.neuaufnahme }}</strong></div>
+          <div class="metric-card"><span>Warteliste</span><strong>{{ summary.warteliste }}</strong></div>
+          <div class="metric-card metric-card-alert"><span>Ohne Anmeldung</span><strong>{{ summary.ohne }}</strong></div>
+          <div class="metric-card"><span>Foerderbedarf</span><strong>{{ summary.foerderbedarf }}</strong></div>
+          <div class="metric-card"><span>Zieldifferent</span><strong>{{ summary.zieldifferent }}</strong></div>
+        </div>
+      </section>
+
       <section class="filter-card">
         <label class="filter-field search-field">
           <span>Schuelername</span>
@@ -280,33 +293,13 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         </label>
       </section>
 
-      <section class="summary-card">
-        <div class="section-head">
-          <div>
-            <p class="section-eyebrow">1</p>
-            <h3>Summary</h3>
-          </div>
-          <span class="summary-context">{{ context.verfahren }} · {{ context.runde }}</span>
-        </div>
-        <div class="summary-grid">
-          <div class="metric-card"><span>Schueler gesamt</span><strong>{{ summary.gesamt }}</strong></div>
-          <div class="metric-card"><span>Schulen</span><strong>{{ summary.schulen }}</strong></div>
-          <div class="metric-card"><span>Neuaufnahme</span><strong>{{ summary.neuaufnahme }}</strong></div>
-          <div class="metric-card"><span>Warteliste</span><strong>{{ summary.warteliste }}</strong></div>
-          <div class="metric-card"><span>Abgelehnt</span><strong>{{ summary.abgelehnt }}</strong></div>
-          <div class="metric-card"><span>Ohne</span><strong>{{ summary.ohne }}</strong></div>
-          <div class="metric-card"><span>Foerderbedarf</span><strong>{{ summary.foerderbedarf }}</strong></div>
-          <div class="metric-card"><span>Zieldifferent</span><strong>{{ summary.zieldifferent }}</strong></div>
-        </div>
-      </section>
-
       <section class="table-card">
         <div class="section-head">
           <div>
             <p class="section-eyebrow">2</p>
-            <h3>School Overview</h3>
+            <h3>Uebersicht Anmeldungen</h3>
           </div>
-          <span class="table-count">{{ schoolOverview.length }} Schulen</span>
+          <span class="table-count">{{ schoolOverview.length }} Schulen | Datenquelle: anm_schueler</span>
         </div>
         <div class="table-wrap">
           <table class="overview-table">
@@ -314,10 +307,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <tr>
                 <th>Schul-Nr</th>
                 <th>Schule</th>
+                <th>Kapazitaet</th>
                 <th>Gesamt</th>
                 <th>Neuaufnahme</th>
                 <th>Warteliste</th>
-                <th>Abgelehnt</th>
                 <th>Ohne</th>
                 <th>Foerderbedarf</th>
                 <th>Zieldifferent</th>
@@ -333,10 +326,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <tr v-for="row in schoolOverview" :key="`${row.schulnummer}-${row.schule}`">
                 <td>{{ row.schulnummer || "-" }}</td>
                 <td>{{ row.schule }}</td>
+                <td>{{ row.kapazitaet }}</td>
                 <td>{{ row.gesamt }}</td>
                 <td>{{ row.neuaufnahme }}</td>
                 <td>{{ row.warteliste }}</td>
-                <td>{{ row.abgelehnt }}</td>
                 <td>{{ row.ohne }}</td>
                 <td>{{ row.foerderbedarf }}</td>
                 <td>{{ row.zieldifferent }}</td>
@@ -350,46 +343,60 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         <div class="section-head">
           <div>
             <p class="section-eyebrow">3</p>
-            <h3>Detailed Student Table</h3>
+            <h3>Schuelerliste</h3>
           </div>
           <span class="table-count">{{ sortedRows.length }} Treffer</span>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap detail-table-wrap">
           <table class="detail-table">
             <thead>
               <tr>
+                <th>Nr.</th>
+                <th><button type="button" @click="setSort('schueler_schul_id')">Schueler-ID{{ sortMarker('schueler_schul_id') }}</button></th>
+                <th><button type="button" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
+                <th><button type="button" @click="setSort('geburtsdatum')">Geburtsdatum{{ sortMarker('geburtsdatum') }}</button></th>
+                <th><button type="button" @click="setSort('foerderbedarf')">LE{{ sortMarker('foerderbedarf') }}</button></th>
+                <th>ZD</th>
+                <th>Herkunft</th>
+                <th><button type="button" @click="setSort('abgleich_status')">Abgleichstatus{{ sortMarker('abgleich_status') }}</button></th>
+                <th><button type="button" @click="setSort('anmeldestatus')">Anmeldestatus{{ sortMarker('anmeldestatus') }}</button></th>
                 <th><button type="button" @click="setSort('schulnummer')">Schul-Nr{{ sortMarker('schulnummer') }}</button></th>
                 <th><button type="button" @click="setSort('schule')">Schule{{ sortMarker('schule') }}</button></th>
-                <th><button type="button" @click="setSort('schueler_schul_id')">Schueler-ID{{ sortMarker('schueler_schul_id') }}</button></th>
-                <th><button type="button" @click="setSort('nachname')">Nachname{{ sortMarker('nachname') }}</button></th>
-                <th><button type="button" @click="setSort('vorname')">Vorname{{ sortMarker('vorname') }}</button></th>
-                <th><button type="button" @click="setSort('geburtsdatum')">Geburtsdatum{{ sortMarker('geburtsdatum') }}</button></th>
-                <th><button type="button" @click="setSort('foerderbedarf')">Foerderbedarf{{ sortMarker('foerderbedarf') }}</button></th>
-                <th>Zieldifferent</th>
-                <th><button type="button" @click="setSort('anmeldestatus')">Anmeldestatus{{ sortMarker('anmeldestatus') }}</button></th>
-                <th><button type="button" @click="setSort('abgleich_status')">Abgleichstatus{{ sortMarker('abgleich_status') }}</button></th>
-                <th>Herkunft</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="11" class="table-empty">Daten werden geladen...</td>
+                <td colspan="12" class="table-empty">Daten werden geladen...</td>
               </tr>
               <tr v-else-if="!sortedRows.length">
-                <td colspan="11" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
+                <td colspan="12" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
               </tr>
-              <tr v-for="row in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}`">
-                <td>{{ row.schulnummer || "-" }}</td>
-                <td>{{ row.schule || "-" }}</td>
+              <tr v-for="(row, index) in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}-${index}`">
+                <td>{{ index + 1 }}</td>
                 <td>{{ row.schueler_schul_id || "-" }}</td>
-                <td>{{ row.nachname || "-" }}</td>
-                <td>{{ row.vorname || "-" }}</td>
+                <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
                 <td>{{ formatDate(row.geburtsdatum) }}</td>
-                <td>{{ row.foerderbedarf || "-" }}</td>
-                <td>{{ isZieldifferent(row.zieldifferent) ? "Ja" : "Nein" }}</td>
-                <td>{{ normalizeStatus(row.anmeldestatus) }}</td>
-                <td>{{ row.abgleich_status || "-" }}</td>
+                <td>
+                  <span v-if="normalizeText(row.foerderbedarf) === '1'" class="status-badge status-badge-le">ja</span>
+                </td>
+                <td>
+                  <span v-if="normalizeText(row.zieldifferent) === '1'" class="status-badge status-badge-zd">ja</span>
+                </td>
                 <td>{{ displayHerkunft(row) }}</td>
+                <td>{{ row.abgleich_status || "-" }}</td>
+                <td>
+                  <span
+                    :class="[
+                      'status-chip',
+                      normalizeStatus(row.anmeldestatus) === 'Ohne' ? 'status-chip-ohne' : '',
+                      normalizeStatus(row.anmeldestatus) === 'Warteliste' ? 'status-chip-warteliste' : '',
+                    ]"
+                  >
+                    {{ normalizeStatus(row.anmeldestatus) }}
+                  </span>
+                </td>
+                <td>{{ row.schulnummer || "---" }}</td>
+                <td>{{ row.schule }}</td>
               </tr>
             </tbody>
           </table>
@@ -456,14 +463,14 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 
 .filter-card {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .filter-field {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .filter-field span,
@@ -480,10 +487,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 .filter-field input,
 .filter-field select {
   border: 1px solid #dbe4f0;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 7px 10px;
   background: #fff;
   color: #17385f;
+  font-size: 13px;
 }
 
 .section-head {
@@ -497,23 +505,34 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 
 .summary-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
 }
 
 .metric-card {
-  padding: 14px 16px;
-  border: 1px solid #dbe4f0;
-  border-radius: 16px;
-  background: #fff;
+  padding: 8px 10px;
+  border: 1px solid #cfe0f5;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
   display: grid;
-  gap: 8px;
+  gap: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .metric-card strong {
-  font-size: 28px;
+  font-size: 20px;
   line-height: 1;
   color: #17385f;
+}
+
+.metric-card-alert {
+  border-color: #f3c7c7;
+  background: linear-gradient(180deg, #fff7f7 0%, #fdecec 100%);
+}
+
+.metric-card-alert span,
+.metric-card-alert strong {
+  color: #b42318;
 }
 
 .table-wrap {
@@ -521,6 +540,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   border: 1px solid #e5edf6;
   border-radius: 16px;
   background: #fff;
+}
+
+.detail-table-wrap {
+  max-height: 620px;
+  overflow: auto;
 }
 
 .overview-table,
@@ -542,12 +566,30 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 }
 
 .overview-table th,
+.overview-table td {
+  padding: 6px 10px;
+  line-height: 1.2;
+}
+
+.detail-table th,
+.detail-table td {
+  padding: 6px 10px;
+  line-height: 1.2;
+}
+
+.overview-table th,
 .detail-table th {
   background: #f8fbff;
   color: #5a7393;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.detail-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .detail-table th button {
@@ -572,6 +614,51 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   border: 0;
   background: #eef4fd;
   color: #17385f;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.status-badge-le {
+  background: #e9f6ec;
+  color: #21653a;
+}
+
+.status-badge-zd {
+  background: #e8f1ff;
+  color: #1d4f91;
+}
+
+.status-badge-muted {
+  background: #eef2f7;
+  color: #6b7f99;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.status-chip-ohne {
+  background: #fdecec;
+  color: #b42318;
+}
+
+.status-chip-warteliste {
+  background: #fff4e5;
+  color: #9a5b00;
 }
 
 .feedback-panel-warning {

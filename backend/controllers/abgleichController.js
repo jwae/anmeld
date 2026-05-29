@@ -253,170 +253,53 @@ async function loadSummary(pool, verfahrenId, rundeId, schoolRows) {
 }
 
 async function loadSchuelerRows(pool, verfahrenId, rundeId) {
-  const schuelerColumns = await loadTableColumns(pool, "anm_schueler_pool");
-  const offenerFallExists = await tableExists(pool, "anm_offener_fall");
-  const offenerFallColumns = offenerFallExists ? await loadTableColumns(pool, "anm_offener_fall") : new Set();
-  const hasFallstatusTable = await tableExists(pool, "anm_kat_fallstatus");
-  const hasEmpfehlungTable = await tableExists(pool, "anm_kat_empfehlung");
+  const columns = await loadTableColumns(pool, "anm_schueler");
+  if (!columns.size) return [];
 
-  const schuelerQuelleExpr = schuelerColumns.has("quelle")
-    ? "COALESCE(NULLIF(TRIM(s.quelle), ''), CASE WHEN ax.schueler_pool_id IS NULL AND ax.schueler_anmeldung_id IS NOT NULL THEN 'ANMELDUNG' ELSE '' END)"
-    : "CASE WHEN ax.schueler_pool_id IS NULL AND ax.schueler_anmeldung_id IS NOT NULL THEN 'ANMELDUNG' ELSE '' END";
-  const schuelerNotizExpr = schuelerColumns.has("notiz")
-    ? "COALESCE(s.notiz, ofall.notiz, '')"
-    : "COALESCE(ofall.notiz, '')";
+  const schoolColumn = columns.has("schul_nr")
+    ? "s.schul_nr"
+    : (columns.has("snr") ? "s.snr" : "''");
+  const studentIdColumn = columns.has("schueler_id")
+    ? "s.schueler_id"
+    : (columns.has("schueler_nr") ? "s.schueler_nr" : "''");
+  const whereParts = [];
+  const params = [];
 
-  const ofallStatusSelect = offenerFallColumns.has("fallstatus_id")
-    ? "f.fallstatus_id"
-    : offenerFallColumns.has("fallstatus_code")
-      ? "f.fallstatus_code"
-      : "NULL AS fallstatus_code";
-
-  const ofallEmpfehlungSelect = offenerFallColumns.has("empfehlung_id")
-    ? "f.empfehlung_id"
-    : "NULL AS empfehlung_id";
-
-  const ofallNotizSelect = offenerFallColumns.has("notiz")
-    ? "f.notiz"
-    : offenerFallColumns.has("bemerkung")
-      ? "f.bemerkung AS notiz"
-      : "NULL AS notiz";
-
-  const ofallZugewieseneSnrSelect = offenerFallColumns.has("zugewiesene_snr")
-    ? "f.zugewiesene_snr"
-    : "NULL AS zugewiesene_snr";
-
-  const fallstatusJoinCond = offenerFallColumns.has("fallstatus_id")
-    ? "fs.id = ofall.fallstatus_id"
-    : "fs.code = ofall.fallstatus_code";
-
-  const empfehlungJoinCond = offenerFallColumns.has("empfehlung_id")
-    ? "emp.id = ofall.empfehlung_id"
-    : "emp.id = s.empfehlung_id";
-
-  const fallJoin = offenerFallExists
-    ? `
-      LEFT JOIN (
-        SELECT
-          f.schueler_pool_id,
-          f.fallgrund_id,
-          ${ofallStatusSelect},
-          ${ofallEmpfehlungSelect},
-          ${ofallNotizSelect},
-          ${ofallZugewieseneSnrSelect}
-        FROM anm_offener_fall f
-        WHERE f.verfahren_id = ?
-      ) ofall
-        ON ofall.schueler_pool_id = s.id
-      LEFT JOIN anm_kat_fallgrund fg
-        ON fg.id = ofall.fallgrund_id
-      ${hasFallstatusTable
-        ? `
-      LEFT JOIN anm_kat_fallstatus fs
-        ON ${fallstatusJoinCond}
-      `
-        : ""}
-    `
-    : `
-      LEFT JOIN (
-        SELECT 
-          NULL AS schueler_pool_id, 
-          NULL AS fallgrund_id, 
-          NULL AS fallstatus_id,
-          NULL AS fallstatus_code,
-          NULL AS empfehlung_id, 
-          NULL AS notiz,
-          NULL AS zugewiesene_snr
-      ) ofall
-        ON 1 = 0
-      LEFT JOIN anm_kat_fallgrund fg
-        ON 1 = 0
-    `;
-
-  const empfehlungJoin = hasEmpfehlungTable
-    ? `
-      LEFT JOIN anm_kat_empfehlung emp
-        ON ${empfehlungJoinCond}
-    `
-    : `
-      LEFT JOIN (
-        SELECT NULL AS id, NULL AS code, NULL AS bezeichnung
-      ) emp
-        ON 1 = 0
-    `;
-
-  const offenerFallFilter = offenerFallExists
-    ? `
-      OR EXISTS (
-        SELECT 1
-        FROM anm_offener_fall fx
-        WHERE fx.verfahren_id = ?
-          AND fx.schueler_pool_id = s.id
-      )
-    `
-    : "";
+  if (columns.has("verfahren_id")) {
+    whereParts.push("s.verfahren_id = ?");
+    params.push(verfahrenId);
+  }
+  if (columns.has("runde_id")) {
+    whereParts.push("s.runde_id = ?");
+    params.push(rundeId);
+  }
 
   const [rows] = await pool.query(
     `
     SELECT
-      COALESCE(s.id, sa.id) AS schueler_id,
-      COALESCE(s.vorname, sa.vorname, '') AS vorname,
-      COALESCE(s.nachname, sa.nachname, '') AS nachname,
-      DATE_FORMAT(COALESCE(s.geburtsdatum, sa.geburtsdatum), '%Y-%m-%d') AS geburtsdatum,
-      COALESCE(s.foerderbedarf, sa.foerderbedarf, '') AS foerderbedarf,
-      COALESCE(s.zieldifferent, sa.zieldifferent, 0) AS zieldifferent,
-      COALESCE(NULLIF(TRIM(emp.code), ''), NULLIF(TRIM(emp.bezeichnung), ''), '') AS empfehlung,
-      ${schuelerQuelleExpr} AS quelle,
-      COALESCE(sch.name, sch_ref.name, '') AS schule,
-      COALESCE(sch.ort, sch_ref.ort, sch_ref.city, '') AS ort,
-      COALESCE(a.snr, sa.snr, '') AS schulnummer,
-      COALESCE(a.schueler_schul_id, sa.schueler_schul_id, '') AS schueler_schul_id,
-      COALESCE(ax.abgleich_status, '') AS abgleich_status,
-      COALESCE(NULLIF(TRIM(ast.code), ''), NULLIF(TRIM(ast.bezeichnung), ''), '') AS anmeldestatus,
-      COALESCE(NULLIF(TRIM(fg.code), ''), NULLIF(TRIM(fg.bezeichnung), ''), '') AS fallgrund,
-      ${hasFallstatusTable
-        ? "COALESCE(NULLIF(TRIM(fs.code), ''), NULLIF(TRIM(fs.bezeichnung), ''), '')"
-        : "COALESCE(NULLIF(TRIM(ofall.fallstatus_code), ''), '')"} AS fallstatus,
-      COALESCE(zs.name, '') AS zugewiesene_schule,
-      ${schuelerNotizExpr} AS notiz
-    FROM anm_schueler_abgleich ax
-    LEFT JOIN anm_schueler_pool s
-      ON s.id = ax.schueler_pool_id
-    LEFT JOIN anm_schueler_anmeldung sa
-      ON sa.id = ax.schueler_anmeldung_id
-    LEFT JOIN anm_anmeldung a
-      ON (
-        (ax.schueler_pool_id IS NOT NULL AND a.schueler_pool_id = ax.schueler_pool_id)
-        OR (
-          ax.schueler_pool_id IS NULL
-          AND ax.schueler_anmeldung_id IS NOT NULL
-          AND a.schueler_anmeldung_id = ax.schueler_anmeldung_id
-        )
-      )
-     AND a.verfahren_id = ?
-     AND a.runde_id = ?
+      COALESCE(s.id, 0) AS schueler_id,
+      COALESCE(s.vorname, '') AS vorname,
+      COALESCE(s.nachname, '') AS nachname,
+      DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+      COALESCE(s.foerderbedarf, '') AS foerderbedarf,
+      COALESCE(s.zieldifferent, 0) AS zieldifferent,
+      COALESCE(s.quelle, '') AS quelle,
+      COALESCE(s.herkunft, '') AS herkunft,
+      COALESCE(sch.name, sref.name, '') AS schule,
+      COALESCE(sch.ort, sref.ort, sref.city, '') AS ort,
+      NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
+      NULLIF(TRIM(${studentIdColumn}), '') AS schueler_schul_id,
+      COALESCE(s.abgleich_status, '') AS abgleich_status,
+      COALESCE(s.anmeldestatus, '') AS anmeldestatus
+    FROM anm_schueler s
     LEFT JOIN anm_schulen sch
-      ON sch.snr = COALESCE(a.snr, sa.snr)
-    LEFT JOIN school sch_ref
-      ON sch_ref.snr = COALESCE(a.snr, sa.snr)
-    LEFT JOIN anm_kat_anmeldestatus ast
-      ON ast.id = a.anmeldestatus_id
-    ${fallJoin}
-    ${empfehlungJoin}
-    LEFT JOIN anm_schulen zs
-      ON zs.snr = ofall.zugewiesene_snr
-    WHERE
-      ax.verfahren_id = ?
-      AND ax.runde_id = ?
-    ORDER BY COALESCE(s.nachname, sa.nachname, '') ASC, COALESCE(s.vorname, sa.vorname, '') ASC, COALESCE(s.id, sa.id) ASC
+      ON sch.snr = ${schoolColumn}
+    LEFT JOIN school sref
+      ON sref.snr = ${schoolColumn}
+    ${whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : ""}
+    ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC
     `,
-    [
-      verfahrenId,
-      rundeId,
-      ...(offenerFallExists ? [verfahrenId] : []),
-      verfahrenId,
-      rundeId,
-    ],
+    params,
   );
 
   return (rows || []).map((row) => ({
@@ -425,19 +308,196 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     nachname: normalizeText(row?.nachname),
     geburtsdatum: row?.geburtsdatum || null,
     foerderbedarf: normalizeText(row?.foerderbedarf),
-    zieldifferent: Number(row?.zieldifferent || 0) === 1 ? 1 : 0,
-    empfehlung: normalizeText(row?.empfehlung),
+    zieldifferent: normalizeText(row?.zieldifferent),
     quelle: normalizeText(row?.quelle),
+    herkunft: normalizeText(row?.herkunft),
     schule: normalizeText(row?.schule),
     ort: normalizeText(row?.ort),
     schulnummer: normalizeText(row?.schulnummer),
     schueler_schul_id: normalizeText(row?.schueler_schul_id),
     abgleich_status: normalizeText(row?.abgleich_status),
     anmeldestatus: normalizeText(row?.anmeldestatus),
-    fallgrund: normalizeText(row?.fallgrund),
-    fallstatus: normalizeText(row?.fallstatus),
-    zugewiesene_schule: normalizeText(row?.zugewiesene_schule),
-    notiz: normalizeText(row?.notiz),
+  }));
+}
+
+async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
+  const columns = await loadTableColumns(pool, "anm_schueler");
+  if (!columns.size) {
+    return {
+      gesamt: 0,
+      schulen: 0,
+      neuaufnahme: 0,
+      warteliste: 0,
+      abgelehnt: 0,
+      ohne: 0,
+      foerderbedarf: 0,
+      zieldifferent: 0,
+    };
+  }
+
+  const filters = [];
+  const params = [];
+
+  if (columns.has("verfahren_id")) {
+    filters.push("verfahren_id = ?");
+    params.push(verfahrenId);
+  }
+  if (columns.has("runde_id")) {
+    filters.push("runde_id = ?");
+    params.push(rundeId);
+  }
+
+  const schoolColumn = columns.has("schul_nr")
+    ? "schul_nr"
+    : (columns.has("snr") ? "snr" : "");
+  const anmeldestatusExpr = columns.has("anmeldestatus")
+    ? "LOWER(TRIM(COALESCE(anmeldestatus, '')))"
+    : "''";
+  const foerderbedarfExpr = columns.has("foerderbedarf")
+    ? `
+      CASE
+        WHEN TRIM(COALESCE(foerderbedarf, '')) = '' THEN 0
+        WHEN LOWER(TRIM(COALESCE(foerderbedarf, ''))) IN ('0', 'false', 'nein', 'no') THEN 0
+        ELSE 1
+      END
+    `
+    : "0";
+  const zieldifferentExpr = columns.has("zieldifferent")
+    ? `
+      CASE
+        WHEN LOWER(TRIM(COALESCE(zieldifferent, '0'))) IN ('1', 'true', 'ja', 'yes') THEN 1
+        ELSE 0
+      END
+    `
+    : "0";
+  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      COUNT(*) AS gesamt,
+      ${schoolColumn
+        ? `COUNT(DISTINCT NULLIF(TRIM(${schoolColumn}), ''))`
+        : "0"} AS schulen,
+      COALESCE(SUM(CASE WHEN ${anmeldestatusExpr} = 'neuaufnahme' THEN 1 ELSE 0 END), 0) AS neuaufnahme,
+      COALESCE(SUM(CASE WHEN ${anmeldestatusExpr} = 'warteliste' THEN 1 ELSE 0 END), 0) AS warteliste,
+      COALESCE(SUM(CASE WHEN ${anmeldestatusExpr} IN ('abgelehnt', 'ablehnung') THEN 1 ELSE 0 END), 0) AS abgelehnt,
+      COALESCE(SUM(CASE WHEN ${anmeldestatusExpr} IN ('', 'ohne') THEN 1 ELSE 0 END), 0) AS ohne,
+      COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
+      COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
+    FROM anm_schueler
+    ${whereClause}
+    `,
+    params,
+  );
+
+  return {
+    gesamt: Number(rows?.[0]?.gesamt || 0),
+    schulen: Number(rows?.[0]?.schulen || 0),
+    neuaufnahme: Number(rows?.[0]?.neuaufnahme || 0),
+    warteliste: Number(rows?.[0]?.warteliste || 0),
+    abgelehnt: Number(rows?.[0]?.abgelehnt || 0),
+    ohne: Number(rows?.[0]?.ohne || 0),
+    foerderbedarf: Number(rows?.[0]?.foerderbedarf || 0),
+    zieldifferent: Number(rows?.[0]?.zieldifferent || 0),
+  };
+}
+
+async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
+  const columns = await loadTableColumns(pool, "anm_schueler");
+  if (!columns.size) return [];
+  const kapazitaetColumns = await loadTableColumns(pool, "anm_kapazitaet");
+
+  const filters = [];
+  const params = [];
+
+  if (columns.has("verfahren_id")) {
+    filters.push("s.verfahren_id = ?");
+    params.push(verfahrenId);
+  }
+  if (columns.has("runde_id")) {
+    filters.push("s.runde_id = ?");
+    params.push(rundeId);
+  }
+
+  const schoolColumn = columns.has("schul_nr")
+    ? "s.schul_nr"
+    : (columns.has("snr") ? "s.snr" : "''");
+  const statusExpr = columns.has("anmeldestatus")
+    ? "LOWER(TRIM(COALESCE(s.anmeldestatus, '')))"
+    : "''";
+  const foerderbedarfExpr = columns.has("foerderbedarf")
+    ? `
+      CASE
+        WHEN TRIM(COALESCE(s.foerderbedarf, '')) = '' THEN 0
+        WHEN LOWER(TRIM(COALESCE(s.foerderbedarf, ''))) IN ('0', 'false', 'nein', 'no') THEN 0
+        ELSE 1
+      END
+    `
+    : "0";
+  const zieldifferentExpr = columns.has("zieldifferent")
+    ? `
+      CASE
+        WHEN LOWER(TRIM(COALESCE(s.zieldifferent, '0'))) IN ('1', 'true', 'ja', 'yes') THEN 1
+        ELSE 0
+      END
+    `
+    : "0";
+  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const capacityJoin = kapazitaetColumns.has("verfahren_id") && kapazitaetColumns.has("snr")
+    ? `
+      LEFT JOIN (
+        SELECT
+          k.snr,
+          SUM(COALESCE(k.gesamtkapazitaet, 0)) AS kapazitaet
+        FROM anm_kapazitaet k
+        WHERE k.verfahren_id = ?
+        GROUP BY k.snr
+      ) cap
+        ON cap.snr = ${schoolColumn}
+    `
+    : `
+      LEFT JOIN (
+        SELECT NULL AS snr, 0 AS kapazitaet
+      ) cap
+        ON 1 = 0
+    `;
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
+      COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule') AS schule,
+      COALESCE(cap.kapazitaet, 0) AS kapazitaet,
+      COUNT(*) AS gesamt,
+      COALESCE(SUM(CASE WHEN ${statusExpr} = 'neuaufnahme' THEN 1 ELSE 0 END), 0) AS neuaufnahme,
+      COALESCE(SUM(CASE WHEN ${statusExpr} = 'warteliste' THEN 1 ELSE 0 END), 0) AS warteliste,
+      COALESCE(SUM(CASE WHEN ${statusExpr} IN ('', 'ohne') THEN 1 ELSE 0 END), 0) AS ohne,
+      COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
+      COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
+    FROM anm_schueler s
+    LEFT JOIN anm_schulen sch
+      ON sch.snr = ${schoolColumn}
+    LEFT JOIN school sref
+      ON sref.snr = ${schoolColumn}
+    ${capacityJoin}
+    ${whereClause}
+    GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0)
+    ORDER BY COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule') ASC
+    `,
+    [...(kapazitaetColumns.has("verfahren_id") && kapazitaetColumns.has("snr") ? [verfahrenId] : []), ...params],
+  );
+
+  return (rows || []).map((row) => ({
+    schulnummer: normalizeText(row?.schulnummer),
+    schule: normalizeText(row?.schule) || "Ohne Schule",
+    kapazitaet: Number(row?.kapazitaet || 0),
+    gesamt: Number(row?.gesamt || 0),
+    neuaufnahme: Number(row?.neuaufnahme || 0),
+    warteliste: Number(row?.warteliste || 0),
+    ohne: Number(row?.ohne || 0),
+    foerderbedarf: Number(row?.foerderbedarf || 0),
+    zieldifferent: Number(row?.zieldifferent || 0),
   }));
 }
 
@@ -488,7 +548,9 @@ function createAbgleichController({ getPool }) {
         if (!context) return sendError(res, 404, "Verfahren oder Runde nicht gefunden.");
 
         const rows = await loadSchuelerRows(pool, verfahrenId, rundeId);
-        return res.json({ rows });
+        const summary = await loadSchuelerCardSummary(pool, verfahrenId, rundeId);
+        const schoolOverview = await loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId);
+        return res.json({ rows, summary, schoolOverview });
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");

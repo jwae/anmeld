@@ -68,6 +68,11 @@ function createAnmeldeverfahrenController({ getPool }) {
         const validationError = validateProcedurePayload(payload);
         if (validationError) return sendError(res, 400, validationError);
 
+        const duplicate = await model.hasDuplicateSchoolYear(getPool(), payload.schuljahr);
+        if (duplicate) {
+          return sendError(res, 409, "Das Schuljahr ist bereits einem anderen Anmeldeverfahren zugeordnet.");
+        }
+
         const row = await model.create(getPool(), payload);
         res.status(201).json({
           message: "Anmeldeverfahren erfolgreich angelegt.",
@@ -87,6 +92,11 @@ function createAnmeldeverfahrenController({ getPool }) {
         const payload = parseProcedurePayload(req.body);
         const validationError = validateProcedurePayload(payload);
         if (validationError) return sendError(res, 400, validationError);
+
+        const duplicate = await model.hasDuplicateSchoolYear(getPool(), payload.schuljahr, id);
+        if (duplicate) {
+          return sendError(res, 409, "Das Schuljahr ist bereits einem anderen Anmeldeverfahren zugeordnet.");
+        }
 
         const row = await model.update(getPool(), id, payload);
         if (!row) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");

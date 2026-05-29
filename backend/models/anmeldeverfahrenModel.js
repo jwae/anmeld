@@ -66,6 +66,28 @@ async function create(pool, payload) {
   return findById(pool, result.insertId);
 }
 
+async function hasDuplicateSchoolYear(pool, schuljahr, excludeId = null) {
+  const normalizedSchuljahr = String(schuljahr || "").trim();
+  if (!normalizedSchuljahr) return false;
+  const [rows] = excludeId
+    ? await pool.query(
+      `SELECT id
+       FROM anm_verfahren
+       WHERE schuljahr = ?
+         AND id <> ?
+       LIMIT 1`,
+      [normalizedSchuljahr, excludeId],
+    )
+    : await pool.query(
+      `SELECT id
+       FROM anm_verfahren
+       WHERE schuljahr = ?
+       LIMIT 1`,
+      [normalizedSchuljahr],
+    );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 function mapParticipatingSchoolRow(row) {
   return {
     snr: String(row.snr || "").trim(),
@@ -212,6 +234,7 @@ module.exports = {
   listAll,
   findById,
   create,
+  hasDuplicateSchoolYear,
   update,
   listParticipatingSchools,
   syncParticipatingSchools,

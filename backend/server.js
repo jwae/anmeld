@@ -10,6 +10,7 @@ const {
 const createAnmeldeverfahrenRouter = require("./routes/anmeldeverfahren");
 const createAnmelderundenRouter = require("./routes/anmelderunden");
 const createAbgleichRouter = require("./routes/abgleich");
+const createKoordinationRouter = require("./routes/koordination");
 const createImporteRouter = require("./routes/importe");
 const createKapazitaetenRoutes = require("./routes/kapazitaeten");
 require("dotenv").config();
@@ -320,6 +321,7 @@ app.use("/api", ensureDatabaseConfigured, authenticateToken);
 app.use("/api/anmeldeverfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api", createAnmelderundenRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api/abgleich", createAbgleichRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api/koordination", createKoordinationRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api/importe", createImporteRouter({ authenticateToken, requireAdmin, getPool }));
 
 // Dynamischer Pool-Proxy fuer die Kapazitaeten-Routen

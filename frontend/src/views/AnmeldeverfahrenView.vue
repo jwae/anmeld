@@ -729,7 +729,7 @@ onMounted(async () => {
 
 
 .anm-grid-top {
-  align-items: start;
+  align-items: stretch;
 }
 
 .anm-card {

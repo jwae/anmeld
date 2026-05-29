@@ -4,6 +4,7 @@ import UserSessionCard from "./UserSessionCard.vue";
 import AnmeldeverfahrenView from "../views/AnmeldeverfahrenView.vue";
 import ImporteView from "../views/ImporteView.vue";
 import AbgleichView from "../views/AbgleichView.vue";
+import KoordinationView from "../views/KoordinationView.vue";
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -18,7 +19,7 @@ const props = defineProps<{
   token?: string;
 }>();
 
-const activeCredentialsMenu = ref<"verfahren" | "importe" | "abgleich" | "roadmap">("verfahren");
+const activeCredentialsMenu = ref<"verfahren" | "importe" | "abgleich" | "koordination" | "roadmap">("verfahren");
 const currentContext = ref<{ verfahren: string; runde: string }>({
   verfahren: "Kein Verfahren ausgewaehlt",
   runde: "Keine Runde ausgewaehlt",
