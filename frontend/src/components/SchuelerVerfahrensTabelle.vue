@@ -97,6 +97,7 @@ function sortMarker(key: keyof SchuelerRow) {
 function getStatusClass(status: string) {
   const s = String(status || "").toUpperCase().trim();
   if (s === "NEUAUFNAHME" || s === "NEUAUFNAHMEN") return "badge-success";
+  if (s === "ZUGEORDNET" || s === "ZUGEWIESEN") return "badge-primary";
   if (s === "WARTELISTE") return "badge-warning";
   if (s === "OHNE ANMELDUNG") return "badge-danger";
   if (s === "ABLEHNUNG" || s === "ABLEHNUNGEN") return "badge-danger";

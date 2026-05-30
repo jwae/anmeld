@@ -1887,40 +1887,10 @@ function createImporteController({ getPool }) {
       try {
         await connection.beginTransaction();
 
-        const anmeldungCols = await loadTableColumns(connection, "anm_anmeldung");
-        if (anmeldungCols.size > 0) {
-          const updates = [];
-          if (anmeldungCols.has("schueler_pool_id")) updates.push("schueler_pool_id = NULL");
-          if (anmeldungCols.has("schueler_anmeldung_id")) updates.push("schueler_anmeldung_id = NULL");
-          if (updates.length > 0) {
-            await connection.query(`UPDATE anm_anmeldung SET ${updates.join(", ")}`);
-          }
-        }
-
-        const abgleichCols = await loadTableColumns(connection, "anm_schueler_abgleich");
-        if (abgleichCols.size > 0) {
-          await connection.query("DELETE FROM anm_schueler_abgleich");
-        }
-
-        const anmeldungSchuelerCols = await loadTableColumns(connection, "anm_schueler_anmeldung");
-        if (anmeldungSchuelerCols.size > 0) {
-          await connection.query("DELETE FROM anm_schueler_anmeldung");
-        }
-
-        const merkzettelCols = await loadTableColumns(connection, "anm_merkzettel");
-        if (merkzettelCols.size > 0) {
-          await connection.query("DELETE FROM anm_merkzettel");
-        }
-
-        const offenerFallCols = await loadTableColumns(connection, "anm_offener_fall");
-        if (offenerFallCols.size > 0) {
-          await connection.query("DELETE FROM anm_offener_fall");
-        }
-
         let deletedRows = 0;
-        const schuelerCols = await loadTableColumns(connection, "anm_schueler_pool");
+        const schuelerCols = await loadTableColumns(connection, "anm_schueler");
         if (schuelerCols.size > 0) {
-          const [result] = await connection.query("DELETE FROM anm_schueler_pool");
+          const [result] = await connection.query("DELETE FROM anm_schueler");
           deletedRows = result.affectedRows || 0;
         }
 

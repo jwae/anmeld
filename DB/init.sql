@@ -292,7 +292,7 @@ CREATE TABLE `anm_schueler` (
   `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL,
   `quelle` enum('Pool','Anmeldung') NOT NULL,
   `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
-  `anmeldestatus` enum('Neuaufnahme','Warteliste','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
+  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugewiesen','Abgelehnt','Ohne','Zugeordnet') NOT NULL DEFAULT 'Ohne',
   `empfehlung` varchar(50) DEFAULT NULL,
   `vorname` varchar(100) DEFAULT NULL,
   `nachname` varchar(100) DEFAULT NULL,

@@ -265,8 +265,8 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const statusExpr = columns.has("anmeldestatus")
     ? "LOWER(TRIM(COALESCE(s.anmeldestatus, '')))"
     : "''";
-  const coordinatedSchoolColumn = columns.has("koordinierte_snr")
-    ? "NULLIF(TRIM(s.koordinierte_snr), '')"
+  const coordinatedSchoolColumn = columns.has("schul_nr")
+    ? "NULLIF(TRIM(s.schul_nr), '')"
     : "NULL";
 
   const filters = [`${statusExpr} <> 'neuaufnahme'`];
@@ -398,27 +398,33 @@ function createKoordinationController({ getPool }) {
       try {
         const verfahrenId = Number(req.body?.verfahren_id || 0);
         const rundeId = Number(req.body?.runde_id || 0);
-        const rowId = Number(req.body?.row_id || 0);
-        const koordinierteSnr = normalizeText(req.body?.koordinierte_snr);
-        const setWarteliste = Number(req.body?.set_warteliste ? 1 : 0) === 1;
+        const rowIds = Array.from(
+          new Set(
+            (Array.isArray(req.body?.row_ids) ? req.body.row_ids : [req.body?.row_id])
+              .map((value) => Number(value || 0))
+              .filter((value) => Number.isInteger(value) && value > 0),
+          ),
+        );
+        const schulNr = normalizeText(req.body?.schul_nr || req.body?.koordinierte_snr);
 
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
-        if (!rowId) return sendError(res, 400, "row_id ist erforderlich.");
-        if (!koordinierteSnr) return sendError(res, 400, "koordinierte_snr ist erforderlich.");
+        if (!rowIds.length) return sendError(res, 400, "row_ids ist erforderlich.");
+        if (!schulNr) return sendError(res, 400, "schul_nr ist erforderlich.");
 
         const pool = getPool();
         const studentColumns = await loadTableColumns(pool, "anm_schueler");
-        if (!studentColumns.has("koordinierte_snr")) {
-          return sendError(res, 400, "Das Feld koordinierte_snr ist in anm_schueler nicht vorhanden.");
+        if (!studentColumns.has("schul_nr")) {
+          return sendError(res, 400, "Das Feld schul_nr ist in anm_schueler nicht vorhanden.");
         }
 
         const schoolBySnr = await loadSchoolMapBySnr(pool);
-        if (!schoolBySnr.has(koordinierteSnr)) {
+        if (!schoolBySnr.has(schulNr)) {
           return sendError(res, 404, "Die ausgewaehlte Schule wurde nicht gefunden.");
         }
 
-        const whereParts = ["id = ?"];
+        const rowPlaceholders = rowIds.map(() => "?").join(", ");
+        const whereParts = [`id IN (${rowPlaceholders})`];
         const params = [];
         if (studentColumns.has("verfahren_id")) {
           whereParts.push("verfahren_id = ?");
@@ -434,17 +440,17 @@ function createKoordinationController({ getPool }) {
           SELECT id, COALESCE(vorname, '') AS vorname, COALESCE(nachname, '') AS nachname
           FROM anm_schueler
           WHERE ${whereParts.join(" AND ")}
-          LIMIT 1
+          ORDER BY COALESCE(nachname, '') ASC, COALESCE(vorname, '') ASC, id ASC
           `,
-          [rowId, ...params],
+          [...rowIds, ...params],
         );
-        const existing = Array.isArray(existingRows) && existingRows.length ? existingRows[0] : null;
-        if (!existing) {
-          return sendError(res, 404, "Der ausgewaehlte Schueler wurde nicht gefunden.");
+        const existing = Array.isArray(existingRows) ? existingRows : [];
+        if (!existing.length) {
+          return sendError(res, 404, "Die ausgewaehlten Schueler wurden nicht gefunden.");
         }
 
-        const assignments = ["koordinierte_snr = ?"];
-        const updateParams = [koordinierteSnr];
+        const assignments = ["schul_nr = ?"];
+        const updateParams = [schulNr];
 
         if (studentColumns.has("koordiniert_am")) {
           assignments.push("koordiniert_am = NOW()");
@@ -453,22 +459,31 @@ function createKoordinationController({ getPool }) {
           assignments.push("koordiniert_von = ?");
           updateParams.push(buildCoordinatorName(req));
         }
-        if (setWarteliste && studentColumns.has("anmeldestatus")) {
-          assignments.push("anmeldestatus = 'Warteliste'");
+        if (studentColumns.has("anmeldestatus")) {
+          assignments.push("anmeldestatus = 'Zugeordnet'");
         }
 
-        await pool.query(
+        const [updateResult] = await pool.query(
           `
           UPDATE anm_schueler
           SET ${assignments.join(", ")}
           WHERE ${whereParts.join(" AND ")}
           `,
-          [...updateParams, rowId, ...params],
+          [...updateParams, ...rowIds, ...params],
         );
+
+        const updatedCount = Number(updateResult?.affectedRows || 0);
+        const assignedSchoolName = schoolBySnr.get(schulNr);
+        const firstStudent = existing[0];
+        const message = updatedCount <= 1
+          ? `${normalizeText(firstStudent?.nachname)}, ${normalizeText(firstStudent?.vorname)} wurde ${assignedSchoolName} zugeordnet.`
+          : `${updatedCount} Schueler wurden ${assignedSchoolName} zugeordnet, beginnend mit ${normalizeText(firstStudent?.nachname)}, ${normalizeText(firstStudent?.vorname)}.`;
 
         return res.json({
           success: true,
-          message: `${normalizeText(existing?.nachname)}, ${normalizeText(existing?.vorname)} wurde ${schoolBySnr.get(koordinierteSnr)} zugeordnet.`,
+          updated_count: updatedCount,
+          requested_count: rowIds.length,
+          message,
         });
       } catch (error) {
         console.error("koordination assignment failed:", error);

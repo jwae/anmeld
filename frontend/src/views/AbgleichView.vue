@@ -79,6 +79,7 @@ function createEmptySummary(): SummaryStats {
 }
 
 const summary = ref<SummaryStats>(createEmptySummary());
+const anmeldestatusOptions = ["Neuaufnahme", "Warteliste", "Zugewiesen", "Abgelehnt", "Ohne", "Zugeordnet"];
 
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
@@ -124,7 +125,6 @@ function uniqueOptions(selector: (row: SchuelerRow) => string) {
 }
 
 const schuleOptions = computed(() => uniqueOptions((row) => row.schule));
-const anmeldestatusOptions = computed(() => uniqueOptions((row) => normalizeStatus(row.anmeldestatus)));
 const foerderbedarfOptions = computed(() => uniqueOptions((row) => row.foerderbedarf));
 const herkunftOptions = computed(() => uniqueOptions((row) => displayHerkunft(row)));
 
@@ -255,28 +255,28 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
           <span>Schuelername</span>
           <input v-model="search" type="search" placeholder="Nachname oder Vorname" />
         </label>
-        <label class="filter-field">
+        <label class="filter-field filter-field-school">
           <span>Schule</span>
           <select v-model="schuleFilter">
             <option value="alle">Alle</option>
             <option v-for="option in schuleOptions" :key="option" :value="option">{{ option }}</option>
           </select>
         </label>
-        <label class="filter-field">
+        <label class="filter-field filter-field-status">
           <span>Anmeldestatus</span>
           <select v-model="anmeldestatusFilter">
             <option value="alle">Alle</option>
             <option v-for="option in anmeldestatusOptions" :key="option" :value="option">{{ option }}</option>
           </select>
         </label>
-        <label class="filter-field">
+        <label class="filter-field filter-field-compact">
           <span>Foerderbedarf</span>
           <select v-model="foerderbedarfFilter">
             <option value="alle">Alle</option>
             <option v-for="option in foerderbedarfOptions" :key="option" :value="option">{{ option }}</option>
           </select>
         </label>
-        <label class="filter-field">
+        <label class="filter-field filter-field-compact">
           <span>Zieldifferent</span>
           <select v-model="zieldifferentFilter">
             <option value="alle">Alle</option>
@@ -284,7 +284,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
             <option value="nein">Nein</option>
           </select>
         </label>
-        <label class="filter-field">
+        <label class="filter-field filter-field-compact">
           <span>Herkunft</span>
           <select v-model="herkunftFilter">
             <option value="alle">Alle</option>
@@ -389,6 +389,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
                     :class="[
                       'status-chip',
                       normalizeStatus(row.anmeldestatus) === 'Ohne' ? 'status-chip-ohne' : '',
+                      normalizeStatus(row.anmeldestatus) === 'Zugeordnet' ? 'status-chip-zugeordnet' : '',
                       normalizeStatus(row.anmeldestatus) === 'Warteliste' ? 'status-chip-warteliste' : '',
                     ]"
                   >
@@ -462,15 +463,34 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 }
 
 .filter-card {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 10px;
   padding: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .filter-field {
   display: grid;
   gap: 4px;
+  flex: 0 0 150px;
+}
+
+.search-field {
+  flex: 0 0 190px;
+  min-width: 190px;
+}
+
+.filter-field-school {
+  flex-basis: 190px;
+}
+
+.filter-field-status {
+  flex-basis: 150px;
+}
+
+.filter-field-compact {
+  flex-basis: 150px;
 }
 
 .filter-field span,
@@ -656,6 +676,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #b42318;
 }
 
+.status-chip-zugeordnet {
+  background: #e7f0ff;
+  color: #1d4ed8;
+}
+
 .status-chip-warteliste {
   background: #fff4e5;
   color: #9a5b00;
@@ -674,7 +699,17 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   }
 
   .filter-card {
+    display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .filter-field,
+  .search-field,
+  .filter-field-school,
+  .filter-field-status,
+  .filter-field-compact {
+    min-width: 0;
+    flex-basis: auto;
   }
 }
 </style>

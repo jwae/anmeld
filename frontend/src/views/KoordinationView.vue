@@ -43,16 +43,21 @@ const successMessage = ref("");
 const schools = ref<SchoolRow[]>([]);
 const students = ref<StudentRow[]>([]);
 const selectedSchoolSnr = ref("");
-const selectedStudentRowId = ref<number | null>(null);
+const selectedStudentRowIds = ref<number[]>([]);
 const distanceMode = ref("");
-const setWarteliste = ref(false);
 
 const selectedSchool = computed(
   () => schools.value.find((school) => school.snr === selectedSchoolSnr.value) || null,
 );
-const selectedStudent = computed(
-  () => students.value.find((student) => student.row_id === selectedStudentRowId.value) || null,
+const selectedStudentCount = computed(() => selectedStudentRowIds.value.length);
+const allStudentsSelected = computed(
+  () => students.value.length > 0 && students.value.every((student) => selectedStudentRowIds.value.includes(student.row_id)),
 );
+const assignButtonLabel = computed(() => {
+  if (assigning.value) return "Speichere...";
+  if (selectedStudentCount.value === 1) return "1 Schueler zuordnen";
+  return `${selectedStudentCount.value} Schueler zuordnen`;
+});
 
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
@@ -76,6 +81,7 @@ function schoolFreePlacesClass(value: number) {
 function statusClass(value: string) {
   const normalized = normalizeStatus(value).toLowerCase();
   if (normalized === "ohne") return "status-chip status-chip-ohne";
+  if (normalized === "zugeordnet") return "status-chip status-chip-zugeordnet";
   if (normalized === "warteliste") return "status-chip status-chip-warteliste";
   if (normalized === "abgelehnt" || normalized === "ablehnung") return "status-chip status-chip-abgelehnt";
   return "status-chip";
@@ -83,12 +89,12 @@ function statusClass(value: string) {
 
 async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
   if (!props.verfahrenId || !props.rundeId) {
-    schools.value = [];
-    students.value = [];
-    selectedSchoolSnr.value = "";
-    selectedStudentRowId.value = null;
-    distanceMode.value = "";
-    return;
+      schools.value = [];
+      students.value = [];
+      selectedSchoolSnr.value = "";
+      selectedStudentRowIds.value = [];
+      distanceMode.value = "";
+      return;
   }
 
   try {
@@ -108,10 +114,9 @@ async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
     distanceMode.value = normalizeText(response?.distance_mode);
     selectedSchoolSnr.value = normalizeText(response?.selected_snr);
 
-    const hasSelectedStudent = students.value.some((student) => student.row_id === selectedStudentRowId.value);
-    if (!hasSelectedStudent) {
-      selectedStudentRowId.value = null;
-    }
+    selectedStudentRowIds.value = selectedStudentRowIds.value.filter((rowId) =>
+      students.value.some((student) => student.row_id === rowId),
+    );
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Koordinationsansicht konnte nicht geladen werden.";
     schools.value = [];
@@ -124,13 +129,33 @@ async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
 
 async function handleSchoolSelect(snr: string) {
   selectedSchoolSnr.value = snr;
-  selectedStudentRowId.value = null;
+  selectedStudentRowIds.value = [];
   await loadData(snr);
+}
+
+function isStudentSelected(rowId: number) {
+  return selectedStudentRowIds.value.includes(rowId);
+}
+
+function toggleStudentSelection(rowId: number) {
+  if (isStudentSelected(rowId)) {
+    selectedStudentRowIds.value = selectedStudentRowIds.value.filter((value) => value !== rowId);
+    return;
+  }
+  selectedStudentRowIds.value = [...selectedStudentRowIds.value, rowId];
+}
+
+function toggleSelectAllStudents() {
+  if (allStudentsSelected.value) {
+    selectedStudentRowIds.value = [];
+    return;
+  }
+  selectedStudentRowIds.value = students.value.map((student) => student.row_id);
 }
 
 async function handleAssign() {
   if (!props.verfahrenId || !props.rundeId) return;
-  if (!selectedSchool.value || !selectedStudent.value) return;
+  if (!selectedSchool.value || !selectedStudentCount.value) return;
 
   try {
     assigning.value = true;
@@ -141,14 +166,14 @@ async function handleAssign() {
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
-        row_id: selectedStudent.value.row_id,
-        koordinierte_snr: selectedSchool.value.snr,
-        set_warteliste: setWarteliste.value,
+        row_ids: selectedStudentRowIds.value,
+        schul_nr: selectedSchool.value.snr,
       },
       props.token,
     );
 
     successMessage.value = response?.message || "Die Zuordnung wurde gespeichert.";
+    selectedStudentRowIds.value = [];
     await loadData(selectedSchool.value.snr);
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Zuordnung konnte nicht gespeichert werden.";
@@ -161,7 +186,7 @@ watch(
   () => [props.verfahrenId, props.rundeId],
   () => {
     selectedSchoolSnr.value = "";
-    selectedStudentRowId.value = null;
+    selectedStudentRowIds.value = [];
     void loadData("");
   },
   { immediate: true },
@@ -267,27 +292,22 @@ watch(
 
           <div class="selection-bar">
             <div class="selection-summary">
-              <strong>Schule:</strong> {{ selectedSchool?.name || "Noch keine Schule ausgewaehlt" }}
+              <strong>Schule:</strong><br/> {{ selectedSchool?.name || "Noch keine Schule ausgewaehlt" }}
             </div>
             <div class="selection-summary">
-              <strong>Schueler:</strong>
-              {{
-                selectedStudent
-                  ? `${selectedStudent.nachname}, ${selectedStudent.vorname}`
-                  : "Noch kein Schueler ausgewaehlt"
+              <strong>Auswahl:</strong><br /> {{
+                selectedStudentCount
+                  ? `${selectedStudentCount} Schueler markiert`
+                  : "Noch keine Schueler markiert"
               }}
             </div>
-            <label class="toggle-field">
-              <input v-model="setWarteliste" type="checkbox" />
-              <span>Anmeldestatus auf Warteliste setzen</span>
-            </label>
             <button
               class="btn-primary"
               type="button"
-              :disabled="assigning || !selectedSchool || !selectedStudent"
+              :disabled="assigning || !selectedSchool || !selectedStudentCount"
               @click="handleAssign"
             >
-              {{ assigning ? "Speichere..." : "Schule zuordnen" }}
+              {{ assignButtonLabel }}
             </button>
           </div>
 
@@ -295,11 +315,16 @@ watch(
             <table class="student-table">
               <thead>
                 <tr>
-                  <th></th>
+                  <th>
+                    <input
+                      :checked="allStudentsSelected"
+                      type="checkbox"
+                      @change="toggleSelectAllStudents"
+                    />
+                  </th>
                   <th>Schueler-ID</th>
-                  <th>Vorname</th>
-                  <th>Nachname</th>
-                  <th>Empfehlung</th>
+                  <th>Name</th>
+                  <th>Empf.</th>
                   <th>Anmeldestatus</th>
                   <th>Abgleichstatus</th>
                   <th>Koordinierte Schule</th>
@@ -308,33 +333,36 @@ watch(
               </thead>
               <tbody>
                 <tr v-if="loading && !students.length">
-                  <td colspan="9" class="table-empty">Daten werden geladen...</td>
+                  <td colspan="8" class="table-empty">Daten werden geladen...</td>
                 </tr>
                 <tr v-else-if="!students.length">
-                  <td colspan="9" class="table-empty">Keine passenden Schueler fuer die Koordination gefunden.</td>
+                  <td colspan="8" class="table-empty">Keine passenden Schueler fuer die Koordination gefunden.</td>
                 </tr>
                 <tr
                   v-for="student in students"
                   :key="student.row_id"
                   class="student-row"
-                  :class="{ 'is-selected': student.row_id === selectedStudentRowId }"
-                  @click="selectedStudentRowId = student.row_id"
+                  :class="{ 'is-selected': isStudentSelected(student.row_id) }"
+                  @click="toggleStudentSelection(student.row_id)"
                 >
                   <td>
                     <input
-                      :checked="student.row_id === selectedStudentRowId"
-                      type="radio"
-                      name="koordination-student"
-                      @change="selectedStudentRowId = student.row_id"
+                      :checked="isStudentSelected(student.row_id)"
+                      type="checkbox"
+                      @click.stop
+                      @change="toggleStudentSelection(student.row_id)"
                     />
                   </td>
                   <td>{{ student.schueler_id || "-" }}</td>
-                  <td>{{ student.vorname || "-" }}</td>
-                  <td>{{ student.nachname || "-" }}</td>
+                  <td>{{
+                    [student.nachname, student.vorname].filter((value) => normalizeText(value)).join(", ") || "-"
+                  }}</td>
                   <td>{{ student.empfehlung || "-" }}</td>
                   <td><span :class="statusClass(student.anmeldestatus)">{{ normalizeStatus(student.anmeldestatus) }}</span></td>
                   <td>{{ student.abgleich_status || "-" }}</td>
-                  <td>{{ student.koordinierte_schule || student.koordinierte_snr || "-" }}</td>
+                  <td :title="student.koordinierte_schule || student.koordinierte_snr || '-'">{{
+                    normalizeText(student.koordinierte_schule || student.koordinierte_snr).slice(0, 15) || "-"
+                  }}</td>
                   <td>{{ selectedSchool ? formatDistance(student.entfernung_km) : "-" }}</td>
                 </tr>
               </tbody>
@@ -509,18 +537,6 @@ watch(
   line-height: 1.4;
 }
 
-.toggle-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #385173;
-  font-size: 14px;
-}
-
-.toggle-field input {
-  margin: 0;
-}
-
 .btn-secondary,
 .btn-primary {
   border-radius: 999px;
@@ -572,6 +588,11 @@ watch(
 .status-chip-ohne {
   background: #fdecec;
   color: #b42318;
+}
+
+.status-chip-zugeordnet {
+  background: #e7f0ff;
+  color: #1d4ed8;
 }
 
 .status-chip-warteliste {

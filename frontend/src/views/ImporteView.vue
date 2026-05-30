@@ -20,14 +20,10 @@ const errorMessage = ref("");
 const successMessage = ref("");
 
 async function handleDeleteAll() {
-  const firstConfirm = confirm(
-    "MÃ¶chten Sie wirklich alle SchÃ¼lerdaten aus der Tabelle 'anm_schueler_pool' lÃ¶schen?\n\nDies lÃ¶scht auch alle damit verknÃ¼pften offenen FÃ¤lle und Merkzettel-EintrÃ¤ge!"
-  );
+  const firstConfirm = confirm("Moechten Sie wirklich alle Schuelerdaten aus der Tabelle 'anm_schueler' loeschen?");
   if (!firstConfirm) return;
 
-  const secondConfirm = confirm(
-    "Sind Sie sich absolut sicher? Diese Aktion kann nicht rÃ¼ckgÃ¤ngig gemacht werden!"
-  );
+  const secondConfirm = confirm("Sind Sie sich absolut sicher? Diese Aktion kann nicht rueckgaengig gemacht werden!");
   if (!secondConfirm) return;
 
   try {
@@ -36,9 +32,9 @@ async function handleDeleteAll() {
     loading.value = true;
 
     const res = await importService.clearSchueler(props.token);
-    successMessage.value = res?.message || "Alle SchÃ¼lerdaten wurden erfolgreich gelÃ¶scht.";
+    successMessage.value = res?.message || "Alle Schuelerdaten wurden erfolgreich geloescht.";
   } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Das LÃ¶schen der SchÃ¼lerdaten ist fehlgeschlagen.";
+    errorMessage.value = error?.response?.data?.error || error?.message || "Das Loeschen der Schuelerdaten ist fehlgeschlagen.";
   } finally {
     loading.value = false;
   }
@@ -67,8 +63,8 @@ async function handleDeleteAll() {
     <section class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
         <p class="importe-eyebrow">Gefahrenbereich</p>
-        <h3>Schuelerdaten entfernen (für Testmodus)</h3>
-        <p>Diese Aktion loescht den gesamten importierten Schuelerpool inklusive verknuepfter offener Faelle und Merkzettel-Eintraege.</p>
+        <h3>Schuelerdaten aus anm_schueler entfernen</h3>
+        <p>Diese Aktion loescht alle Datensaetze direkt aus der Tabelle anm_schueler.</p>
       </div>
 
       <button

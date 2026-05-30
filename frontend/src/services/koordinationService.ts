@@ -32,9 +32,8 @@ export default {
     payload: {
       verfahren_id: number;
       runde_id: number;
-      row_id: number;
-      koordinierte_snr: string;
-      set_warteliste?: boolean;
+      row_ids: number[];
+      schul_nr: string;
     },
     token?: string,
   ) {
