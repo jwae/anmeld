@@ -2,6 +2,8 @@
 
 -- anmeld.anm_kat_anmeldestatus definition
 
+-- anmeld.anm_kat_anmeldestatus definition
+
 CREATE TABLE `anm_kat_anmeldestatus` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `code` varchar(50) NOT NULL,
@@ -10,7 +12,7 @@ CREATE TABLE `anm_kat_anmeldestatus` (
   `aktiv` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_kat_empfehlung definition
@@ -23,7 +25,7 @@ CREATE TABLE `anm_kat_empfehlung` (
   `aktiv` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_kat_fallgrund definition
@@ -36,7 +38,7 @@ CREATE TABLE `anm_kat_fallgrund` (
   `aktiv` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_kat_fallstatus definition
@@ -49,7 +51,18 @@ CREATE TABLE `anm_kat_fallstatus` (
   `aktiv` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- anmeld.anm_kat_foerderbedarf definition
+
+CREATE TABLE `anm_kat_foerderbedarf` (
+  `foerder_id` smallint(6) NOT NULL AUTO_INCREMENT,
+  `asd` varchar(64) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  PRIMARY KEY (`foerder_id`),
+  UNIQUE KEY `code` (`asd`)
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_kat_sf definition
@@ -76,7 +89,7 @@ CREATE TABLE `anm_verfahren` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_anm_verfahren_schuljahr` (`schuljahr`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.app_dashboard definition
@@ -89,7 +102,7 @@ CREATE TABLE `app_dashboard` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`dashboard_id`),
   UNIQUE KEY `dashboard_key` (`dashboard_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=1028 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1083 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 -- anmeld.app_group definition
@@ -277,41 +290,7 @@ CREATE TABLE `anm_runde` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_anm_runde_verfahren_nummer` (`verfahren_id`,`runden_nummer`),
   CONSTRAINT `fk_anm_runde_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- anmeld.anm_schueler definition
-
-CREATE TABLE `anm_schueler` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `verfahren_id` bigint(20) NOT NULL,
-  `runde_id` bigint(20) NOT NULL,
-  `schueler_id` varchar(50) NOT NULL,
-  `schueler_nr` varchar(50) DEFAULT NULL,
-  `schul_nr` varchar(50) DEFAULT NULL,
-  `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL,
-  `quelle` enum('Pool','Anmeldung') NOT NULL,
-  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
-  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugewiesen','Abgelehnt','Ohne','Zugeordnet') NOT NULL DEFAULT 'Ohne',
-  `empfehlung` varchar(50) DEFAULT NULL,
-  `vorname` varchar(100) DEFAULT NULL,
-  `nachname` varchar(100) DEFAULT NULL,
-  `geburtsdatum` date DEFAULT NULL,
-  `foerderbedarf` varchar(100) DEFAULT NULL,
-  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
-  `bemerkung` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
-  KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
-  KEY `idx_schueler_id` (`schueler_id`),
-  KEY `idx_schul_nr` (`schul_nr`),
-  KEY `idx_abgleich_status` (`abgleich_status`),
-  KEY `idx_anmeldestatus` (`anmeldestatus`),
-  KEY `idx_empfehlung` (`empfehlung`),
-  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`)
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_schueler_pool definition
@@ -346,6 +325,11 @@ CREATE TABLE `anm_schulen` (
   `plz` varchar(20) DEFAULT NULL,
   `ort` varchar(100) DEFAULT NULL,
   `strasse` varchar(255) DEFAULT NULL,
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `geocoding_status` enum('Offen','OK','Fehler') NOT NULL DEFAULT 'Offen',
+  `geocoding_fehler` text DEFAULT NULL,
+  `geocoded_at` datetime DEFAULT NULL,
   `sf_id` varchar(32) DEFAULT NULL,
   `db_host` varchar(500) DEFAULT NULL,
   `db_name` varchar(255) DEFAULT NULL,
@@ -562,7 +546,7 @@ CREATE TABLE `anm_abgleich_protokoll` (
   KEY `idx_anm_abgleich_protokoll_runde` (`runde_id`),
   CONSTRAINT `fk_anm_abgleich_protokoll_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_anm_abgleich_protokoll_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
-) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=90 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.anm_kapazitaet definition
@@ -587,6 +571,57 @@ CREATE TABLE `anm_kapazitaet` (
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- anmeld.anm_schueler definition
+
+CREATE TABLE `anm_schueler` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `schueler_id` varchar(50) NOT NULL,
+  `schueler_nr` varchar(50) DEFAULT NULL,
+  `schul_nr` varchar(50) DEFAULT NULL,
+  `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
+  `quelle` enum('Pool','Anmeldung') NOT NULL COMMENT 'Nicht mehr verwednen. Doppelt sich mich Herkunft',
+  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
+  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
+  `empfehlung` varchar(50) DEFAULT NULL,
+  `vorname` varchar(100) DEFAULT NULL,
+  `nachname` varchar(100) DEFAULT NULL,
+  `geburtsdatum` date DEFAULT NULL,
+  `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
+  `foerder_id` smallint(6) DEFAULT NULL,
+  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
+  `bemerkung` text DEFAULT NULL,
+  `strasse` varchar(255) DEFAULT NULL,
+  `plz` varchar(10) DEFAULT NULL,
+  `ort` varchar(100) DEFAULT NULL,
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `geocoding_status` enum('Offen','OK','Fehler') NOT NULL DEFAULT 'Offen',
+  `geocoding_fehler` text DEFAULT NULL,
+  `geocoded_at` datetime DEFAULT NULL,
+  `koordinierte_snr` varchar(50) DEFAULT NULL COMMENT 'Wird nicht mehr verwendet. Wert steht in schul_nr',
+  `koordiniert_am` datetime DEFAULT NULL,
+  `koordiniert_von` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
+  KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
+  KEY `idx_schueler_id` (`schueler_id`),
+  KEY `idx_schul_nr` (`schul_nr`),
+  KEY `idx_abgleich_status` (`abgleich_status`),
+  KEY `idx_anmeldestatus` (`anmeldestatus`),
+  KEY `idx_empfehlung` (`empfehlung`),
+  KEY `idx_anm_schueler_koord_schule` (`koordinierte_snr`),
+  KEY `idx_anm_schueler_geo` (`latitude`,`longitude`),
+  KEY `idx_anm_schueler_foerder_id` (`foerder_id`),
+  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`),
+  CONSTRAINT `fk_anm_schueler_foerder` FOREIGN KEY (`foerder_id`) REFERENCES `anm_kat_foerderbedarf` (`foerder_id`),
+  CONSTRAINT `fk_anm_schueler_koord_schule` FOREIGN KEY (`koordinierte_snr`) REFERENCES `anm_schulen` (`snr`)
+) ENGINE=InnoDB AUTO_INCREMENT=144 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- anmeld.anm_schueler_anmeldung definition
 
 CREATE TABLE `anm_schueler_anmeldung` (
@@ -609,7 +644,7 @@ CREATE TABLE `anm_schueler_anmeldung` (
   CONSTRAINT `1` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
   CONSTRAINT `2` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
   CONSTRAINT `3` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
-) ENGINE=InnoDB AUTO_INCREMENT=228 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=248 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.school_source_import_log definition
@@ -734,7 +769,7 @@ CREATE TABLE `anm_schueler_abgleich` (
   CONSTRAINT `3` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
   CONSTRAINT `4` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
   CONSTRAINT `CONSTRAINT_1` CHECK (`schueler_pool_id` is not null or `schueler_anmeldung_id` is not null)
-) ENGINE=InnoDB AUTO_INCREMENT=28780 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=31238 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- -----------------------------------------------------
 -- Stammdaten / Kataloge
 -- -----------------------------------------------------

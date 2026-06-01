@@ -8,8 +8,9 @@ type SchuelerRow = {
   nachname: string;
   geburtsdatum: string | null;
   foerderbedarf: string;
+  foerder_id?: string | number | null;
+  foerder_label?: string | null;
   zieldifferent: number | string;
-  quelle: string;
   herkunft?: string;
   schule: string;
   schulnummer: string;
@@ -90,12 +91,24 @@ function normalizeStatus(value: unknown) {
 }
 
 function displayHerkunft(row: SchuelerRow) {
-  return normalizeText(row.herkunft) || normalizeText(row.quelle) || "-";
+  return normalizeText(row.herkunft) || "-";
 }
 
 function hasPositiveFoerderbedarf(value: unknown) {
   const text = normalizeText(value).toLowerCase();
-  return ["1", "true", "ja", "yes"].includes(text) || text.length > 0;
+  return text === "1";
+}
+
+function rawFoerderbedarfValue(row: SchuelerRow) {
+  return normalizeText(row.foerderbedarf);
+}
+
+function foerderbedarfHoverText(row: SchuelerRow) {
+  return normalizeText(row.foerder_label) || normalizeText(row.foerder_id) || "-";
+}
+
+function foerderbedarfDropdownValue(row: SchuelerRow) {
+  return hasPositiveFoerderbedarf(rawFoerderbedarfValue(row)) ? "1" : "0";
 }
 
 function isZieldifferent(value: unknown) {
@@ -125,7 +138,10 @@ function uniqueOptions(selector: (row: SchuelerRow) => string) {
 }
 
 const schuleOptions = computed(() => uniqueOptions((row) => row.schule));
-const foerderbedarfOptions = computed(() => uniqueOptions((row) => row.foerderbedarf));
+const foerderbedarfOptions = [
+  { value: "1", label: "Ja" },
+  { value: "0", label: "Nein" },
+];
 const herkunftOptions = computed(() => uniqueOptions((row) => displayHerkunft(row)));
 
 const filteredRows = computed(() => {
@@ -136,7 +152,7 @@ const filteredRows = computed(() => {
     if (searchText && !fullName.includes(searchText)) return false;
     if (schuleFilter.value !== "alle" && normalizeText(row.schule) !== schuleFilter.value) return false;
     if (anmeldestatusFilter.value !== "alle" && normalizeStatus(row.anmeldestatus) !== anmeldestatusFilter.value) return false;
-    if (foerderbedarfFilter.value !== "alle" && normalizeText(row.foerderbedarf) !== foerderbedarfFilter.value) return false;
+    if (foerderbedarfFilter.value !== "alle" && foerderbedarfDropdownValue(row) !== foerderbedarfFilter.value) return false;
     if (herkunftFilter.value !== "alle" && displayHerkunft(row) !== herkunftFilter.value) return false;
     if (zieldifferentFilter.value === "ja" && !isZieldifferent(row.zieldifferent)) return false;
     if (zieldifferentFilter.value === "nein" && isZieldifferent(row.zieldifferent)) return false;
@@ -273,7 +289,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
           <span>Foerderbedarf</span>
           <select v-model="foerderbedarfFilter">
             <option value="alle">Alle</option>
-            <option v-for="option in foerderbedarfOptions" :key="option" :value="option">{{ option }}</option>
+            <option v-for="option in foerderbedarfOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
         </label>
         <label class="filter-field filter-field-compact">
@@ -377,7 +393,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
                 <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
                 <td>{{ formatDate(row.geburtsdatum) }}</td>
                 <td>
-                  <span v-if="normalizeText(row.foerderbedarf) === '1'" class="status-badge status-badge-le">ja</span>
+                  <span
+                    v-if="normalizeText(row.foerderbedarf) === '1'"
+                    class="status-badge status-badge-le"
+                    :title="foerderbedarfHoverText(row)"
+                  >ja</span>
                 </td>
                 <td>
                   <span v-if="normalizeText(row.zieldifferent) === '1'" class="status-badge status-badge-zd">ja</span>

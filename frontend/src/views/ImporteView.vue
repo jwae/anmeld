@@ -63,7 +63,7 @@ async function handleDeleteAll() {
     <section class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
         <p class="importe-eyebrow">Gefahrenbereich</p>
-        <h3>Schuelerdaten aus anm_schueler entfernen</h3>
+        <h3>Schuelerdaten loeschen (aus anm_schueler, fuer Testzwecke)</h3>
         <p>Diese Aktion loescht alle Datensaetze direkt aus der Tabelle anm_schueler.</p>
       </div>
 

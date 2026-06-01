@@ -9,7 +9,7 @@ type SchuelerRow = {
   foerderbedarf: string;
   zieldifferent: number;
   empfehlung: string;
-  quelle: string;
+  herkunft: string;
   schule: string;
   ort: string;
   schulnummer: string;
@@ -38,7 +38,7 @@ const fallstatusFilter = ref("alle");
 const schuleFilter = ref("alle");
 const foerderbedarfFilter = ref("alle");
 const zieldifferentFilter = ref("alle");
-const quelleFilter = ref("alle");
+const herkunftFilter = ref("alle");
 const sortKey = ref<keyof SchuelerRow>("nachname");
 const sortDirection = ref<"asc" | "desc">("asc");
 
@@ -52,7 +52,7 @@ const anmeldestatusOptions = computed(() => uniqueOptions("anmeldestatus"));
 const fallstatusOptions = computed(() => uniqueOptions("fallstatus"));
 const schuleOptions = computed(() => uniqueOptions("schule"));
 const foerderbedarfOptions = computed(() => uniqueOptions("foerderbedarf"));
-const quelleOptions = computed(() => uniqueOptions("quelle"));
+const herkunftOptions = computed(() => uniqueOptions("herkunft"));
 
 const filteredRows = computed(() => {
   const searchText = search.value.trim().toLowerCase();
@@ -63,7 +63,7 @@ const filteredRows = computed(() => {
     if (fallstatusFilter.value !== "alle" && row.fallstatus !== fallstatusFilter.value) return false;
     if (schuleFilter.value !== "alle" && row.schule !== schuleFilter.value) return false;
     if (foerderbedarfFilter.value !== "alle" && row.foerderbedarf !== foerderbedarfFilter.value) return false;
-    if (quelleFilter.value !== "alle" && row.quelle !== quelleFilter.value) return false;
+    if (herkunftFilter.value !== "alle" && row.herkunft !== herkunftFilter.value) return false;
     if (zieldifferentFilter.value === "ja" && Number(row.zieldifferent || 0) !== 1) return false;
     if (zieldifferentFilter.value === "nein" && Number(row.zieldifferent || 0) !== 0) return false;
     return true;
@@ -113,12 +113,12 @@ function displayAnmeldestatus(row: SchuelerRow) {
   return "";
 }
 
-function getQuelleClass(quelle: string) {
-  const q = String(quelle || "").toUpperCase().trim();
-  if (q.includes("ZUZUG")) return "badge-danger";
-  if (q.includes("POOL")) return "badge-warning";
-  if (q.includes("IMPORT")) return "badge-info";
-  if (q.includes("MANUELL") || q.includes("MANUAL")) return "badge-primary";
+function getHerkunftClass(herkunft: string) {
+  const h = String(herkunft || "").toUpperCase().trim();
+  if (h.includes("ZUZUG")) return "badge-danger";
+  if (h.includes("POOL")) return "badge-warning";
+  if (h.includes("IMPORT")) return "badge-info";
+  if (h.includes("MANUELL") || h.includes("MANUAL")) return "badge-primary";
   return "badge-neutral";
 }
 
@@ -197,10 +197,10 @@ function isPositiveFlag(value: string | number | null | undefined) {
         </select>
       </label>
       <label>
-        <span>Quelle</span>
-        <select v-model="quelleFilter">
+        <span>Herkunft</span>
+        <select v-model="herkunftFilter">
           <option value="alle">Alle</option>
-          <option v-for="option in quelleOptions" :key="option" :value="option">{{ option }}</option>
+          <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
         </select>
       </label>
       <div class="schueler-filter-count" aria-live="polite">
@@ -231,7 +231,7 @@ function isPositiveFlag(value: string | number | null | undefined) {
                 ZD{{ sortMarker('zieldifferent') }}
               </button>
             </th>
-            <th><button type="button" @click="setSort('quelle')">Quelle{{ sortMarker('quelle') }}</button></th>
+            <th><button type="button" @click="setSort('herkunft')">Herkunft{{ sortMarker('herkunft') }}</button></th>
             <th><button type="button" @click="setSort('anmeldestatus')">Anmeldestatus{{ sortMarker('anmeldestatus') }}</button></th>
             <th class="schueler-actions-col">Aktion</th>
           </tr>
@@ -259,8 +259,8 @@ function isPositiveFlag(value: string | number | null | undefined) {
               <span v-if="Number(row.zieldifferent || 0) === 1" class="badge badge-info">Ja</span>
             </td>
             <td>
-              <span v-if="row.quelle" :class="['badge', getQuelleClass(row.quelle)]">
-                {{ row.quelle }}
+              <span v-if="row.herkunft" :class="['badge', getHerkunftClass(row.herkunft)]">
+                {{ row.herkunft }}
               </span>
               <span v-else>-</span>
             </td>

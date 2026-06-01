@@ -2,6 +2,36 @@
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 
+type PoolSchuelerRow = {
+  schueler_id: number;
+  schueler_schul_id: string;
+  vorname: string;
+  nachname: string;
+  geburtsdatum: string | null;
+  foerderbedarf: string;
+  foerder_id?: string | number | null;
+  foerder_label?: string | null;
+  zieldifferent: string;
+  herkunft?: string;
+  abgleich_status: string;
+  anmeldestatus: string;
+  schulnummer: string;
+  schule: string;
+};
+
+type PoolSortKey =
+  | "schueler_schul_id"
+  | "nachname"
+  | "vorname"
+  | "geburtsdatum"
+  | "foerderbedarf"
+  | "zieldifferent"
+  | "herkunft"
+  | "abgleich_status"
+  | "anmeldestatus"
+  | "schulnummer"
+  | "schule";
+
 const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
@@ -18,10 +48,62 @@ const successMessage = ref("");
 const summary = ref<any | null>(null);
 const isExpanded = ref(false);
 const poolCount = ref<number | null>(null);
+const poolSchuelerRows = ref<PoolSchuelerRow[]>([]);
+const loadingPoolSchueler = ref(false);
+const poolSearch = ref("");
+const poolStatusFilter = ref("alle");
+const poolFoerderbedarfFilter = ref("alle");
+const poolZieldifferentFilter = ref("alle");
+const poolSortKey = ref<PoolSortKey>("nachname");
+const poolSortDirection = ref<"asc" | "desc">("asc");
 
 const selectedValidRows = computed(() => (
   previewRows.value.filter((row) => !!row?.selected && !!row?.valid)
 ));
+
+const poolStatusOptions = computed(() => (
+  Array.from(new Set(
+    poolSchuelerRows.value
+      .map((row) => normalizeText(row.anmeldestatus))
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }))
+));
+
+const filteredPoolSchuelerRows = computed(() => {
+  const searchText = normalizeText(poolSearch.value).toLowerCase();
+  return poolSchuelerRows.value.filter((row) => {
+    const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
+    if (searchText && !fullName.includes(searchText) && !normalizeText(row.schueler_schul_id).toLowerCase().includes(searchText)) return false;
+    if (displayHerkunft(row) !== "Pool") return false;
+    if (poolStatusFilter.value !== "alle" && normalizeText(row.anmeldestatus) !== poolStatusFilter.value) return false;
+    if (poolFoerderbedarfFilter.value === "ja" && !isPositiveFlag(row.foerderbedarf)) return false;
+    if (poolFoerderbedarfFilter.value === "nein" && isPositiveFlag(row.foerderbedarf)) return false;
+    if (poolZieldifferentFilter.value === "ja" && !isPositiveFlag(row.zieldifferent)) return false;
+    if (poolZieldifferentFilter.value === "nein" && isPositiveFlag(row.zieldifferent)) return false;
+    return true;
+  });
+});
+
+const sortedPoolSchuelerRows = computed(() => {
+  const factor = poolSortDirection.value === "asc" ? 1 : -1;
+  return [...filteredPoolSchuelerRows.value].sort((left, right) => {
+    const resolveValue = (row: PoolSchuelerRow) => {
+      switch (poolSortKey.value) {
+        case "foerderbedarf":
+          return isPositiveFlag(row.foerderbedarf) ? "1" : "0";
+        case "zieldifferent":
+          return isPositiveFlag(row.zieldifferent) ? "1" : "0";
+        case "herkunft":
+          return displayHerkunft(row);
+        default:
+          return normalizeText(row[poolSortKey.value] as string | number | null | undefined);
+      }
+    };
+    const a = resolveValue(left);
+    const b = resolveValue(right);
+    return a.localeCompare(b, "de", { numeric: true, sensitivity: "base" }) * factor;
+  });
+});
 
 function openPicker() {
   fileInput.value?.click();
@@ -56,6 +138,63 @@ async function loadPoolStats() {
   } catch {
     poolCount.value = null;
   }
+}
+
+async function loadPoolSchueler() {
+  if (!props.verfahrenId) {
+    poolSchuelerRows.value = [];
+    return;
+  }
+
+  try {
+    loadingPoolSchueler.value = true;
+    const response = await importService.getPoolSchueler(props.verfahrenId, props.rundeId, props.token);
+    poolSchuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
+  } catch {
+    poolSchuelerRows.value = [];
+  } finally {
+    loadingPoolSchueler.value = false;
+  }
+}
+
+function normalizeText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function formatDate(value: string | null | undefined) {
+  const text = normalizeText(value);
+  if (!text) return "-";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const [year, month, day] = text.split("-");
+    return `${day}.${month}.${year}`;
+  }
+  return text;
+}
+
+function displayHerkunft(row: PoolSchuelerRow) {
+  return normalizeText(row.herkunft) || "-";
+}
+
+function isPositiveFlag(value: unknown) {
+  return normalizeText(value) === "1";
+}
+
+function foerderbedarfHoverText(row: PoolSchuelerRow) {
+  return normalizeText(row.foerder_label) || normalizeText(row.foerder_id) || "-";
+}
+
+function setPoolSort(nextKey: PoolSortKey) {
+  if (poolSortKey.value === nextKey) {
+    poolSortDirection.value = poolSortDirection.value === "asc" ? "desc" : "asc";
+    return;
+  }
+  poolSortKey.value = nextKey;
+  poolSortDirection.value = "asc";
+}
+
+function poolSortMarker(key: PoolSortKey) {
+  if (poolSortKey.value !== key) return "";
+  return poolSortDirection.value === "asc" ? " ▲" : " ▼";
 }
 
 async function handleFileChange(event: Event) {
@@ -115,6 +254,8 @@ async function startImport() {
     summary.value = response;
     successMessage.value = "Schuelerpool-Import erfolgreich abgeschlossen.";
     resetPreview();
+    await loadPoolSchueler();
+    await loadPoolStats();
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Der Schuelerpool-Import ist fehlgeschlagen.";
   } finally {
@@ -128,6 +269,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   successMessage.value = "";
   errorMessage.value = "";
   loadPoolStats();
+  loadPoolSchueler();
 }, { immediate: true });
 </script>
 
@@ -145,7 +287,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
           <span class="import-step">2.</span>
-          Schuelerpool importieren
+          Schuelerpool importieren (CSV, EWO-Datei) 
         </h3>
         <p>CSV-Datei laden, Vorschau pruefen und gueltige Zeilen in den Schuelerpool uebernehmen.</p>
         <p v-show="isExpanded" class="pool-info-line">
@@ -243,6 +385,90 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <td>{{ row.data?.zieldifferent || "-" }}</td>
               <td>{{ row.data?.empfehlung_code || "-" }}</td>
               <td>{{ row.data?.fallgrund_code || "-" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="import-preview">
+      <div class="import-preview-head">
+        <div>
+          <strong>Schuelerpool</strong>
+          <span>{{ filteredPoolSchuelerRows.length }} Treffer | Datenquelle: anm_schueler</span>
+        </div>
+      </div>
+
+      <div class="pool-table-toolbar">
+        <label class="pool-search-field">
+          <span>Suche</span>
+          <input v-model="poolSearch" type="search" placeholder="Name oder Schueler-ID" />
+        </label>
+        <label>
+          <span>Anmeldestatus</span>
+          <select v-model="poolStatusFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in poolStatusOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+        </label>
+        <label>
+          <span>Foerderbedarf</span>
+          <select v-model="poolFoerderbedarfFilter">
+            <option value="alle">Alle</option>
+            <option value="ja">Ja</option>
+            <option value="nein">Nein</option>
+          </select>
+        </label>
+        <label>
+          <span>Zieldifferent</span>
+          <select v-model="poolZieldifferentFilter">
+            <option value="alle">Alle</option>
+            <option value="ja">Ja</option>
+            <option value="nein">Nein</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="table-wrap detail-table-wrap">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Nr.</th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('schueler_schul_id')">Schueler-ID{{ poolSortMarker('schueler_schul_id') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('nachname')">Name + Vorname{{ poolSortMarker('nachname') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('geburtsdatum')">Geburtsdatum{{ poolSortMarker('geburtsdatum') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('foerderbedarf')">LE{{ poolSortMarker('foerderbedarf') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('zieldifferent')">ZD{{ poolSortMarker('zieldifferent') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('herkunft')">Herkunft{{ poolSortMarker('herkunft') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('abgleich_status')">Abgleichstatus{{ poolSortMarker('abgleich_status') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('anmeldestatus')">Anmeldestatus{{ poolSortMarker('anmeldestatus') }}</button></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loadingPoolSchueler">
+              <td colspan="9" class="table-empty">Daten werden geladen...</td>
+            </tr>
+            <tr v-else-if="!sortedPoolSchuelerRows.length">
+              <td colspan="9" class="table-empty">Keine Datensaetze in anm_schueler gefunden.</td>
+            </tr>
+            <tr v-for="(row, index) in sortedPoolSchuelerRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${index}`">
+              <td>{{ index + 1 }}</td>
+              <td>{{ row.schueler_schul_id || "-" }}</td>
+              <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
+              <td>{{ formatDate(row.geburtsdatum) }}</td>
+              <td>
+                <span
+                  v-if="isPositiveFlag(row.foerderbedarf)"
+                  class="status-badge status-badge-le"
+                  :title="foerderbedarfHoverText(row)"
+                >ja</span>
+              </td>
+              <td>
+                <span v-if="isPositiveFlag(row.zieldifferent)" class="status-badge status-badge-zd">ja</span>
+              </td>
+              <td>{{ displayHerkunft(row) }}</td>
+              <td>{{ row.abgleich_status || "-" }}</td>
+              <td>{{ row.anmeldestatus || "-" }}</td>
             </tr>
           </tbody>
         </table>
@@ -406,6 +632,41 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #5d7390;
 }
 
+.pool-table-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.pool-table-toolbar label {
+  display: grid;
+  gap: 4px;
+}
+
+.pool-table-toolbar span {
+  color: #5a7393;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pool-table-toolbar input,
+.pool-table-toolbar select {
+  min-height: 32px;
+  border: 1px solid #d7e2ef;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: #17385f;
+  font-size: 13px;
+}
+
+.pool-search-field {
+  min-width: 0;
+}
+
 .table-wrap {
   overflow-x: auto;
   max-height: 640px;
@@ -452,10 +713,86 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   background: #fff5f5;
 }
 
+.detail-table-wrap {
+  max-height: 560px;
+}
+
+.detail-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.detail-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fbff;
+  z-index: 1;
+}
+
+.detail-table th,
+.detail-table td {
+  padding: 4px 7px;
+  border-bottom: 1px solid #e5edf6;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.detail-table th {
+  color: #5a7393;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-sort-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.table-empty {
+  text-align: center !important;
+  color: #6b7f99;
+  padding: 18px 12px !important;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.status-badge-le {
+  background: #e9f6ec;
+  color: #21653a;
+}
+
+.status-badge-zd {
+  background: #fdf1d8;
+  color: #9a5a00;
+}
+
 @media (max-width: 900px) {
   .import-card-head,
   .import-preview-head {
     flex-direction: column;
+  }
+
+  .pool-table-toolbar {
+    grid-template-columns: 1fr;
   }
 }
 

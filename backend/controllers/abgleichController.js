@@ -255,6 +255,10 @@ async function loadSummary(pool, verfahrenId, rundeId, schoolRows) {
 async function loadSchuelerRows(pool, verfahrenId, rundeId) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) return [];
+  const hasFoerderbedarfTable = await tableExists(pool, "anm_kat_foerderbedarf");
+  const foerderbedarfColumns = hasFoerderbedarfTable
+    ? await loadTableColumns(pool, "anm_kat_foerderbedarf")
+    : new Set();
 
   const schoolColumn = columns.has("schul_nr")
     ? "s.schul_nr"
@@ -262,6 +266,17 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
   const studentIdColumn = columns.has("schueler_id")
     ? "s.schueler_id"
     : (columns.has("schueler_nr") ? "s.schueler_nr" : "''");
+  const foerderCatalogKey = foerderbedarfColumns.has("foerder_id")
+    ? "foerder_id"
+    : (foerderbedarfColumns.has("id") ? "id" : "");
+  const foerderJoin = columns.has("foerder_id") && hasFoerderbedarfTable && foerderCatalogKey
+    ? `LEFT JOIN anm_kat_foerderbedarf fbd ON fbd.${foerderCatalogKey} = s.foerder_id`
+    : "";
+  const foerderLabelExpr = foerderJoin && foerderbedarfColumns.has("bezeichnung")
+    ? "COALESCE(fbd.bezeichnung, '')"
+    : (foerderJoin && foerderbedarfColumns.has("name")
+      ? "COALESCE(fbd.name, '')"
+      : (foerderJoin && foerderbedarfColumns.has("code") ? "COALESCE(fbd.code, '')" : "''"));
   const whereParts = [];
   const params = [];
 
@@ -282,8 +297,9 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       COALESCE(s.nachname, '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
       COALESCE(s.foerderbedarf, '') AS foerderbedarf,
+      ${columns.has("foerder_id") ? "COALESCE(s.foerder_id, '')" : "''"} AS foerder_id,
+      ${foerderLabelExpr} AS foerder_label,
       COALESCE(s.zieldifferent, 0) AS zieldifferent,
-      COALESCE(s.quelle, '') AS quelle,
       COALESCE(s.herkunft, '') AS herkunft,
       COALESCE(sch.name, sref.name, '') AS schule,
       COALESCE(sch.ort, sref.ort, sref.city, '') AS ort,
@@ -296,6 +312,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ON sch.snr = ${schoolColumn}
     LEFT JOIN school sref
       ON sref.snr = ${schoolColumn}
+    ${foerderJoin}
     ${whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : ""}
     ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC
     `,
@@ -308,8 +325,9 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     nachname: normalizeText(row?.nachname),
     geburtsdatum: row?.geburtsdatum || null,
     foerderbedarf: normalizeText(row?.foerderbedarf),
+    foerder_id: normalizeText(row?.foerder_id),
+    foerder_label: normalizeText(row?.foerder_label),
     zieldifferent: normalizeText(row?.zieldifferent),
-    quelle: normalizeText(row?.quelle),
     herkunft: normalizeText(row?.herkunft),
     schule: normalizeText(row?.schule),
     ort: normalizeText(row?.ort),

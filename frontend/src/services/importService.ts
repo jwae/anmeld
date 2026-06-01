@@ -22,6 +22,17 @@ export const importService = {
     return response.data;
   },
 
+  async getPoolSchueler(verfahrenId: number, rundeId?: number | null, token?: string) {
+    const response = await apiClient.get("/api/importe/pool/schueler", {
+      params: {
+        verfahren_id: verfahrenId,
+        ...(rundeId ? { runde_id: rundeId } : {}),
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
   async previewPool(payload: Record<string, unknown>, token?: string) {
     const response = await apiClient.post(
       "/api/importe/pool/vorschau",
