@@ -68,6 +68,7 @@ function formatDate(value: string | null) {
                 <button
                   class="btn-secondary anm-icon-btn"
                   type="button"
+                  :disabled="item.status === 'abgeschlossen'"
                   title="Bearbeiten"
                   aria-label="Bearbeiten"
                   @click.stop="emit('edit', item)"
@@ -77,7 +78,7 @@ function formatDate(value: string | null) {
                 <button
                   class="btn-secondary anm-icon-btn anm-danger-btn"
                   type="button"
-                  :disabled="deletingId === item.id"
+                  :disabled="deletingId === item.id || item.status === 'abgeschlossen'"
                   title="Loeschen"
                   aria-label="Loeschen"
                   @click.stop="emit('delete', item)"

@@ -573,6 +573,8 @@ CREATE TABLE `anm_kapazitaet` (
 
 -- anmeld.anm_schueler definition
 
+-- anmeld.anm_schueler definition
+
 CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
@@ -581,9 +583,9 @@ CREATE TABLE `anm_schueler` (
   `schueler_nr` varchar(50) DEFAULT NULL,
   `schul_nr` varchar(50) DEFAULT NULL,
   `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
-  `quelle` enum('Pool','Anmeldung') NOT NULL COMMENT 'Nicht mehr verwednen. Doppelt sich mich Herkunft',
   `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
   `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
+  `teilnahmestatus` enum('Aktiv','Wegzug','Abgemeldet','Verstorben') NOT NULL DEFAULT 'Aktiv',
   `empfehlung` varchar(50) DEFAULT NULL,
   `vorname` varchar(100) DEFAULT NULL,
   `nachname` varchar(100) DEFAULT NULL,
@@ -619,8 +621,7 @@ CREATE TABLE `anm_schueler` (
   CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`),
   CONSTRAINT `fk_anm_schueler_foerder` FOREIGN KEY (`foerder_id`) REFERENCES `anm_kat_foerderbedarf` (`foerder_id`),
   CONSTRAINT `fk_anm_schueler_koord_schule` FOREIGN KEY (`koordinierte_snr`) REFERENCES `anm_schulen` (`snr`)
-) ENGINE=InnoDB AUTO_INCREMENT=144 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+) ENGINE=InnoDB AUTO_INCREMENT=145 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- anmeld.anm_schueler_anmeldung definition
 

@@ -166,6 +166,14 @@ export interface Anmelderunde {
   updated_at: string;
 }
 
+export interface NextRoundTransitionResponse {
+  message: string;
+  created: boolean;
+  copied_students: number;
+  current_round: Anmelderunde;
+  next_round: Anmelderunde;
+}
+
 export interface BeteiligteSchule {
   snr: string;
   name: string;

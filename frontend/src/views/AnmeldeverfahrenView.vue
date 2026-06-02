@@ -14,7 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "update-context", payload: { verfahren: string; runde: string }): void;
-  (e: "update-selection", payload: { verfahrenId: number | null; rundeId: number | null }): void;
+  (e: "update-selection", payload: { verfahrenId: number | null; rundeId: number | null; rundeStatus: AnmeldeStatus | null }): void;
 }>();
 
 type VerfahrenFormState = {
@@ -52,6 +52,8 @@ const loadingBeteiligteSchulen = ref<boolean>(false);
 const savingBeteiligteSchulen = ref<boolean>(false);
 const beteiligteSchulenSortKey = ref<BeteiligteSchulenSortKey>("name");
 const beteiligteSchulenSortDirection = ref<"asc" | "desc">("asc");
+const showNextRoundOverlay = ref<boolean>(false);
+const savingNextRound = ref<boolean>(false);
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
 const rundenForm = ref<RundenFormState>(createEmptyRundenForm());
@@ -83,6 +85,18 @@ const selectedVerfahren = computed<Anmeldeverfahren | null>(
 const selectedRunde = computed<Anmelderunde | null>(
   () => runden.value.find((item) => item.id === selectedRundenId.value) || null,
 );
+
+const nextRoundCandidate = computed<Anmelderunde | null>(() => {
+  const currentRound = selectedRunde.value;
+  if (!currentRound) return null;
+  return runden.value.find((item) => item.runden_nummer === currentRound.runden_nummer + 1) || null;
+});
+
+const canStartNextRound = computed<boolean>(() => (
+  Boolean(selectedVerfahrenId.value)
+  && Boolean(selectedRunde.value)
+  && selectedRunde.value?.status === "aktiv"
+));
 
 const currentVerfahrenTitle = computed<string>(() => (
   selectedVerfahren.value
@@ -121,6 +135,7 @@ function emitContext() {
   emit("update-selection", {
     verfahrenId: selectedVerfahrenId.value,
     rundeId: selectedRundenId.value,
+    rundeStatus: selectedRunde.value?.status || null,
   });
 }
 
@@ -371,6 +386,12 @@ async function submitRunde() {
 }
 
 async function deleteRunde(item: Anmelderunde) {
+  if (item.status === "abgeschlossen") {
+    errorMessage.value = "Abgeschlossene Runden koennen nicht geloescht werden.";
+    successMessage.value = "";
+    return;
+  }
+
   const confirmed = window.confirm(
     `Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`,
   );
@@ -413,6 +434,44 @@ function setBeteiligteSchulenSort(nextSortKey: BeteiligteSchulenSortKey) {
 function getBeteiligteSchulenSortIndicator(sortKey: BeteiligteSchulenSortKey) {
   if (beteiligteSchulenSortKey.value !== sortKey) return "";
   return beteiligteSchulenSortDirection.value === "asc" ? "▲" : "▼";
+}
+
+function openNextRoundOverlay() {
+  if (!canStartNextRound.value) return;
+  showNextRoundOverlay.value = true;
+}
+
+function closeNextRoundOverlay() {
+  if (savingNextRound.value) return;
+  showNextRoundOverlay.value = false;
+}
+
+async function startNextRound() {
+  if (!selectedRunde.value) {
+    errorMessage.value = "Bitte zuerst eine aktive Runde auswaehlen.";
+    successMessage.value = "";
+    return;
+  }
+
+  savingNextRound.value = true;
+  try {
+    const response = await anmelderundenService.startNextRound(selectedRunde.value.id, props.token);
+    await loadRunden(selectedVerfahrenId.value);
+    if (response.next_round?.id) {
+      selectedRundenId.value = response.next_round.id;
+      const refreshedNextRound = runden.value.find((item) => item.id === response.next_round.id) || response.next_round;
+      editRunde(refreshedNextRound);
+    } else {
+      resetRundenForm();
+      emitContext();
+    }
+    showNextRoundOverlay.value = false;
+    showSuccess(response.message || "Die naechste Runde wurde erfolgreich gestartet.");
+  } catch (error) {
+    showError(error, "Der Rundenwechsel konnte nicht ausgefuehrt werden.");
+  } finally {
+    savingNextRound.value = false;
+  }
 }
 
 async function submitBeteiligteSchulen() {
@@ -470,9 +529,9 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="anm-form-grid">
-        <label class="field-block">
-          <span class="field-label">Aktuelles Verfahren</span>
+      <div class="anm-form-grid anm-current-selection-grid">
+        <label class="field-block anm-current-selection-field">
+          <span class="field-label anm-current-selection-label">Aktuelles Verfahren</span>
           <select
             :value="selectedVerfahrenId ?? ''"
             :disabled="loadingVerfahren || !verfahren.length"
@@ -485,21 +544,33 @@ onMounted(async () => {
           </select>
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Aktuelle Runde</span>
-          <select
-            :value="selectedRundenId ?? ''"
-            :disabled="loadingRunden || !selectedVerfahrenId || !runden.length"
-            @change="selectRunde(Number(($event.target as HTMLSelectElement).value || 0))"
+        <div class="anm-current-selection-round-row">
+          <label class="field-block anm-current-selection-field">
+            <span class="field-label anm-current-selection-label">Aktuelle Runde</span>
+            <select
+              :value="selectedRundenId ?? ''"
+              :disabled="loadingRunden || !selectedVerfahrenId || !runden.length"
+              @change="selectRunde(Number(($event.target as HTMLSelectElement).value || 0))"
+            >
+              <option disabled value="">
+                {{ selectedVerfahrenId ? "Bitte Runde waehlen" : "Zuerst Verfahren waehlen" }}
+              </option>
+              <option v-for="item in runden" :key="item.id" :value="item.id">
+                Runde {{ item.runden_nummer }} - {{ item.bezeichnung }}
+              </option>
+            </select>
+          </label>
+
+          <button
+            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
+            type="button"
+            :disabled="!canStartNextRound"
+            title="Die aktive Runde abschliessen und die naechste Runde starten."
+            @click="openNextRoundOverlay"
           >
-            <option disabled value="">
-              {{ selectedVerfahrenId ? "Bitte Runde waehlen" : "Zuerst Verfahren waehlen" }}
-            </option>
-            <option v-for="item in runden" :key="item.id" :value="item.id">
-              Runde {{ item.runden_nummer }} - {{ item.bezeichnung }}
-            </option>
-          </select>
-        </label>
+            Naechste Runde starten
+          </button>
+        </div>
       </div>
     </section>
 
@@ -513,6 +584,58 @@ onMounted(async () => {
         <p>{{ successMessage }}</p>
       </div>
     </transition>
+
+    <div
+      v-if="showNextRoundOverlay"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-next-round-overlay-title"
+      @click.self="closeNextRoundOverlay"
+    >
+      <section class="anm-overlay-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-next-round-overlay-title">Naechste Runde starten</h3>
+        </div>
+        <div class="anm-overlay-copy">
+          <p>
+            Die aktuelle Runde bleibt unveraendert erhalten und wird auf "abgeschlossen" gesetzt.
+            Alle aktiven Schueler werden in die naechste Runde uebernommen.
+          </p>
+          <p>
+            Achtung: Abgeschlossene Runden sind nur noch lesbar und koennen nicht mehr bearbeitet werden.
+          </p>
+          <p>
+            <strong>
+              Runde {{ selectedRunde?.runden_nummer || "-" }} abschliessen und
+              Runde {{ (selectedRunde?.runden_nummer || 0) + 1 }} starten?
+            </strong>
+          </p>
+          <p v-if="nextRoundCandidate">
+            Die vorhandene Runde {{ nextRoundCandidate.runden_nummer }} wird verwendet.
+          </p>
+          <p v-else>
+            Die naechste Runde wird automatisch angelegt.
+          </p>
+          <p class="anm-overlay-warning">
+            Fortfahren?
+          </p>
+        </div>
+        <div class="anm-overlay-actions">
+          <button class="btn-secondary anm-overlay-close" type="button" :disabled="savingNextRound" @click="closeNextRoundOverlay">
+            Abbrechen
+          </button>
+          <button
+            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
+            type="button"
+            :disabled="savingNextRound"
+            @click="startNextRound"
+          >
+            {{ savingNextRound ? "Starte..." : "Fortfahren" }}
+          </button>
+        </div>
+      </section>
+    </div>
 
     <div class="anm-grid anm-grid-top">
       <AnmeldeverfahrenListe
@@ -649,7 +772,6 @@ onMounted(async () => {
 }
 
 .anm-roadmap-card,
-.anm-current-selection-card,
 .anm-card {
   border: 1px solid #dbe4f0;
   border-radius: 22px;
@@ -674,7 +796,11 @@ onMounted(async () => {
 .anm-current-selection-card {
   display: grid;
   gap: 16px;
-  padding: 20px 22px;
+  padding: 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 32px rgba(23, 58, 108, 0.05);
 }
 
 .anm-roadmap-eyebrow {
@@ -687,9 +813,10 @@ onMounted(async () => {
 }
 
 .anm-roadmap-card h2,
+.anm-current-selection-card h3,
 .anm-card h3 {
   margin: 0;
-  color: #19365b;
+  color: #19385e;
 }
 
 .anm-roadmap-card p,
@@ -698,6 +825,13 @@ onMounted(async () => {
   margin: 8px 0 0;
   color: #4a607e;
   line-height: 1.55;
+}
+
+.anm-current-selection-card .anm-card-head p {
+  margin-top: 4px;
+  color: #607794;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .anm-roadmap {
@@ -743,6 +877,17 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: start;
   gap: 12px;
+}
+
+.anm-current-selection-button {
+  min-height: 34px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+  justify-self: end;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .anm-badge {
@@ -870,10 +1015,143 @@ onMounted(async () => {
   color: #5d7390;
 }
 
+.anm-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 34, 56, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.anm-overlay-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #dbe4f0;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 20px 48px rgba(16, 39, 73, 0.18);
+}
+
+.anm-overlay-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.anm-overlay-head h3 {
+  margin: 0;
+  color: #19385e;
+}
+
+.anm-overlay-card p {
+  margin: 0;
+  color: #4a607e;
+  line-height: 1.55;
+}
+
+.anm-overlay-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.anm-overlay-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.anm-overlay-warning {
+  color: #8c2e2e !important;
+  font-weight: 700;
+}
+
+.anm-overlay-close {
+  min-height: 34px;
+  padding: 10px 18px;
+  border: 1px solid #fca5a5;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.anm-overlay-close:hover {
+  background: #fecaca;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
 .anm-form-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.anm-current-selection-grid {
+  gap: 10px;
+  grid-template-columns: auto auto;
+  justify-content: start;
+  align-items: end;
+}
+
+.anm-current-selection-field {
+  gap: 5px;
+  min-width: 0;
+  width: min(320px, 100%);
+  max-width: 100%;
+}
+
+.anm-current-selection-round-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.anm-current-selection-label {
+  color: #607794;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.anm-current-selection-field :deep(select) {
+  min-height: 34px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #cfdceb;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  color: #19385e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.anm-current-selection-field :deep(select:disabled) {
+  background: #f5f8fc;
+  color: #7d90a8;
+}
+
+.anm-current-selection-button-danger {
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.anm-current-selection-button-danger:hover:not(:disabled) {
+  background: #fecaca;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.anm-current-selection-button-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .anm-form-grid-3 {
@@ -890,6 +1168,27 @@ onMounted(async () => {
   .anm-form-grid,
   .anm-form-grid-3 {
     grid-template-columns: 1fr;
+  }
+
+  .anm-current-selection-round-row {
+    grid-template-columns: 1fr;
+  }
+
+  .anm-current-selection-field {
+    width: 100%;
+  }
+
+  .anm-current-selection-button {
+    justify-self: start;
+  }
+
+  .anm-overlay-head {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .anm-overlay-actions {
+    justify-content: stretch;
   }
 }
 </style>

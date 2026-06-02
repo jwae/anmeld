@@ -26,6 +26,7 @@ const currentContext = ref<{ verfahren: string; runde: string }>({
 });
 const selectedVerfahrenId = ref<number | null>(null);
 const selectedRundenId = ref<number | null>(null);
+const selectedRundenStatus = ref<"geplant" | "aktiv" | "abgeschlossen" | null>(null);
 
 function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   currentContext.value = {
@@ -34,9 +35,10 @@ function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   };
 }
 
-function handleSelectionUpdate(payload: { verfahrenId: number | null; rundeId: number | null }) {
+function handleSelectionUpdate(payload: { verfahrenId: number | null; rundeId: number | null; rundeStatus: "geplant" | "aktiv" | "abgeschlossen" | null }) {
   selectedVerfahrenId.value = payload?.verfahrenId ?? null;
   selectedRundenId.value = payload?.rundeId ?? null;
+  selectedRundenStatus.value = payload?.rundeStatus ?? null;
 }
 </script>
 

@@ -97,6 +97,9 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
+        if (existing.status === "abgeschlossen") {
+          return sendError(res, 409, "Abgeschlossene Runden sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
+        }
 
         const payload = parseRoundPayload(req.body);
         const validationError = validateRoundPayload(payload);
@@ -130,6 +133,9 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
+        if (existing.status === "abgeschlossen") {
+          return sendError(res, 409, "Abgeschlossene Runden sind schreibgeschuetzt und koennen nicht geloescht werden.");
+        }
 
         const blockers = await model.countBlockingDependencies(getPool(), id);
         if (blockers.length) {
@@ -149,6 +155,24 @@ function createAnmelderundenController({ getPool }) {
       } catch (error) {
         console.error(error);
         sendError(res, 500, "Anmelderunde konnte nicht geloescht werden.");
+      }
+    },
+
+    startNextRound: async (req, res) => {
+      try {
+        const id = Number(req.params.id || 0);
+        if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const result = await model.startNextRound(getPool(), id);
+        res.status(201).json({
+          message: result.created
+            ? `Runde ${result.current_round.runden_nummer} wurde abgeschlossen und Runde ${result.next_round.runden_nummer} neu gestartet.`
+            : `Runde ${result.current_round.runden_nummer} wurde abgeschlossen und die vorhandene Runde ${result.next_round.runden_nummer} aktiviert.`,
+          ...result,
+        });
+      } catch (error) {
+        console.error(error);
+        sendError(res, error?.statusCode || 500, error?.message || "Der Rundenwechsel konnte nicht ausgefuehrt werden.");
       }
     },
   };

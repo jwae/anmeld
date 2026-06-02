@@ -30,6 +30,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  rundeStatus?: "geplant" | "aktiv" | "abgeschlossen" | null;
   context: {
     verfahren: string;
     runde: string;
@@ -53,6 +54,7 @@ const selectedStudentCount = computed(() => selectedStudentRowIds.value.length);
 const allStudentsSelected = computed(
   () => students.value.length > 0 && students.value.every((student) => selectedStudentRowIds.value.includes(student.row_id)),
 );
+const isActiveRound = computed(() => props.rundeStatus === "aktiv");
 const assignButtonLabel = computed(() => {
   if (assigning.value) return "Speichere...";
   if (selectedStudentCount.value === 1) return "1 Schueler zuordnen";
@@ -155,6 +157,7 @@ function toggleSelectAllStudents() {
 
 async function handleAssign() {
   if (!props.verfahrenId || !props.rundeId) return;
+  if (!isActiveRound.value) return;
   if (!selectedSchool.value || !selectedStudentCount.value) return;
 
   try {
@@ -304,7 +307,7 @@ watch(
             <button
               class="btn-primary"
               type="button"
-              :disabled="assigning || !selectedSchool || !selectedStudentCount"
+              :disabled="assigning || !isActiveRound || !selectedSchool || !selectedStudentCount"
               @click="handleAssign"
             >
               {{ assignButtonLabel }}

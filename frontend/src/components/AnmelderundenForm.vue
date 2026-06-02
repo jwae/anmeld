@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { AnmeldeStatus, Anmeldeverfahren } from "../types";
 
-defineProps<{
+const props = defineProps<{
   verfahren: Anmeldeverfahren | null;
   modelValue: {
     id: number | null;
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 }>();
 
 const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
+const isLocked = computed<boolean>(() => Boolean(props.modelValue.id) && props.modelValue.status === "abgeschlossen");
 </script>
 
 <template>
@@ -47,7 +49,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
           type="number"
           min="1"
           :value="modelValue.runden_nummer ?? ''"
-          :disabled="saving || !verfahren"
+          :disabled="saving || !verfahren || isLocked"
           @input="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLInputElement).value || 0) || null })"
         />
       </label>
@@ -57,7 +59,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
         <input
           :value="modelValue.bezeichnung"
           placeholder="Hauptverfahren"
-          :disabled="saving || !verfahren"
+          :disabled="saving || !verfahren || isLocked"
           @input="emit('update:modelValue', { ...modelValue, bezeichnung: String(($event.target as HTMLInputElement).value || '') })"
         />
       </label>
@@ -69,7 +71,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
         <input
           type="date"
           :value="modelValue.startdatum"
-          :disabled="saving || !verfahren"
+          :disabled="saving || !verfahren || isLocked"
           @input="emit('update:modelValue', { ...modelValue, startdatum: String(($event.target as HTMLInputElement).value || '') })"
         />
       </label>
@@ -79,7 +81,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
         <input
           type="date"
           :value="modelValue.enddatum"
-          :disabled="saving || !verfahren"
+          :disabled="saving || !verfahren || isLocked"
           @input="emit('update:modelValue', { ...modelValue, enddatum: String(($event.target as HTMLInputElement).value || '') })"
         />
       </label>
@@ -90,7 +92,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
         <span class="field-label">Status</span>
         <select
           :value="modelValue.status"
-          :disabled="saving || !verfahren"
+          :disabled="saving || !verfahren || isLocked"
           @change="emit('update:modelValue', { ...modelValue, status: String(($event.target as HTMLSelectElement).value || 'geplant') as AnmeldeStatus })"
         >
           <option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option>
@@ -99,7 +101,7 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
 
       <div class="anm-actions anm-runden-form-actions">
         <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">Reset</button>
-        <button class="btn-primary anm-form-primary-btn" type="button" :disabled="saving || !verfahren" @click="emit('submit')">
+        <button class="btn-primary anm-form-primary-btn" type="button" :disabled="saving || !verfahren || isLocked" @click="emit('submit')">
           {{ saving ? "Speichere..." : (modelValue.id ? "Aenderungen speichern" : "Runde anlegen") }}
         </button>
       </div>

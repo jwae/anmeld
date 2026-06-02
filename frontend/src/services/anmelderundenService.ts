@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import type { AnmeldeStatus, Anmelderunde } from "../types";
+import type { AnmeldeStatus, Anmelderunde, NextRoundTransitionResponse } from "../types";
 
 type AuthConfig = {
   headers?: Record<string, string>;
@@ -53,6 +53,15 @@ export const anmelderundenService = {
   async remove(id: number, token?: string) {
     const resp = await apiClient.delete<{ message: string }>(
       `/api/anmelderunden/${encodeURIComponent(String(id))}`,
+      buildAuthConfig(token),
+    );
+    return resp.data;
+  },
+
+  async startNextRound(id: number, token?: string) {
+    const resp = await apiClient.post<NextRoundTransitionResponse>(
+      `/api/anmelderunden/${encodeURIComponent(String(id))}/start-next`,
+      {},
       buildAuthConfig(token),
     );
     return resp.data;
