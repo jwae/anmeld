@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import AnmeldeverfahrenListe from "../components/AnmeldeverfahrenListe.vue";
-import AnmeldeverfahrenForm from "../components/AnmeldeverfahrenForm.vue";
-import AnmelderundenListe from "../components/AnmelderundenListe.vue";
-import AnmelderundenForm from "../components/AnmelderundenForm.vue";
+import { computed, ref, watch } from "vue";
+import VerfahrenUndRundenBereich from "../components/anmeldeverfahren/VerfahrenUndRundenBereich.vue";
 import { anmeldeverfahrenService } from "../services/anmeldeverfahrenService";
-import { anmelderundenService } from "../services/anmelderundenService";
-import type { AnmeldeStatus, Anmeldeverfahren, Anmelderunde, BeteiligteSchule } from "../types";
+import type { AnmeldeStatus, BeteiligteSchule } from "../types";
 
 const props = defineProps<{
   token?: string;
@@ -17,34 +13,9 @@ const emit = defineEmits<{
   (e: "update-selection", payload: { verfahrenId: number | null; rundeId: number | null; rundeStatus: AnmeldeStatus | null }): void;
 }>();
 
-type VerfahrenFormState = {
-  id: number | null;
-  schuljahr: string;
-  bezeichnung: string;
-  status: AnmeldeStatus;
-};
-
-type RundenFormState = {
-  id: number | null;
-  runden_nummer: number | null;
-  bezeichnung: string;
-  startdatum: string;
-  enddatum: string;
-  status: AnmeldeStatus;
-};
-
 type BeteiligteSchulenSortKey = "snr" | "name" | "ort" | "schulform";
 
-const verfahren = ref<Anmeldeverfahren[]>([]);
-const runden = ref<Anmelderunde[]>([]);
 const selectedVerfahrenId = ref<number | null>(null);
-const selectedRundenId = ref<number | null>(null);
-const loadingVerfahren = ref<boolean>(false);
-const loadingRunden = ref<boolean>(false);
-const savingVerfahren = ref<boolean>(false);
-const savingRunden = ref<boolean>(false);
-const deletingVerfahrenId = ref<number | null>(null);
-const deletingRundenId = ref<number | null>(null);
 const errorMessage = ref<string>("");
 const successMessage = ref<string>("");
 const beteiligteSchulen = ref<BeteiligteSchule[]>([]);
@@ -52,63 +23,7 @@ const loadingBeteiligteSchulen = ref<boolean>(false);
 const savingBeteiligteSchulen = ref<boolean>(false);
 const beteiligteSchulenSortKey = ref<BeteiligteSchulenSortKey>("name");
 const beteiligteSchulenSortDirection = ref<"asc" | "desc">("asc");
-const showNextRoundOverlay = ref<boolean>(false);
-const savingNextRound = ref<boolean>(false);
-
-const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
-const rundenForm = ref<RundenFormState>(createEmptyRundenForm());
-
-function createEmptyVerfahrenForm(): VerfahrenFormState {
-  return {
-    id: null,
-    schuljahr: "",
-    bezeichnung: "",
-    status: "geplant",
-  };
-}
-
-function createEmptyRundenForm(): RundenFormState {
-  return {
-    id: null,
-    runden_nummer: null,
-    bezeichnung: "",
-    startdatum: "",
-    enddatum: "",
-    status: "geplant",
-  };
-}
-
-const selectedVerfahren = computed<Anmeldeverfahren | null>(
-  () => verfahren.value.find((item) => item.id === selectedVerfahrenId.value) || null,
-);
-
-const selectedRunde = computed<Anmelderunde | null>(
-  () => runden.value.find((item) => item.id === selectedRundenId.value) || null,
-);
-
-const nextRoundCandidate = computed<Anmelderunde | null>(() => {
-  const currentRound = selectedRunde.value;
-  if (!currentRound) return null;
-  return runden.value.find((item) => item.runden_nummer === currentRound.runden_nummer + 1) || null;
-});
-
-const canStartNextRound = computed<boolean>(() => (
-  Boolean(selectedVerfahrenId.value)
-  && Boolean(selectedRunde.value)
-  && selectedRunde.value?.status === "aktiv"
-));
-
-const currentVerfahrenTitle = computed<string>(() => (
-  selectedVerfahren.value
-    ? `${selectedVerfahren.value.schuljahr} ${selectedVerfahren.value.bezeichnung}`
-    : "Kein Verfahren ausgewaehlt"
-));
-
-const currentRundenTitle = computed<string>(() => (
-  selectedRunde.value
-    ? `Runde ${selectedRunde.value.runden_nummer} ${selectedRunde.value.bezeichnung}`
-    : "Keine Runde ausgewaehlt"
-));
+const showBeteiligteSchulenSection = ref<boolean>(true);
 
 const allBeteiligteSchulenSelected = computed<boolean>(() => (
   beteiligteSchulen.value.length > 0
@@ -127,18 +42,6 @@ const sortedBeteiligteSchulen = computed<BeteiligteSchule[]>(() => {
   });
 });
 
-function emitContext() {
-  emit("update-context", {
-    verfahren: currentVerfahrenTitle.value,
-    runde: currentRundenTitle.value,
-  });
-  emit("update-selection", {
-    verfahrenId: selectedVerfahrenId.value,
-    rundeId: selectedRundenId.value,
-    rundeStatus: selectedRunde.value?.status || null,
-  });
-}
-
 function getErrorMessage(error: any, fallbackMessage: string) {
   const apiError = String(error?.response?.data?.error || "").trim();
   const apiDetails = String(error?.response?.data?.details || "").trim();
@@ -156,55 +59,6 @@ function showSuccess(message: string) {
   errorMessage.value = "";
 }
 
-async function loadVerfahren(preferredSelectionId?: number | null) {
-  loadingVerfahren.value = true;
-  try {
-    const rows = await anmeldeverfahrenService.list(props.token);
-    verfahren.value = rows;
-
-    const desiredSelection = preferredSelectionId ?? selectedVerfahrenId.value;
-    const stillExists = rows.some((item) => item.id === desiredSelection);
-    const nextSelectionId = stillExists ? desiredSelection : (rows[0]?.id ?? null);
-    selectedVerfahrenId.value = nextSelectionId;
-
-    if (nextSelectionId) {
-      await loadRunden(nextSelectionId);
-      await loadBeteiligteSchulen(nextSelectionId);
-    } else {
-      runden.value = [];
-      selectedRundenId.value = null;
-      beteiligteSchulen.value = [];
-    }
-    emitContext();
-  } catch (error) {
-    showError(error, "Anmeldeverfahren konnten nicht geladen werden.");
-  } finally {
-    loadingVerfahren.value = false;
-  }
-}
-
-async function loadRunden(verfahrenId?: number | null) {
-  const effectiveId = verfahrenId ?? selectedVerfahrenId.value;
-  if (!effectiveId) {
-    runden.value = [];
-    selectedRundenId.value = null;
-    return;
-  }
-
-  loadingRunden.value = true;
-  try {
-    const rows = await anmelderundenService.listByVerfahren(effectiveId, props.token);
-    runden.value = rows;
-    const currentSelectedExists = rows.some((item) => item.id === selectedRundenId.value);
-    selectedRundenId.value = currentSelectedExists ? selectedRundenId.value : (rows[0]?.id ?? null);
-    emitContext();
-  } catch (error) {
-    showError(error, "Anmelderunden konnten nicht geladen werden.");
-  } finally {
-    loadingRunden.value = false;
-  }
-}
-
 async function loadBeteiligteSchulen(verfahrenId?: number | null) {
   const effectiveId = verfahrenId ?? selectedVerfahrenId.value;
   if (!effectiveId) {
@@ -219,194 +73,6 @@ async function loadBeteiligteSchulen(verfahrenId?: number | null) {
     showError(error, "Beteiligte Schulen konnten nicht geladen werden.");
   } finally {
     loadingBeteiligteSchulen.value = false;
-  }
-}
-
-function resetVerfahrenForm() {
-  verfahrenForm.value = createEmptyVerfahrenForm();
-}
-
-function resetRundenForm() {
-  const nextRoundNumber = runden.value.length
-    ? Math.max(...runden.value.map((item) => Number(item.runden_nummer || 0))) + 1
-    : 1;
-
-  rundenForm.value = {
-    ...createEmptyRundenForm(),
-    runden_nummer: selectedVerfahrenId.value ? nextRoundNumber : null,
-  };
-}
-
-function editVerfahren(item: Anmeldeverfahren) {
-  verfahrenForm.value = {
-    id: item.id,
-    schuljahr: item.schuljahr,
-    bezeichnung: item.bezeichnung,
-    status: item.status,
-  };
-}
-
-function editRunde(item: Anmelderunde) {
-  selectedRundenId.value = item.id;
-  rundenForm.value = {
-    id: item.id,
-    runden_nummer: item.runden_nummer,
-    bezeichnung: item.bezeichnung,
-    startdatum: item.startdatum || "",
-    enddatum: item.enddatum || "",
-    status: item.status,
-  };
-  emitContext();
-}
-
-async function selectVerfahren(id: number) {
-  selectedVerfahrenId.value = id;
-  selectedRundenId.value = null;
-  await loadRunden(id);
-  await loadBeteiligteSchulen(id);
-  resetRundenForm();
-}
-
-function selectRunde(id: number) {
-  selectedRundenId.value = id;
-  emitContext();
-}
-
-async function submitVerfahren() {
-  const schuljahr = verfahrenForm.value.schuljahr.trim();
-  const bezeichnung = verfahrenForm.value.bezeichnung.trim();
-  if (!schuljahr) {
-    errorMessage.value = "Schuljahr darf nicht leer sein.";
-    successMessage.value = "";
-    return;
-  }
-  if (!bezeichnung) {
-    errorMessage.value = "Bezeichnung darf nicht leer sein.";
-    successMessage.value = "";
-    return;
-  }
-
-  savingVerfahren.value = true;
-  try {
-    const payload = {
-      schuljahr,
-      bezeichnung,
-      status: verfahrenForm.value.status,
-    };
-
-    const response = verfahrenForm.value.id
-      ? await anmeldeverfahrenService.update(verfahrenForm.value.id, payload, props.token)
-      : await anmeldeverfahrenService.create(payload, props.token);
-
-    await loadVerfahren(response.row?.id || null);
-    editVerfahren(response.row);
-    showSuccess(response.message || "Anmeldeverfahren erfolgreich gespeichert.");
-  } catch (error) {
-    showError(error, "Anmeldeverfahren konnte nicht gespeichert werden.");
-  } finally {
-    savingVerfahren.value = false;
-  }
-}
-
-async function deleteVerfahren(item: Anmeldeverfahren) {
-  const confirmed = window.confirm(
-    `Soll das Anmeldeverfahren "${item.bezeichnung}" wirklich geloescht werden? Zugehoerige Runden werden dabei ebenfalls entfernt.`,
-  );
-  if (!confirmed) return;
-
-  deletingVerfahrenId.value = item.id;
-  try {
-    const response = await anmeldeverfahrenService.remove(item.id, props.token);
-    if (verfahrenForm.value.id === item.id) resetVerfahrenForm();
-    resetRundenForm();
-    await loadVerfahren(selectedVerfahrenId.value === item.id ? null : selectedVerfahrenId.value);
-    showSuccess(response.message || "Anmeldeverfahren erfolgreich geloescht.");
-  } catch (error) {
-    showError(error, "Anmeldeverfahren konnte nicht geloescht werden.");
-  } finally {
-    deletingVerfahrenId.value = null;
-  }
-}
-
-async function submitRunde() {
-  if (!selectedVerfahrenId.value) {
-    errorMessage.value = "Bitte zuerst ein Anmeldeverfahren auswaehlen.";
-    successMessage.value = "";
-    return;
-  }
-
-  const bezeichnung = rundenForm.value.bezeichnung.trim();
-  if (!rundenForm.value.runden_nummer) {
-    errorMessage.value = "Rundennummer muss eine positive Zahl sein.";
-    successMessage.value = "";
-    return;
-  }
-  if (!bezeichnung) {
-    errorMessage.value = "Bezeichnung darf nicht leer sein.";
-    successMessage.value = "";
-    return;
-  }
-  if (
-    rundenForm.value.startdatum
-    && rundenForm.value.enddatum
-    && rundenForm.value.startdatum > rundenForm.value.enddatum
-  ) {
-    errorMessage.value = "Startdatum darf nicht nach dem Enddatum liegen.";
-    successMessage.value = "";
-    return;
-  }
-
-  savingRunden.value = true;
-  try {
-    const payload = {
-      runden_nummer: Number(rundenForm.value.runden_nummer),
-      bezeichnung,
-      startdatum: rundenForm.value.startdatum || null,
-      enddatum: rundenForm.value.enddatum || null,
-      status: rundenForm.value.status,
-    };
-
-    const response = rundenForm.value.id
-      ? await anmelderundenService.update(rundenForm.value.id, payload, props.token)
-      : await anmelderundenService.create(selectedVerfahrenId.value, payload, props.token);
-
-    await loadRunden(selectedVerfahrenId.value);
-    selectedRundenId.value = response.row?.id ?? selectedRundenId.value;
-    if (rundenForm.value.id) {
-      editRunde(response.row);
-    } else {
-      resetRundenForm();
-    }
-    showSuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
-  } catch (error) {
-    showError(error, "Anmelderunde konnte nicht gespeichert werden.");
-  } finally {
-    savingRunden.value = false;
-  }
-}
-
-async function deleteRunde(item: Anmelderunde) {
-  if (item.status === "abgeschlossen") {
-    errorMessage.value = "Abgeschlossene Runden koennen nicht geloescht werden.";
-    successMessage.value = "";
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`,
-  );
-  if (!confirmed) return;
-
-  deletingRundenId.value = item.id;
-  try {
-    const response = await anmelderundenService.remove(item.id, props.token);
-    if (rundenForm.value.id === item.id) resetRundenForm();
-    await loadRunden(selectedVerfahrenId.value);
-    showSuccess(response.message || "Anmelderunde erfolgreich geloescht.");
-  } catch (error) {
-    showError(error, "Anmelderunde konnte nicht geloescht werden.");
-  } finally {
-    deletingRundenId.value = null;
   }
 }
 
@@ -436,42 +102,17 @@ function getBeteiligteSchulenSortIndicator(sortKey: BeteiligteSchulenSortKey) {
   return beteiligteSchulenSortDirection.value === "asc" ? "▲" : "▼";
 }
 
-function openNextRoundOverlay() {
-  if (!canStartNextRound.value) return;
-  showNextRoundOverlay.value = true;
+function handleBereichContextUpdate(payload: { verfahren: string; runde: string }) {
+  emit("update-context", payload);
 }
 
-function closeNextRoundOverlay() {
-  if (savingNextRound.value) return;
-  showNextRoundOverlay.value = false;
-}
-
-async function startNextRound() {
-  if (!selectedRunde.value) {
-    errorMessage.value = "Bitte zuerst eine aktive Runde auswaehlen.";
-    successMessage.value = "";
-    return;
-  }
-
-  savingNextRound.value = true;
-  try {
-    const response = await anmelderundenService.startNextRound(selectedRunde.value.id, props.token);
-    await loadRunden(selectedVerfahrenId.value);
-    if (response.next_round?.id) {
-      selectedRundenId.value = response.next_round.id;
-      const refreshedNextRound = runden.value.find((item) => item.id === response.next_round.id) || response.next_round;
-      editRunde(refreshedNextRound);
-    } else {
-      resetRundenForm();
-      emitContext();
-    }
-    showNextRoundOverlay.value = false;
-    showSuccess(response.message || "Die naechste Runde wurde erfolgreich gestartet.");
-  } catch (error) {
-    showError(error, "Der Rundenwechsel konnte nicht ausgefuehrt werden.");
-  } finally {
-    savingNextRound.value = false;
-  }
+function handleBereichSelectionUpdate(payload: {
+  verfahrenId: number | null;
+  rundeId: number | null;
+  rundeStatus: AnmeldeStatus | null;
+}) {
+  selectedVerfahrenId.value = payload.verfahrenId;
+  emit("update-selection", payload);
 }
 
 async function submitBeteiligteSchulen() {
@@ -500,8 +141,9 @@ async function submitBeteiligteSchulen() {
   }
 }
 
-onMounted(async () => {
-  await loadVerfahren();
+watch(selectedVerfahrenId, async (nextVerfahrenId, previousVerfahrenId) => {
+  if (nextVerfahrenId === previousVerfahrenId) return;
+  await loadBeteiligteSchulen(nextVerfahrenId);
 });
 </script>
 
@@ -513,66 +155,17 @@ onMounted(async () => {
           <p class="anm-roadmap-eyebrow">Schritt 1</p>
           <h2>Grundlage des Schulanmeldeverfahrens</h2>
           <p>
-            Verfahren und Runde festlegen / Kapazitaeten aktualisieren / Schuelerpool /Anmeldungen holen / Koordinieren.
+            Hier können Sie: Verfahren und Runde festlegen / Kapazitaeten aktualisieren / Schuelerpool /Anmeldungen holen / Koordinieren.
           </p>
         </div>
       </div>
-
     </section>
 
-    <section class="anm-current-selection-card">
-      <div class="anm-card-head">
-        <div>
-          <p class="anm-roadmap-eyebrow">Aktuelle Auswahl</p>
-          <h3>Verfahren und Runde festlegen</h3>
-          <p>Diese Auswahl bildet den aktuellen Arbeitskontext fuer die weiteren Module.</p>
-        </div>
-      </div>
-
-      <div class="anm-form-grid anm-current-selection-grid">
-        <label class="field-block anm-current-selection-field">
-          <span class="field-label anm-current-selection-label">Aktuelles Verfahren</span>
-          <select
-            :value="selectedVerfahrenId ?? ''"
-            :disabled="loadingVerfahren || !verfahren.length"
-            @change="selectVerfahren(Number(($event.target as HTMLSelectElement).value || 0))"
-          >
-            <option disabled value="">Bitte Verfahren waehlen</option>
-            <option v-for="item in verfahren" :key="item.id" :value="item.id">
-              {{ item.schuljahr }} - {{ item.bezeichnung }}
-            </option>
-          </select>
-        </label>
-
-        <div class="anm-current-selection-round-row">
-          <label class="field-block anm-current-selection-field">
-            <span class="field-label anm-current-selection-label">Aktuelle Runde</span>
-            <select
-              :value="selectedRundenId ?? ''"
-              :disabled="loadingRunden || !selectedVerfahrenId || !runden.length"
-              @change="selectRunde(Number(($event.target as HTMLSelectElement).value || 0))"
-            >
-              <option disabled value="">
-                {{ selectedVerfahrenId ? "Bitte Runde waehlen" : "Zuerst Verfahren waehlen" }}
-              </option>
-              <option v-for="item in runden" :key="item.id" :value="item.id">
-                Runde {{ item.runden_nummer }} - {{ item.bezeichnung }}
-              </option>
-            </select>
-          </label>
-
-          <button
-            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
-            type="button"
-            :disabled="!canStartNextRound"
-            title="Die aktive Runde abschliessen und die naechste Runde starten."
-            @click="openNextRoundOverlay"
-          >
-            Naechste Runde starten
-          </button>
-        </div>
-      </div>
-    </section>
+    <VerfahrenUndRundenBereich
+      :token="token"
+      @update-context="handleBereichContextUpdate"
+      @update-selection="handleBereichSelectionUpdate"
+    />
 
     <transition name="feedback-fade" mode="out-in">
       <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
@@ -585,103 +178,25 @@ onMounted(async () => {
       </div>
     </transition>
 
-    <div
-      v-if="showNextRoundOverlay"
-      class="anm-overlay-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="anm-next-round-overlay-title"
-      @click.self="closeNextRoundOverlay"
-    >
-      <section class="anm-overlay-card">
-        <div class="anm-overlay-head">
-          <h3 id="anm-next-round-overlay-title">Naechste Runde starten</h3>
-        </div>
-        <div class="anm-overlay-copy">
-          <p>
-            Die aktuelle Runde bleibt unveraendert erhalten und wird auf "abgeschlossen" gesetzt.
-            Alle aktiven Schueler werden in die naechste Runde uebernommen.
-          </p>
-          <p>
-            Achtung: Abgeschlossene Runden sind nur noch lesbar und koennen nicht mehr bearbeitet werden.
-          </p>
-          <p>
-            <strong>
-              Runde {{ selectedRunde?.runden_nummer || "-" }} abschliessen und
-              Runde {{ (selectedRunde?.runden_nummer || 0) + 1 }} starten?
-            </strong>
-          </p>
-          <p v-if="nextRoundCandidate">
-            Die vorhandene Runde {{ nextRoundCandidate.runden_nummer }} wird verwendet.
-          </p>
-          <p v-else>
-            Die naechste Runde wird automatisch angelegt.
-          </p>
-          <p class="anm-overlay-warning">
-            Fortfahren?
-          </p>
-        </div>
-        <div class="anm-overlay-actions">
-          <button class="btn-secondary anm-overlay-close" type="button" :disabled="savingNextRound" @click="closeNextRoundOverlay">
-            Abbrechen
-          </button>
-          <button
-            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
-            type="button"
-            :disabled="savingNextRound"
-            @click="startNextRound"
-          >
-            {{ savingNextRound ? "Starte..." : "Fortfahren" }}
-          </button>
-        </div>
-      </section>
-    </div>
-
-    <div class="anm-grid anm-grid-top">
-      <AnmeldeverfahrenListe
-        :items="verfahren"
-        :selected-id="selectedVerfahrenId"
-        :loading="loadingVerfahren"
-        :deleting-id="deletingVerfahrenId"
-        @select="selectVerfahren"
-        @edit="editVerfahren"
-        @delete="deleteVerfahren"
-      />
-
-      <AnmeldeverfahrenForm
-        v-model="verfahrenForm"
-        :saving="savingVerfahren"
-        @submit="submitVerfahren"
-        @reset="resetVerfahrenForm"
-      />
-    </div>
-
-    <div class="anm-grid">
-      <AnmelderundenListe
-        :verfahren="selectedVerfahren"
-        :items="runden"
-        :selected-id="selectedRundenId"
-        :loading="loadingRunden"
-        :deleting-id="deletingRundenId"
-        @select="selectRunde"
-        @edit="editRunde"
-        @delete="deleteRunde"
-      />
-
-      <AnmelderundenForm
-        v-model="rundenForm"
-        :verfahren="selectedVerfahren"
-        :saving="savingRunden"
-        @submit="submitRunde"
-        @reset="resetRundenForm"
-      />
-    </div>
-
     <section class="anm-card anm-schools-card">
       <div class="anm-card-head">
         <div>
           <p class="anm-roadmap-eyebrow">Schritt 1a</p>
-          <h3>Schulen im Verfahren</h3>
+          <h3 class="anm-section-heading">
+            <button
+              type="button"
+              class="anm-section-toggle"
+              :aria-expanded="showBeteiligteSchulenSection ? 'true' : 'false'"
+              @click="showBeteiligteSchulenSection = !showBeteiligteSchulenSection"
+            >
+              <span
+                class="anm-section-toggle-chevron"
+                :class="{ 'is-collapsed': !showBeteiligteSchulenSection }"
+                aria-hidden="true"
+              ></span>
+            </button>
+            <span>Schulen im Verfahren</span>
+          </h3>
           <p>Markiere die Schulen, die am aktuell ausgewaehlten Anmeldeverfahren teilnehmen.</p>
         </div>
         <button
@@ -694,72 +209,74 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div v-if="!selectedVerfahrenId" class="anm-empty-state">
-        Bitte zuerst ein Verfahren auswaehlen, damit die beteiligten Schulen gepflegt werden koennen.
-      </div>
+      <div v-show="showBeteiligteSchulenSection">
+        <div v-if="!selectedVerfahrenId" class="anm-empty-state">
+          Bitte zuerst ein Verfahren auswaehlen, damit die beteiligten Schulen gepflegt werden koennen.
+        </div>
 
-      <div v-else-if="loadingBeteiligteSchulen" class="anm-loading-state">
-        Schulen werden geladen...
-      </div>
+        <div v-else-if="loadingBeteiligteSchulen" class="anm-loading-state">
+          Schulen werden geladen...
+        </div>
 
-      <div v-else class="anm-table-wrap">
-        <table class="anm-table">
-          <thead>
-            <tr>
-              <th class="anm-checkbox-cell">
-                <input
-                  type="checkbox"
-                  :checked="allBeteiligteSchulenSelected"
-                  :disabled="savingBeteiligteSchulen || !beteiligteSchulen.length"
-                  @change="toggleAllBeteiligteSchulen(($event.target as HTMLInputElement).checked)"
-                />
-              </th>
-              <th>
-                <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('snr')">
-                  Snr <span>{{ getBeteiligteSchulenSortIndicator("snr") }}</span>
-                </button>
-              </th>
-              <th>
-                <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('name')">
-                  Name <span>{{ getBeteiligteSchulenSortIndicator("name") }}</span>
-                </button>
-              </th>
-              <th>
-                <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('ort')">
-                  Ort <span>{{ getBeteiligteSchulenSortIndicator("ort") }}</span>
-                </button>
-              </th>
-              <th>
-                <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('schulform')">
-                  Schulform <span>{{ getBeteiligteSchulenSortIndicator("schulform") }}</span>
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!beteiligteSchulen.length">
-              <td colspan="5" class="anm-empty-cell">Es sind keine Schulen fuer die Auswahl vorhanden.</td>
-            </tr>
-            <tr
-              v-for="item in sortedBeteiligteSchulen"
-              :key="item.snr"
-              :class="{ 'is-selected': item.selected }"
-            >
-              <td class="anm-checkbox-cell">
-                <input
-                  type="checkbox"
-                  :checked="item.selected"
-                  :disabled="savingBeteiligteSchulen"
-                  @change="toggleBeteiligteSchule(item.snr, ($event.target as HTMLInputElement).checked)"
-                />
-              </td>
-              <td>{{ item.snr }}</td>
-              <td>{{ item.name || "-" }}</td>
-              <td>{{ item.ort || "-" }}</td>
-              <td>{{ item.schulform || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="anm-table-wrap">
+          <table class="anm-table">
+            <thead>
+              <tr>
+                <th class="anm-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    :checked="allBeteiligteSchulenSelected"
+                    :disabled="savingBeteiligteSchulen || !beteiligteSchulen.length"
+                    @change="toggleAllBeteiligteSchulen(($event.target as HTMLInputElement).checked)"
+                  />
+                </th>
+                <th>
+                  <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('snr')">
+                    Snr <span>{{ getBeteiligteSchulenSortIndicator("snr") }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('name')">
+                    Name <span>{{ getBeteiligteSchulenSortIndicator("name") }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('ort')">
+                    Ort <span>{{ getBeteiligteSchulenSortIndicator("ort") }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="anm-sort-btn" type="button" @click="setBeteiligteSchulenSort('schulform')">
+                    Schulform <span>{{ getBeteiligteSchulenSortIndicator("schulform") }}</span>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!beteiligteSchulen.length">
+                <td colspan="5" class="anm-empty-cell">Es sind keine Schulen fuer die Auswahl vorhanden.</td>
+              </tr>
+              <tr
+                v-for="item in sortedBeteiligteSchulen"
+                :key="item.snr"
+                :class="{ 'is-selected': item.selected }"
+              >
+                <td class="anm-checkbox-cell">
+                  <input
+                    type="checkbox"
+                    :checked="item.selected"
+                    :disabled="savingBeteiligteSchulen"
+                    @change="toggleBeteiligteSchule(item.snr, ($event.target as HTMLInputElement).checked)"
+                  />
+                </td>
+                <td>{{ item.snr }}</td>
+                <td>{{ item.name || "-" }}</td>
+                <td>{{ item.ort || "-" }}</td>
+                <td>{{ item.schulform || "-" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   </section>
@@ -793,16 +310,6 @@ onMounted(async () => {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.anm-current-selection-card {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid #dbe4f0;
-  border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 16px 32px rgba(23, 58, 108, 0.05);
-}
-
 .anm-roadmap-eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
@@ -813,57 +320,16 @@ onMounted(async () => {
 }
 
 .anm-roadmap-card h2,
-.anm-current-selection-card h3,
 .anm-card h3 {
   margin: 0;
   color: #19385e;
 }
 
 .anm-roadmap-card p,
-.anm-current-selection-card p,
 .anm-card p {
   margin: 8px 0 0;
   color: #4a607e;
   line-height: 1.55;
-}
-
-.anm-current-selection-card .anm-card-head p {
-  margin-top: 4px;
-  color: #607794;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.anm-roadmap {
-  display: grid;
-  gap: 10px;
-}
-
-.anm-roadmap-step {
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px dashed #ccdaea;
-  color: #5d7492;
-  background: rgba(245, 249, 255, 0.9);
-  font-weight: 600;
-}
-
-.anm-roadmap-step.is-active {
-  border-style: solid;
-  border-color: #b3cae2;
-  background: #ffffff;
-  color: #16385d;
-}
-
-.anm-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
-}
-
-
-.anm-grid-top {
-  align-items: stretch;
 }
 
 .anm-card {
@@ -879,25 +345,45 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.anm-current-selection-button {
-  min-height: 34px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-  white-space: nowrap;
-  justify-self: end;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.anm-section-heading {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.anm-badge {
-  min-width: 40px;
-  padding: 6px 10px;
+.anm-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  background: #e8f1fb;
-  color: #23486f;
-  font-weight: 700;
-  text-align: center;
+  background: #eef4fd;
+  color: #1459a8;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.anm-section-toggle:hover {
+  background: #dbeafe;
+}
+
+.anm-section-toggle-chevron {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin-top: -2px;
+}
+
+.anm-section-toggle-chevron.is-collapsed {
+  transform: rotate(-45deg);
+  margin-top: 0;
 }
 
 .anm-table-wrap {
@@ -969,42 +455,6 @@ onMounted(async () => {
   background: #eef6ff;
 }
 
-.anm-status-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #eef3f9;
-  color: #34506d;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.anm-status-pill[data-status="aktiv"] {
-  background: #e8f7eb;
-  color: #2a6a36;
-}
-
-.anm-status-pill[data-status="abgeschlossen"] {
-  background: #eef0f3;
-  color: #526173;
-}
-
-.anm-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.anm-actions-end {
-  justify-content: flex-end;
-}
-
-.anm-danger-btn {
-  border-color: #e6c4c4;
-  color: #8c2e2e;
-}
-
 .anm-empty-cell,
 .anm-empty-state,
 .anm-loading-state {
@@ -1013,182 +463,5 @@ onMounted(async () => {
   border-radius: 16px;
   background: #f8fbff;
   color: #5d7390;
-}
-
-.anm-overlay-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(18, 34, 56, 0.42);
-  backdrop-filter: blur(2px);
-}
-
-.anm-overlay-card {
-  width: min(560px, 100%);
-  display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid #dbe4f0;
-  border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 20px 48px rgba(16, 39, 73, 0.18);
-}
-
-.anm-overlay-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 12px;
-}
-
-.anm-overlay-head h3 {
-  margin: 0;
-  color: #19385e;
-}
-
-.anm-overlay-card p {
-  margin: 0;
-  color: #4a607e;
-  line-height: 1.55;
-}
-
-.anm-overlay-copy {
-  display: grid;
-  gap: 12px;
-}
-
-.anm-overlay-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.anm-overlay-warning {
-  color: #8c2e2e !important;
-  font-weight: 700;
-}
-
-.anm-overlay-close {
-  min-height: 34px;
-  padding: 10px 18px;
-  border: 1px solid #fca5a5;
-  border-radius: 999px;
-  background: #fee2e2;
-  color: #991b1b;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.anm-overlay-close:hover {
-  background: #fecaca;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-.anm-form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.anm-current-selection-grid {
-  gap: 10px;
-  grid-template-columns: auto auto;
-  justify-content: start;
-  align-items: end;
-}
-
-.anm-current-selection-field {
-  gap: 5px;
-  min-width: 0;
-  width: min(320px, 100%);
-  max-width: 100%;
-}
-
-.anm-current-selection-round-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.anm-current-selection-label {
-  color: #607794;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.anm-current-selection-field :deep(select) {
-  min-height: 34px;
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #cfdceb;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
-  color: #19385e;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-}
-
-.anm-current-selection-field :deep(select:disabled) {
-  background: #f5f8fc;
-  color: #7d90a8;
-}
-
-.anm-current-selection-button-danger {
-  border: 1px solid #fca5a5;
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.anm-current-selection-button-danger:hover:not(:disabled) {
-  background: #fecaca;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-.anm-current-selection-button-danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.anm-form-grid-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (max-width: 1080px) {
-  .anm-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .anm-form-grid,
-  .anm-form-grid-3 {
-    grid-template-columns: 1fr;
-  }
-
-  .anm-current-selection-round-row {
-    grid-template-columns: 1fr;
-  }
-
-  .anm-current-selection-field {
-    width: 100%;
-  }
-
-  .anm-current-selection-button {
-    justify-self: start;
-  }
-
-  .anm-overlay-head {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .anm-overlay-actions {
-    justify-content: stretch;
-  }
 }
 </style>

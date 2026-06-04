@@ -1,4 +1,5 @@
 const STATUS_VALUES = ["geplant", "aktiv", "abgeschlossen"];
+const VERFAHRENSTYP_VALUES = ["GS", "SEK1"];
 
 async function querySingleValue(pool, sql, params = []) {
   const [rows] = await pool.query(sql, params);
@@ -18,6 +19,7 @@ async function mapProcedureRow(row) {
     id: Number(row.id),
     schuljahr: String(row.schuljahr || "").trim(),
     bezeichnung: String(row.bezeichnung || "").trim(),
+    verfahrenstyp: String(row.verfahrenstyp || "GS").trim(),
     status: String(row.status || "").trim(),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -30,6 +32,7 @@ async function listAll(pool) {
       id,
       schuljahr,
       bezeichnung,
+      verfahrenstyp,
       status,
       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
@@ -45,6 +48,7 @@ async function findById(pool, id) {
       id,
       schuljahr,
       bezeichnung,
+      verfahrenstyp,
       status,
       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
@@ -59,9 +63,9 @@ async function findById(pool, id) {
 
 async function create(pool, payload) {
   const [result] = await pool.query(
-    `INSERT INTO anm_verfahren (schuljahr, bezeichnung, status)
-     VALUES (?, ?, ?)`,
-    [payload.schuljahr, payload.bezeichnung, payload.status],
+    `INSERT INTO anm_verfahren (schuljahr, bezeichnung, verfahrenstyp, status)
+     VALUES (?, ?, ?, ?)`,
+    [payload.schuljahr, payload.bezeichnung, payload.verfahrenstyp, payload.status],
   );
   return findById(pool, result.insertId);
 }
@@ -101,9 +105,9 @@ function mapParticipatingSchoolRow(row) {
 async function update(pool, id, payload) {
   const [result] = await pool.query(
     `UPDATE anm_verfahren
-     SET schuljahr = ?, bezeichnung = ?, status = ?
+     SET schuljahr = ?, bezeichnung = ?, verfahrenstyp = ?, status = ?
      WHERE id = ?`,
-    [payload.schuljahr, payload.bezeichnung, payload.status, id],
+    [payload.schuljahr, payload.bezeichnung, payload.verfahrenstyp, payload.status, id],
   );
   if (!result.affectedRows) return null;
   return findById(pool, id);
@@ -231,6 +235,7 @@ async function removeWithRounds(pool, verfahrenId) {
 
 module.exports = {
   STATUS_VALUES,
+  VERFAHRENSTYP_VALUES,
   listAll,
   findById,
   create,

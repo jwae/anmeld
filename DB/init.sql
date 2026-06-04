@@ -1,9 +1,5 @@
 -- anmeld.anm_kat_anmeldestatus definition
 
--- anmeld.anm_kat_anmeldestatus definition
-
--- anmeld.anm_kat_anmeldestatus definition
-
 CREATE TABLE `anm_kat_anmeldestatus` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `code` varchar(50) NOT NULL,
@@ -85,11 +81,12 @@ CREATE TABLE `anm_verfahren` (
   `schuljahr` varchar(20) NOT NULL,
   `bezeichnung` varchar(255) NOT NULL,
   `status` varchar(50) NOT NULL DEFAULT 'geplant',
+  `verfahrenstyp` enum('GS','SEK1') NOT NULL DEFAULT 'SEK1',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_anm_verfahren_schuljahr` (`schuljahr`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- anmeld.app_dashboard definition
@@ -295,27 +292,56 @@ CREATE TABLE `anm_runde` (
 
 -- anmeld.anm_schueler_pool definition
 
-CREATE TABLE `anm_schueler_pool` (
+CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `vorname` varchar(100) NOT NULL,
-  `nachname` varchar(100) NOT NULL,
+  `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `schueler_id` varchar(50) NOT NULL,
+  `schueler_nr` varchar(50) DEFAULT NULL,
+  `quell_snr` varchar(50) DEFAULT NULL COMMENT 'Herkunftsschule / abgebende Grundschule',
+  `quell_schueler_nr` varchar(50) DEFAULT NULL COMMENT 'Schueler-Nr an der Quellschule',
+  `schul_nr` varchar(50) DEFAULT NULL,
+  `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
+  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
+  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
+  `teilnahmestatus` enum('Aktiv','Wegzug','Abgemeldet','Verstorben') NOT NULL DEFAULT 'Aktiv',
+  `empfehlung` varchar(50) DEFAULT NULL,
+  `vorname` varchar(100) DEFAULT NULL,
+  `nachname` varchar(100) DEFAULT NULL,
   `geburtsdatum` date DEFAULT NULL,
-  `adresse` varchar(255) DEFAULT NULL,
-  `erzieher` varchar(255) DEFAULT NULL,
   `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
+  `foerder_id` smallint(6) DEFAULT NULL,
   `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
-  `empfehlung_id` bigint(20) DEFAULT NULL,
-  `notiz` text DEFAULT NULL,
-  `quelle` varchar(50) DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `bemerkung` text DEFAULT NULL,
+  `strasse` varchar(255) DEFAULT NULL,
+  `plz` varchar(10) DEFAULT NULL,
+  `ort` varchar(100) DEFAULT NULL,
+  `latitude` decimal(10,8) DEFAULT NULL,
+  `longitude` decimal(11,8) DEFAULT NULL,
+  `geocoding_status` enum('Offen','OK','Fehler') NOT NULL DEFAULT 'Offen',
+  `geocoding_fehler` text DEFAULT NULL,
+  `geocoded_at` datetime DEFAULT NULL,
+  `koordiniert_am` datetime DEFAULT NULL,
+  `koordiniert_von` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `quell_jahrgang` varchar(10) DEFAULT NULL COMMENT 'Jahrgang an der Herkunftsschule',
   PRIMARY KEY (`id`),
-  KEY `fk_anm_schueler_empfehlung` (`empfehlung_id`),
-  KEY `idx_anm_schueler_name` (`nachname`,`vorname`),
-  KEY `idx_anm_schueler_geburtsdatum` (`geburtsdatum`),
-  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=900023 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
+  KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
+  KEY `idx_schueler_id` (`schueler_id`),
+  KEY `idx_schul_nr` (`schul_nr`),
+  KEY `idx_abgleich_status` (`abgleich_status`),
+  KEY `idx_anmeldestatus` (`anmeldestatus`),
+  KEY `idx_empfehlung` (`empfehlung`),
+  KEY `idx_anm_schueler_geo` (`latitude`,`longitude`),
+  KEY `idx_anm_schueler_foerder_id` (`foerder_id`),
+  KEY `idx_anm_schueler_quell_snr` (`quell_snr`),
+  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`),
+  CONSTRAINT `fk_anm_schueler_foerder` FOREIGN KEY (`foerder_id`) REFERENCES `anm_kat_foerderbedarf` (`foerder_id`),
+  CONSTRAINT `fk_anm_schueler_quell_schule` FOREIGN KEY (`quell_snr`) REFERENCES `anm_schulen` (`snr`),
+  CONSTRAINT `fk_anm_schueler_ziel_schule` FOREIGN KEY (`schul_nr`) REFERENCES `anm_schulen` (`snr`)
+) ENGINE=InnoDB AUTO_INCREMENT=208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- anmeld.anm_schulen definition
 

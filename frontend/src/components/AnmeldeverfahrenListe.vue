@@ -38,6 +38,7 @@ function formatTimestamp(value: string) {
           <tr>
             <th>Schuljahr</th>
             <th>Bezeichnung</th>
+            <th>Typ</th>
             <th>Status</th>
             <th>Erstellt am</th>
             <th>Geaendert am</th>
@@ -55,6 +56,7 @@ function formatTimestamp(value: string) {
             <td class="anm-cell-title">
               <strong>{{ item.bezeichnung }}</strong>
             </td>
+            <td class="anm-cell-primary">{{ item.verfahrenstyp }}</td>
             <td><span class="anm-status-pill" :data-status="item.status">{{ item.status }}</span></td>
             <td class="anm-cell-muted">{{ formatTimestamp(item.created_at) }}</td>
             <td class="anm-cell-muted">{{ formatTimestamp(item.updated_at) }}</td>
@@ -84,7 +86,7 @@ function formatTimestamp(value: string) {
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td colspan="6" class="anm-empty-cell">Noch kein Anmeldeverfahren vorhanden.</td>
+            <td colspan="7" class="anm-empty-cell">Noch kein Anmeldeverfahren vorhanden.</td>
           </tr>
         </tbody>
       </table>

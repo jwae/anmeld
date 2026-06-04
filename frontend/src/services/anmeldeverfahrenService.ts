@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import type { AnmeldeStatus, Anmeldeverfahren, BeteiligteSchule } from "../types";
+import type { AnmeldeStatus, Anmeldeverfahren, Anmeldeverfahrenstyp, BeteiligteSchule } from "../types";
 
 type AuthConfig = {
   headers?: Record<string, string>;
@@ -8,6 +8,7 @@ type AuthConfig = {
 type VerfahrenPayload = {
   schuljahr: string;
   bezeichnung: string;
+  verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
 };
 

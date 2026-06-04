@@ -13,8 +13,9 @@ function normalizeText(value) {
 function parseProcedurePayload(body = {}) {
   const schuljahr = normalizeText(body.schuljahr);
   const bezeichnung = normalizeText(body.bezeichnung);
+  const verfahrenstyp = normalizeText(body.verfahrenstyp) || "GS";
   const status = normalizeText(body.status) || "geplant";
-  return { schuljahr, bezeichnung, status };
+  return { schuljahr, bezeichnung, verfahrenstyp, status };
 }
 
 function parseParticipatingSchoolsPayload(body = {}) {
@@ -31,6 +32,9 @@ function parseParticipatingSchoolsPayload(body = {}) {
 function validateProcedurePayload(payload) {
   if (!payload.schuljahr) return "Schuljahr darf nicht leer sein.";
   if (!payload.bezeichnung) return "Bezeichnung darf nicht leer sein.";
+  if (!model.VERFAHRENSTYP_VALUES.includes(payload.verfahrenstyp)) {
+    return `Verfahrenstyp ist ungueltig. Erlaubt: ${model.VERFAHRENSTYP_VALUES.join(", ")}.`;
+  }
   if (!model.STATUS_VALUES.includes(payload.status)) {
     return `Status ist ungueltig. Erlaubt: ${model.STATUS_VALUES.join(", ")}.`;
   }

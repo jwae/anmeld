@@ -1,23 +1,28 @@
 <script setup lang="ts">
-import type { AnmeldeStatus } from "../types";
+import type { AnmeldeStatus, Anmeldeverfahrenstyp } from "../types";
 
 defineProps<{
   modelValue: {
     id: number | null;
     schuljahr: string;
     bezeichnung: string;
+    verfahrenstyp: Anmeldeverfahrenstyp;
     status: AnmeldeStatus;
   };
   saving?: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: { id: number | null; schuljahr: string; bezeichnung: string; status: AnmeldeStatus }): void;
+  (e: "update:modelValue", value: { id: number | null; schuljahr: string; bezeichnung: string; verfahrenstyp: Anmeldeverfahrenstyp; status: AnmeldeStatus }): void;
   (e: "submit"): void;
   (e: "reset"): void;
 }>();
 
 const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
+const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }> = [
+  { value: "GS", label: "Grundschule" },
+  { value: "SEK1", label: "Sek I" },
+];
 </script>
 
 <template>
@@ -47,6 +52,19 @@ const statusOptions: AnmeldeStatus[] = ["geplant", "aktiv", "abgeschlossen"];
           :disabled="saving"
           @input="emit('update:modelValue', { ...modelValue, bezeichnung: String(($event.target as HTMLInputElement).value || '') })"
         />
+      </label>
+
+      <label class="field-block anm-form-field anm-form-field-type">
+        <span class="field-label">Verfahrenstyp</span>
+        <select
+          :value="modelValue.verfahrenstyp"
+          :disabled="saving"
+          @change="emit('update:modelValue', { ...modelValue, verfahrenstyp: String(($event.target as HTMLSelectElement).value || 'GS') as Anmeldeverfahrenstyp })"
+        >
+          <option v-for="option in verfahrenstypOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
       </label>
     </div>
 

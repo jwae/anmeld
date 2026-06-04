@@ -144,11 +144,13 @@ export interface ConnectionResponse {
 }
 
 export type AnmeldeStatus = "geplant" | "aktiv" | "abgeschlossen";
+export type Anmeldeverfahrenstyp = "GS" | "SEK1";
 
 export interface Anmeldeverfahren {
   id: number;
   schuljahr: string;
   bezeichnung: string;
+  verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
   created_at: string;
   updated_at: string;

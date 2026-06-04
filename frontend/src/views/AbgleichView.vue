@@ -359,7 +359,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         <div class="section-head">
           <div>
             <p class="section-eyebrow">3</p>
-            <h3>Schuelerliste</h3>
+            <h3>Schuelerliste im Anmeldeverfahren</h3>
           </div>
           <span class="table-count">{{ sortedRows.length }} Treffer</span>
         </div>
