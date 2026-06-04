@@ -1487,7 +1487,7 @@ function parseAnmSchoolCsv(csvText) {
 
   const delimiter = detectCsvDelimiter(lines[0]);
   const headerCells = parseDelimitedLine(lines[0], delimiter).map((cell) => normalizeCsvHeaderKey(cell));
-  const requiredColumns = ["snr", "name", "plz", "ort", "strasse", "sf_id", "db_host", "db_name", "db_user", "db_password_enc", "is_active"];
+  const requiredColumns = ["snr", "name", "plz", "ort", "strasse", "db_host", "db_name", "db_user", "db_password_enc", "is_active"];
   const indices = {};
 
   for (const column of requiredColumns) {
@@ -1500,6 +1500,14 @@ function parseAnmSchoolCsv(csvText) {
     indices[column] = index;
   }
 
+  const sfIndex = findCsvHeaderIndex(headerCells, ["sf", "sf_id"]);
+  if (sfIndex < 0) {
+    const error = new Error("Die CSV-Datei enthaelt nicht die erforderliche Spalte sf.");
+    error.statusCode = 400;
+    throw error;
+  }
+  indices.sf = sfIndex;
+
   return lines.slice(1).map((line, rowIndex) => {
     const cells = parseDelimitedLine(line, delimiter);
     return {
@@ -1509,7 +1517,7 @@ function parseAnmSchoolCsv(csvText) {
       plz: String(cells[indices.plz] || "").trim(),
       ort: String(cells[indices.ort] || "").trim(),
       strasse: String(cells[indices.strasse] || "").trim(),
-      sf_id: String(cells[indices.sf_id] || "").trim(),
+      sf_id: String(cells[indices.sf] || "").trim(),
       db_host: String(cells[indices.db_host] || "").trim(),
       db_name: String(cells[indices.db_name] || "").trim(),
       db_user: String(cells[indices.db_user] || "").trim(),
@@ -1575,8 +1583,10 @@ async function resolveSchoolFormLookup(conn) {
     [tableName],
   );
   const columnNames = (columnRows || []).map((row) => String(row?.column_name || "").trim());
-  const codeColumn = ["code", "sf", "sf_kurz", "label", "name"]
-    .find((column) => columnNames.includes(column)) || "";
+  const preferredCodeColumns = tableName === "anm_kat_sf"
+    ? ["sf_kurz", "sf", "code", "label", "name"]
+    : ["sf_kurz", "code", "sf", "label", "name"];
+  const codeColumn = preferredCodeColumns.find((column) => columnNames.includes(column)) || "";
   const labelColumn = ["name", "label", "bezeichnung", "sf", "code", "sf_kurz"]
     .find((column) => columnNames.includes(column)) || "";
   const shortLabelColumn = ["sf_kurz", "sf", "code", "label", "name"]
@@ -1586,6 +1596,9 @@ async function resolveSchoolFormLookup(conn) {
   if (codeColumn) selectColumns.push(codeColumn);
   if (labelColumn) selectColumns.push(labelColumn);
   if (shortLabelColumn && shortLabelColumn !== labelColumn) selectColumns.push(shortLabelColumn);
+  if (columnNames.includes("sf_kurz") && !selectColumns.includes("sf_kurz")) selectColumns.push("sf_kurz");
+  if (columnNames.includes("sf") && !selectColumns.includes("sf")) selectColumns.push("sf");
+  if (columnNames.includes("code") && !selectColumns.includes("code")) selectColumns.push("code");
   const [rows] = await conn.query(`SELECT ${selectColumns.join(", ")} FROM ${tableName}`);
   const ids = new Set();
   const labels = new Map();
@@ -1598,13 +1611,20 @@ async function resolveSchoolFormLookup(conn) {
     const sfId = Number(row?.sf_id || 0);
     if (!sfId) continue;
     ids.add(sfId);
-    if (codeColumn) {
-      const codeValue = String(row?.[codeColumn] || "").trim();
-      if (codeValue) {
-        codeToId.set(codeValue.toLowerCase(), sfId);
-        idToCode.set(sfId, codeValue);
-        normalizedCodeToCode.set(codeValue.toLowerCase(), codeValue);
-      }
+    const storageCode = String(row?.code || row?.[codeColumn] || row?.sf_kurz || "").trim();
+    const shortCode = String(row?.sf_kurz || "").trim();
+    if (storageCode) {
+      idToCode.set(sfId, storageCode);
+    }
+    const acceptedCodes = [
+      shortCode,
+      String(row?.sf || "").trim(),
+      String(row?.code || "").trim(),
+      String(row?.[codeColumn] || "").trim(),
+    ].filter(Boolean);
+    for (const acceptedCode of acceptedCodes) {
+      codeToId.set(acceptedCode.toLowerCase(), sfId);
+      normalizedCodeToCode.set(acceptedCode.toLowerCase(), storageCode || acceptedCode);
     }
     labels.set(sfId, labelColumn ? String(row?.[labelColumn] || "").trim() : String(sfId));
     shortLabels.set(

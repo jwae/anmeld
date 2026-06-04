@@ -10,11 +10,18 @@ import type { AnmeldeStatus, Anmeldeverfahren, Anmelderunde, Anmeldeverfahrensty
 
 const props = defineProps<{
   token?: string;
+  initialVerfahrenId?: number | null;
+  initialRundeId?: number | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update-context", payload: { verfahren: string; runde: string }): void;
-  (e: "update-selection", payload: { verfahrenId: number | null; rundeId: number | null; rundeStatus: AnmeldeStatus | null }): void;
+  (e: "update-selection", payload: {
+    verfahrenId: number | null;
+    verfahrenstyp: Anmeldeverfahrenstyp | null;
+    rundeId: number | null;
+    rundeStatus: AnmeldeStatus | null;
+  }): void;
 }>();
 
 type VerfahrenFormState = {
@@ -36,8 +43,8 @@ type RundenFormState = {
 
 const verfahren = ref<Anmeldeverfahren[]>([]);
 const runden = ref<Anmelderunde[]>([]);
-const selectedVerfahrenId = ref<number | null>(null);
-const selectedRundenId = ref<number | null>(null);
+const selectedVerfahrenId = ref<number | null>(props.initialVerfahrenId ?? null);
+const selectedRundenId = ref<number | null>(props.initialRundeId ?? null);
 const loadingVerfahren = ref<boolean>(false);
 const loadingRunden = ref<boolean>(false);
 const savingVerfahren = ref<boolean>(false);
@@ -112,6 +119,7 @@ function emitContext() {
   });
   emit("update-selection", {
     verfahrenId: selectedVerfahrenId.value,
+    verfahrenstyp: selectedVerfahren.value?.verfahrenstyp || null,
     rundeId: selectedRundenId.value,
     rundeStatus: selectedRunde.value?.status || null,
   });
@@ -142,7 +150,7 @@ async function loadVerfahren(preferredSelectionId?: number | null) {
 
     const desiredSelection = preferredSelectionId ?? selectedVerfahrenId.value;
     const stillExists = rows.some((item) => item.id === desiredSelection);
-    const nextSelectionId = stillExists ? desiredSelection : (rows[0]?.id ?? null);
+    const nextSelectionId = stillExists ? desiredSelection : null;
     selectedVerfahrenId.value = nextSelectionId;
 
     if (nextSelectionId) {
@@ -174,7 +182,7 @@ async function loadRunden(verfahrenId?: number | null) {
     const rows = await anmelderundenService.listByVerfahren(effectiveId, props.token);
     runden.value = rows;
     const currentSelectedExists = rows.some((item) => item.id === selectedRundenId.value);
-    selectedRundenId.value = currentSelectedExists ? selectedRundenId.value : (rows[0]?.id ?? null);
+    selectedRundenId.value = currentSelectedExists ? selectedRundenId.value : null;
     syncRundenFormToSelection();
   } catch (error) {
     showError(error, "Anmelderunden konnten nicht geladen werden.");
@@ -420,7 +428,7 @@ async function startNextRound() {
 }
 
 onMounted(async () => {
-  await loadVerfahren();
+  await loadVerfahren(props.initialVerfahrenId);
 });
 </script>
 

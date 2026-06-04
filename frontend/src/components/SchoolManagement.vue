@@ -863,7 +863,7 @@ async function handleSchoolTableImportFileSelected(event: Event) {
     const csvText = await readCsvFileText(file);
     schoolTableImportRawCsv.value = csvText;
     const response = await apiClient.post(
-      "/api/schulen/import/vorschau",
+      "/api/auth/schulen/import/vorschau",
       { csv_text: csvText },
       { headers: managementAuthHeaders() },
     );
@@ -973,7 +973,7 @@ async function confirmSchoolTableImport() {
       }
 
       const response = await apiClient.post(
-        "/api/schulen/import",
+        "/api/auth/schulen/import",
         {
           preview_token: schoolTableImportPreviewToken.value,
           selected_row_nos: validSelectedRows.map((row) => Number(row?.row_no || 0)).filter((rowNo) => rowNo > 0),

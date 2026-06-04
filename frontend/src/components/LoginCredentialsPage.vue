@@ -5,6 +5,8 @@ import AnmeldeverfahrenView from "../views/AnmeldeverfahrenView.vue";
 import ImporteView from "../views/ImporteView.vue";
 import AbgleichView from "../views/AbgleichView.vue";
 import KoordinationView from "../views/KoordinationView.vue";
+import SchulenImVerfahrenBereich from "./anmeldeverfahren/SchulenImVerfahrenBereich.vue";
+import type { AnmeldeStatus, Anmeldeverfahrenstyp } from "../types";
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -19,14 +21,15 @@ const props = defineProps<{
   token?: string;
 }>();
 
-const activeCredentialsMenu = ref<"verfahren" | "importe" | "abgleich" | "koordination" | "roadmap">("verfahren");
+const activeCredentialsMenu = ref<"verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "roadmap">("verfahren");
 const currentContext = ref<{ verfahren: string; runde: string }>({
   verfahren: "Kein Verfahren ausgewaehlt",
   runde: "Keine Runde ausgewaehlt",
 });
 const selectedVerfahrenId = ref<number | null>(null);
+const selectedVerfahrenstyp = ref<Anmeldeverfahrenstyp | null>(null);
 const selectedRundenId = ref<number | null>(null);
-const selectedRundenStatus = ref<"geplant" | "aktiv" | "abgeschlossen" | null>(null);
+const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
 
 function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   currentContext.value = {
@@ -35,8 +38,14 @@ function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   };
 }
 
-function handleSelectionUpdate(payload: { verfahrenId: number | null; rundeId: number | null; rundeStatus: "geplant" | "aktiv" | "abgeschlossen" | null }) {
+function handleSelectionUpdate(payload: {
+  verfahrenId: number | null;
+  verfahrenstyp: Anmeldeverfahrenstyp | null;
+  rundeId: number | null;
+  rundeStatus: AnmeldeStatus | null;
+}) {
   selectedVerfahrenId.value = payload?.verfahrenId ?? null;
+  selectedVerfahrenstyp.value = payload?.verfahrenstyp ?? null;
   selectedRundenId.value = payload?.rundeId ?? null;
   selectedRundenStatus.value = payload?.rundeStatus ?? null;
 }

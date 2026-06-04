@@ -244,8 +244,8 @@ watch(
                   <th>SNR</th>
                   <th>Name</th>
                   <th>Kapazitaet</th>
-                  <th>Anmeldung gesamt</th>
-                  <th>Freie Plaetze</th>
+                  <th>Anmeldungen</th>
+                  <th>Frei Plaetze</th>
                 </tr>
               </thead>
               <tbody>

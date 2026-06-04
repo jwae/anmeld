@@ -583,6 +583,19 @@ button:disabled {
   border-top: 1px solid #dbe4f0;
 }
 
+.school-management-modal-actions .btn-primary,
+.school-management-modal-actions .btn-secondary {
+  min-height: 34px;
+  padding: 8px 14px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .school-management-import-overwrite-toggle {
   display: inline-flex;
   align-items: center;
@@ -683,6 +696,10 @@ button:disabled {
 }
 
 .school-management-import-select-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -691,6 +708,9 @@ button:disabled {
   font-weight: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .school-management-import-preview-row td {
@@ -729,39 +749,68 @@ button:disabled {
 }
 
 .school-management-import-info-modal {
-  width: min(760px, 100%);
-  max-height: min(78vh, 760px);
+  width: min(840px, 100%);
+  max-height: min(82vh, 820px);
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .school-management-import-info-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 14px;
   min-height: 0;
+  align-items: start;
 }
 
 .school-management-import-info-card {
   padding: 14px 16px;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
-  background: #fff;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  display: grid;
+  gap: 12px;
 }
 
 .school-management-import-info-card h4 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 16px;
   color: #173252;
 }
 
 .school-management-import-info-card p {
-  margin: 0 0 8px;
+  margin: 0;
   color: #51657f;
   line-height: 1.45;
 }
 
+.school-management-import-info-callout {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #d8e6fb;
+  border-radius: 12px;
+  background: #f4f8ff;
+  color: #29476d;
+}
+
+.school-management-import-info-callout strong {
+  font-size: 13px;
+  color: #173252;
+}
+
+.school-management-import-info-callout span {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.school-management-import-info-list {
+  display: grid;
+  gap: 8px;
+}
+
 .school-management-import-info-code {
-  margin: 0 0 10px;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid #dbe4f0;
@@ -769,6 +818,27 @@ button:disabled {
   color: #1e3555;
   font: 12px/1.45 "Consolas", "Courier New", monospace;
   white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.school-management-import-info-inline-note {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #cfe0f5;
+  background: #f9fbfe;
+}
+
+.school-management-import-info-inline-note strong {
+  color: #173252;
+  font-size: 13px;
+}
+
+.school-management-import-info-inline-note span {
+  color: #51657f;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .school-management-import-info-note {

@@ -67,7 +67,7 @@
 
       <div class="user-management-form-grid school-management-form-grid">
         <label class="field-block">
-          <span class="field-label">Schulform (sf_id)</span>
+          <span class="field-label">Schulform (sf)</span>
           <input v-model="schoolSourceForm.sf_id" :disabled="managementSaving" />
         </label>
 
@@ -343,8 +343,8 @@
                 <th>PLZ</th>
                 <th>Ort</th>
                 <th>Strasse</th>
-                <th>SF-ID</th>
-                <th>SF-ID</th>
+                <th>SF</th>
+                <th>SF-Code</th>
                 <th>Host</th>
                 <th>DB</th>
                 <th>User</th>
@@ -533,7 +533,7 @@
         <div class="school-management-modal-head">
           <div>
             <h3>Info zum Import</h3>
-            <p>Kurzer Ueberblick ueber den erwarteten Aufbau der CSV-Dateien.</p>
+            <p>So muss die CSV-Datei fuer den Import in <code>anm_schulen</code> aufgebaut sein.</p>
           </div>
           <button class="btn-secondary" type="button" @click="closeImportInfoOverlay">
             Schliessen
@@ -542,28 +542,29 @@
 
         <div class="school-management-import-info-grid">
           <section class="school-management-import-info-card">
-            <h4>Schulen</h4>
-            <p>Pflichtspalten:</p>
-            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf_id;db_host;db_name;db_user;db_password_enc;is_active</pre>
-            <p>Pflichtwerte pro Zeile: `snr` und `name`.</p>
-            <p>Vor dem Import wird jede Zeile geprueft und als `Neu`, `Aenderung` oder `Fehler` markiert.</p>
-            <p>Beispiel:</p>
-            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf_id;db_host;db_name;db_user;db_password_enc;is_active
-123456;Goethe-Gymnasium;50667;Koeln;Domkloster 4;3;https://svws.example.de;svwsdb;svws_user;***;1</pre>
+            <h4>CSV-Aufbau</h4>
+            <div class="school-management-import-info-callout">
+              <strong>Pflichtspalten</strong>
+              <span>Die Kopfzeile muss genau diese Spalten enthalten:</span>
+            </div>
+            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf;db_host;db_name;db_user;db_password_enc;is_active</pre>
+            <div class="school-management-import-info-list">              
+              <p><strong>sf:</strong> Gibt die Schulform an, zum Beispiel <code>GS</code>, <code>GE</code> oder <code>GY</code>.</p>              
+              <p><strong>Pruefung:</strong> Jede Zeile wird vor dem Import als <code>Neu</code>, <code>Aenderung</code>, <code>Unveraendert</code> oder <code>Fehler</code> bewertet.</p>
+            </div>
           </section>
 
           <section class="school-management-import-info-card">
-            <h4>Schulserver</h4>
-            <p>Pflichtspalten:</p>
-            <pre class="school-management-import-info-code">snr;db_host;db_name;db_user;db_passwd</pre>
-            <p>`db_password_enc` wird ebenfalls akzeptiert. Ein eigener `db_port` wird nicht mehr eingelesen.</p>
-            <p>Beispiel:</p>
-            <pre class="school-management-import-info-code">123456;https://server.example.de:8443;svwsdb;svws_user;geheim</pre>
+            <h4>Beispiel</h4>
+            <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf;db_host;db_name;db_user;db_password_enc;is_active
+123456;Goethe-Gymnasium;50667;Koeln;Domkloster 4;GY;https://svws.example.de;svwsdb;svws_user;***;1</pre>
+            
           </section>
+
         </div>
 
         <div class="school-management-import-info-note">
-          <p>Als Trennzeichen werden `;` und `,` akzeptiert. Gross- und Kleinschreibung der Ueberschriften wird ignoriert.</p>
+          <p>Als Trennzeichen werden `;` und `,` akzeptiert. Gross- und Kleinschreibung der Ueberschriften wird ignoriert. Leere oder ungueltige `sf`-Werte fuehren in der Vorschau zu einem Fehler.</p>
         </div>
       </section>
     </div>
