@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { authStore } from "../authStore";
 import apiClient from "../services/apiClient";
 import SchoolManagement from "./SchoolManagement.vue";
+import SchoolGroupManagement from "./SchoolGroupManagement.vue";
 import type { User } from "../types";
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const managementGroups = ref<any[]>([]);
 const managementUsers = ref<any[]>([]);
 const managementSchools = ref<any[]>([]);
 const managementSchoolSources = ref<any[]>([]);
+const managementSchoolGroups = ref<any[]>([]);
 const managementSnapshots = ref<any[]>([]);
 const managementTerms = ref<any[]>([]);
 const activeManagementTab = ref<string>("users");
@@ -118,6 +120,7 @@ function applyManagementBootstrap(data: any) {
   managementUsers.value = Array.isArray(data?.users) ? data.users : [];
   managementSchools.value = Array.isArray(data?.schools) ? data.schools : [];
   managementSchoolSources.value = Array.isArray(data?.school_sources) ? data.school_sources : [];
+  managementSchoolGroups.value = Array.isArray(data?.school_groups) ? data.school_groups : [];
   managementSnapshots.value = Array.isArray(data?.snapshots) ? data.snapshots : [];
   managementTerms.value = Array.isArray(data?.terms) ? data.terms : [];
   managementStats.value = {
@@ -162,6 +165,7 @@ function clearManagementSession() {
   managementUsers.value = [];
   managementSchools.value = [];
   managementSchoolSources.value = [];
+  managementSchoolGroups.value = [];
   managementSnapshots.value = [];
   managementTerms.value = [];
   managementStats.value = {

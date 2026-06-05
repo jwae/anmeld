@@ -164,19 +164,26 @@ async function loadSchoolRows(pool, verfahrenId, rundeId) {
       COALESCE(neu.anmeldungen_gesamt, 0) AS anmeldungen_gesamt,
       ${schoolLatitudeColumn} AS latitude,
       ${schoolLongitudeColumn} AS longitude
-    FROM anm_verfahren_schule vs
+    FROM (
+      SELECT DISTINCT sgs.snr
+      FROM anm_verfahren_schulgruppe vsg
+      JOIN anm_schulgruppe_schule sgs
+        ON sgs.schulgruppe_id = vsg.schulgruppe_id
+      WHERE vsg.verfahren_id = ?
+        AND vsg.rolle = 'Zielschulen'
+    ) vzs
     JOIN anm_schulen s
-      ON s.snr = vs.snr
+      ON s.snr = vzs.snr
     ${capacityJoin}
     ${studentJoin}
-    WHERE vs.verfahren_id = ?
+    WHERE 1 = 1
     ${activeFilter}
     ORDER BY COALESCE(s.name, '') ASC, s.snr ASC
     `,
     [
+      verfahrenId,
       ...(capacityColumns.has("verfahren_id") && capacityColumns.has("snr") ? [verfahrenId] : []),
       ...studentParams,
-      verfahrenId,
     ],
   );
 

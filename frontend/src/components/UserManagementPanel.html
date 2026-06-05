@@ -156,6 +156,18 @@
         </button>
         <button
           class="user-management-tab"
+          :class="{ 'is-active': activeManagementTab === 'school-groups' }"
+          type="button"
+          role="tab"
+          title="Schulgruppen fuer Quell- und Zielschulen verwalten."
+          :aria-selected="activeManagementTab === 'school-groups' ? 'true' : 'false'"
+          @click="activeManagementTab = 'school-groups'"
+        >
+          <i class="bi bi-diagram-3" aria-hidden="true"></i>
+          <span>Schulgruppen</span>
+        </button>
+        <button
+          class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'catalogs' }"
           type="button"
           role="tab"
@@ -417,6 +429,16 @@
           :is-management-session-active="isManagementSessionActive"
           :management-schools="managementSchools"
           :management-school-sources="managementSchoolSources"
+          @bootstrap-updated="applyManagementBootstrap"
+          @feedback="handleSchoolManagementFeedback"
+        />
+      </div>
+      <div v-else-if="activeManagementTab === 'school-groups'" class="user-management-tab-panel" role="tabpanel">
+        <SchoolGroupManagement
+          :management-token="effectiveManagementToken"
+          :is-management-session-active="isManagementSessionActive"
+          :management-schools="managementSchoolSources"
+          :management-school-groups="managementSchoolGroups"
           @bootstrap-updated="applyManagementBootstrap"
           @feedback="handleSchoolManagementFeedback"
         />

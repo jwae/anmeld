@@ -290,9 +290,15 @@ async function loadProcedureSchoolLookup(pool, verfahrenId) {
   const [rows] = await pool.query(
     `
     SELECT s.snr, s.name, s.is_active
-    FROM anm_verfahren_schule vs
-    JOIN anm_schulen s ON s.snr = vs.snr
-    WHERE vs.verfahren_id = ?
+    FROM (
+      SELECT DISTINCT sgs.snr
+      FROM anm_verfahren_schulgruppe vsg
+      JOIN anm_schulgruppe_schule sgs
+        ON sgs.schulgruppe_id = vsg.schulgruppe_id
+      WHERE vsg.verfahren_id = ?
+        AND vsg.rolle = 'Zielschulen'
+    ) vzs
+    JOIN anm_schulen s ON s.snr = vzs.snr
     `,
     [verfahrenId],
   );
@@ -1744,7 +1750,7 @@ function createImporteController({ getPool }) {
             ${schuelerWhereClause}
             GROUP BY s.${schuelerSchoolColumn}
           ) stat
-            ON stat.snr = vs.snr
+            ON stat.snr = vzs.snr
           `
           : `
           LEFT JOIN (
@@ -1755,10 +1761,17 @@ function createImporteController({ getPool }) {
         const [capacityRows] = await pool.query(
           `
           SELECT
-            vs.snr,
+            vzs.snr,
             COALESCE(cap.kapazitaet, 0) AS kapazitaet,
             COALESCE(stat.anmeldungen, 0) AS anmeldungen
-          FROM anm_verfahren_schule vs
+          FROM (
+            SELECT DISTINCT sgs.snr
+            FROM anm_verfahren_schulgruppe vsg
+            JOIN anm_schulgruppe_schule sgs
+              ON sgs.schulgruppe_id = vsg.schulgruppe_id
+            WHERE vsg.verfahren_id = ?
+              AND vsg.rolle = 'Zielschulen'
+          ) vzs
           LEFT JOIN (
             SELECT
               k.snr,
@@ -1767,11 +1780,10 @@ function createImporteController({ getPool }) {
             WHERE k.verfahren_id = ?
             GROUP BY k.snr
           ) cap
-            ON cap.snr = vs.snr
+            ON cap.snr = vzs.snr
           ${schuelerStatJoin}
-          WHERE vs.verfahren_id = ?
           `,
-          [verfahrenId, ...schuelerParams, verfahrenId],
+          [verfahrenId, verfahrenId, ...schuelerParams],
         );
 
         const metricsBySnr = new Map();

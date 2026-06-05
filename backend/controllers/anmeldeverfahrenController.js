@@ -18,15 +18,31 @@ function parseProcedurePayload(body = {}) {
   return { schuljahr, bezeichnung, verfahrenstyp, status };
 }
 
-function parseParticipatingSchoolsPayload(body = {}) {
-  const schools = Array.isArray(body.schulen) ? body.schulen : [];
-  return schools
-    .map((entry) => {
-      if (typeof entry === "string") return normalizeText(entry);
-      if (entry && typeof entry === "object") return normalizeText(entry.snr);
-      return "";
-    })
-    .filter(Boolean);
+function parseSchoolGroupsPayload(body = {}) {
+  const schoolGroups = Array.isArray(body.schulgruppen)
+    ? body.schulgruppen
+    : Array.isArray(body.schulgruppeIds)
+      ? body.schulgruppeIds
+      : [];
+
+  const normalizedSchoolGroups = Array.from(new Set(
+    schoolGroups
+      .map((entry) => {
+        if (typeof entry === "number") return Number(entry);
+        if (typeof entry === "string") return Number(normalizeText(entry));
+        if (entry && typeof entry === "object") return Number(entry.id);
+        return 0;
+      })
+      .filter((entry) => Number.isInteger(entry) && entry > 0),
+  ));
+
+  if (normalizedSchoolGroups.length > 1) {
+    const error = new Error("Pro Rolle darf genau eine Schulgruppe je Verfahren uebergeben werden.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedSchoolGroups;
 }
 
 function validateProcedurePayload(payload) {
@@ -115,7 +131,7 @@ function createAnmeldeverfahrenController({ getPool }) {
       }
     },
 
-    listParticipatingSchools: async (req, res) => {
+    listSchoolGroups: async (req, res) => {
       try {
         const id = Number(req.params.id || 0);
         if (!id) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
@@ -123,30 +139,49 @@ function createAnmeldeverfahrenController({ getPool }) {
         const row = await model.findById(getPool(), id);
         if (!row) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
 
-        const rows = await model.listParticipatingSchools(getPool(), id);
-        res.json({ rows });
+        const schoolGroups = await model.listProcedureSchoolGroups(getPool(), id);
+        res.json(schoolGroups);
       } catch (error) {
         console.error(error);
-        sendError(res, error?.statusCode || 500, error?.message || "Beteiligte Schulen konnten nicht geladen werden.");
+        sendError(res, error?.statusCode || 500, error?.message || "Schulgruppen des Verfahrens konnten nicht geladen werden.");
       }
     },
 
-    syncParticipatingSchools: async (req, res) => {
+    syncSourceSchoolGroups: async (req, res) => {
       try {
         const id = Number(req.params.id || 0);
         if (!id) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
 
-        const schulen = parseParticipatingSchoolsPayload(req.body);
-        const result = await model.syncParticipatingSchools(getPool(), id, schulen);
+        const schulgruppen = parseSchoolGroupsPayload(req.body);
+        const result = await model.syncProcedureSchoolGroupsByRole(getPool(), id, "Quellschulen", schulgruppen);
         if (!result.exists) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
 
         res.json({
-          message: "Beteiligte Schulen erfolgreich uebernommen.",
-          rows: result.rows,
+          message: "Quellschulgruppen erfolgreich uebernommen.",
+          schoolGroups: result.schoolGroups,
         });
       } catch (error) {
         console.error(error);
-        sendError(res, error?.statusCode || 500, error?.message || "Beteiligte Schulen konnten nicht gespeichert werden.");
+        sendError(res, error?.statusCode || 500, error?.message || "Quellschulgruppen konnten nicht gespeichert werden.");
+      }
+    },
+
+    syncTargetSchoolGroups: async (req, res) => {
+      try {
+        const id = Number(req.params.id || 0);
+        if (!id) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+
+        const schulgruppen = parseSchoolGroupsPayload(req.body);
+        const result = await model.syncProcedureSchoolGroupsByRole(getPool(), id, "Zielschulen", schulgruppen);
+        if (!result.exists) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+
+        res.json({
+          message: "Zielschulgruppen erfolgreich uebernommen.",
+          schoolGroups: result.schoolGroups,
+        });
+      } catch (error) {
+        console.error(error);
+        sendError(res, error?.statusCode || 500, error?.message || "Zielschulgruppen konnten nicht gespeichert werden.");
       }
     },
 

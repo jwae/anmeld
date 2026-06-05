@@ -131,9 +131,16 @@ async function loadSchoolRows(pool, verfahrenId, rundeId) {
       COALESCE(stat.warteliste, 0) AS warteliste,
       COALESCE(stat.ablehnungen, 0) AS ablehnungen,
       prot.letzter_import
-    FROM anm_verfahren_schule vs
+    FROM (
+      SELECT DISTINCT sgs.snr
+      FROM anm_verfahren_schulgruppe vsg
+      JOIN anm_schulgruppe_schule sgs
+        ON sgs.schulgruppe_id = vsg.schulgruppe_id
+      WHERE vsg.verfahren_id = ?
+        AND vsg.rolle = 'Zielschulen'
+    ) vzs
     JOIN anm_schulen s
-      ON s.snr = vs.snr
+      ON s.snr = vzs.snr
     LEFT JOIN anm_kat_sf sf
       ON sf.code = s.sf_id
     LEFT JOIN (
@@ -161,10 +168,10 @@ async function loadSchoolRows(pool, verfahrenId, rundeId) {
     ) stat
       ON stat.snr = s.snr
     ${protocolJoin}
-    WHERE vs.verfahren_id = ?
+    WHERE 1 = 1
     ORDER BY s.name ASC, s.snr ASC
     `,
-    [verfahrenId, verfahrenId, rundeId, ...protocolParams, verfahrenId],
+    [verfahrenId, verfahrenId, verfahrenId, rundeId, ...protocolParams],
   );
 
   return (rows || []).map((row) => {

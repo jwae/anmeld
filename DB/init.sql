@@ -372,25 +372,6 @@ CREATE TABLE `anm_schulen` (
   CONSTRAINT `fk_anm_schulen_sf` FOREIGN KEY (`sf_id`) REFERENCES `anm_kat_sf` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
--- anmeld.anm_verfahren_schule definition
-
-CREATE TABLE `anm_verfahren_schule` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `verfahren_id` bigint(20) NOT NULL,
-  `snr` varchar(50) NOT NULL,
-  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
-  `bemerkung` text DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_anm_verfahren_schule` (`verfahren_id`,`snr`),
-  KEY `fk_anm_verfahren_schule_schule` (`snr`),
-  CONSTRAINT `fk_anm_verfahren_schule_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`),
-  CONSTRAINT `fk_anm_verfahren_schule_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
 -- anmeld.app_group_dashboard definition
 
 CREATE TABLE `app_group_dashboard` (
@@ -797,6 +778,70 @@ CREATE TABLE `anm_schueler_abgleich` (
   CONSTRAINT `4` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
   CONSTRAINT `CONSTRAINT_1` CHECK (`schueler_pool_id` is not null or `schueler_anmeldung_id` is not null)
 ) ENGINE=InnoDB AUTO_INCREMENT=31238 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE anm_schulgruppe (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    beschreibung TEXT NULL,
+    aktiv TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id)
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE anm_schulgruppe_schule (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    schulgruppe_id BIGINT NOT NULL,
+    snr VARCHAR(50) NOT NULL,
+
+    PRIMARY KEY (id),
+
+    UNIQUE KEY uq_schulgruppe_schule (schulgruppe_id, snr),
+
+    CONSTRAINT fk_schulgruppe_schule_gruppe
+        FOREIGN KEY (schulgruppe_id)
+        REFERENCES anm_schulgruppe(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_schulgruppe_schule_schule
+        FOREIGN KEY (snr)
+        REFERENCES anm_schulen(snr)
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE anm_verfahren_schulgruppe (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    verfahren_id BIGINT NOT NULL,
+    schulgruppe_id BIGINT NOT NULL,
+    rolle ENUM('Quellschulen', 'Zielschulen') NOT NULL,
+
+    PRIMARY KEY (id),
+
+    UNIQUE KEY uq_verfahren_schulgruppe_rolle (
+        verfahren_id,
+        rolle
+    ),
+
+    CONSTRAINT fk_verfahren_schulgruppe_verfahren
+        FOREIGN KEY (verfahren_id)
+        REFERENCES anm_verfahren(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_verfahren_schulgruppe_gruppe
+        FOREIGN KEY (schulgruppe_id)
+        REFERENCES anm_schulgruppe(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_unicode_ci;
+
+
+
 -- -----------------------------------------------------
 -- Stammdaten / Kataloge
 -- -----------------------------------------------------

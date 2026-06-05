@@ -19,12 +19,18 @@ class KapazitaetenModel {
         s.sf_id,
         s.is_active,
         sf.name AS schulform_name
-      FROM anm_verfahren_schule vs
+      FROM (
+        SELECT DISTINCT sgs.snr
+        FROM anm_verfahren_schulgruppe vsg
+        JOIN anm_schulgruppe_schule sgs
+          ON sgs.schulgruppe_id = vsg.schulgruppe_id
+        WHERE vsg.verfahren_id = ?
+          AND vsg.rolle = 'Zielschulen'
+      ) vzs
       JOIN anm_schulen s
-        ON s.snr = vs.snr
+        ON s.snr = vzs.snr
       LEFT JOIN anm_kat_sf sf
         ON sf.code = s.sf_id
-      WHERE vs.verfahren_id = ?
       `,
       [verfahren_id],
     );
@@ -201,9 +207,15 @@ class KapazitaetenModel {
         s.is_active,
         sf.name AS schulform_name
       FROM anm_schulen s
-      INNER JOIN anm_verfahren_schule vs
-        ON vs.snr = s.snr
-       AND vs.verfahren_id = ?
+      INNER JOIN (
+        SELECT DISTINCT sgs.snr
+        FROM anm_verfahren_schulgruppe vsg
+        JOIN anm_schulgruppe_schule sgs
+          ON sgs.schulgruppe_id = vsg.schulgruppe_id
+        WHERE vsg.verfahren_id = ?
+          AND vsg.rolle = 'Zielschulen'
+      ) vzs
+        ON vzs.snr = s.snr
       LEFT JOIN anm_kat_sf sf
         ON sf.code = s.sf_id
       WHERE 1 = 1

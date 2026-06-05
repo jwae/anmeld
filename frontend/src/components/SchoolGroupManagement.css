@@ -1,0 +1,559 @@
+.school-group-page {
+  display: grid;
+  gap: 16px;
+}
+
+.feedback-panel {
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.feedback-panel-success {
+  border: 1px solid #bfe5c9;
+  background: #eefaf2;
+  color: #1f5f37;
+}
+
+.feedback-panel-error {
+  border: 1px solid #f0c2c8;
+  background: #fff4f6;
+}
+
+.feedback-panel .error {
+  margin: 0;
+}
+
+.btn-primary,
+.btn-secondary {
+  border-radius: 10px;
+  border: 1px solid #c7d3e3;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-primary {
+  background: #214c7a;
+  border-color: #214c7a;
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #f8fbff;
+  color: #1f3552;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #314561;
+}
+
+.field-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-block input,
+.field-block select,
+.field-block textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #c7d3e3;
+  border-radius: 10px;
+  font: inherit;
+  resize: none;
+}
+
+.field-block input,
+.field-block select {
+  min-height: 34px;
+}
+
+.user-management-panel,
+.user-management-list-card {
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.user-management-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.user-management-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.user-management-panel-head h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.user-management-panel-head p {
+  margin: 0;
+  color: #5c6f88;
+  font-size: 12px;
+}
+
+.user-management-inline-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.school-group-inline-actions-right {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.user-management-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.school-group-form-grid {
+  align-items: start;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(180px, 0.45fr);
+}
+
+.school-group-field-name,
+.school-group-field-description,
+.school-group-field-active {
+  grid-column: span 1;
+}
+
+.school-group-field-active {
+  justify-self: start;
+  min-width: 180px;
+  align-self: end;
+}
+
+.school-group-field-active .user-management-checkbox {
+  min-height: 34px;
+}
+
+.school-group-field-active .user-management-checkbox-card {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.user-management-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.user-management-checkbox-field {
+  align-content: start;
+}
+
+.user-management-checkbox-card {
+  min-height: 30px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: #f8fbff;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.user-management-checkbox-card input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.user-management-checkbox-card span {
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.school-group-select-field {
+  flex: 0 0 20%;
+  max-width: 20%;
+  min-width: 160px;
+}
+
+.school-group-delete-button {
+  min-width: 180px;
+  height: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 12px;
+}
+
+.school-group-danger-button {
+  background: #f7e6e8;
+  border-color: #d8aeb4;
+  color: #8a3d48;
+}
+
+.school-group-danger-button:hover {
+  background: #f2d9dd;
+  border-color: #c88f98;
+}
+
+.school-group-danger-button:disabled {
+  background: #f8eef0;
+  border-color: #e2c7cb;
+  color: #b48a91;
+}
+
+.school-group-selected-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 13px;
+  color: #314561;
+}
+
+.school-group-select-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.school-group-select-card .user-management-panel-head,
+.school-group-select-card > .user-management-inline-actions,
+.school-group-select-card > .school-group-selected-summary {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.school-group-select-card .user-management-panel-head {
+  padding-top: 12px;
+}
+
+.school-group-select-card > .user-management-inline-actions,
+.school-group-select-card > .school-group-selected-summary {
+  margin-top: 12px;
+}
+
+.school-group-table-toolbar {
+  padding: 12px;
+  border-top: 1px solid #edf2f7;
+  border-bottom: 1px solid #edf2f7;
+  background: #fbfdff;
+}
+
+.school-group-search-field {
+  max-width: 420px;
+}
+
+.school-group-search-input-wrap {
+  position: relative;
+}
+
+.school-group-search-input-wrap input {
+  padding-right: 30px;
+}
+
+.school-group-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  color: #7a8ca3;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.school-group-search-clear:hover {
+  color: #42556d;
+}
+
+.school-group-empty-state {
+  margin: 12px;
+  padding: 14px;
+  border: 1px dashed #d4dfeb;
+  border-radius: 12px;
+  background: #fbfdff;
+  color: #5c6f88;
+}
+
+.school-group-table-wrap {
+  width: 100%;
+  max-height: 420px;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.school-group-table {
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.school-group-table th,
+.school-group-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.school-group-table th {
+  background: #f8fbff;
+  color: #314561;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.school-group-sort {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.school-group-sort-indicator {
+  min-width: 10px;
+  color: #6c7f95;
+}
+
+.school-group-checkbox-cell {
+  width: 72px;
+}
+
+.school-group-school-name {
+  min-width: 220px;
+}
+
+.school-group-table tbody tr.is-selected {
+  background: #e2f3e6;
+  box-shadow: inset 4px 0 0 #5aa06a;
+}
+
+.school-group-table tbody tr.is-selected:hover {
+  background: #d7ecdd;
+}
+
+.school-group-table tbody tr.is-selected td {
+  color: #244d2d;
+  font-weight: 600;
+}
+
+.school-group-empty-cell {
+  text-align: center;
+  color: #5c6f88;
+}
+
+.school-group-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(22, 34, 52, 0.5);
+}
+
+.school-group-modal {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.2);
+}
+
+.school-group-danger-modal {
+  border-color: #f0d6da;
+  background: linear-gradient(180deg, #fffefe 0%, #fff7f8 100%);
+}
+
+.school-group-danger-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.school-group-danger-hero h3 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  color: #7d3640;
+}
+
+.school-group-danger-hero p {
+  margin: 0;
+  color: #7c5a60;
+  line-height: 1.45;
+}
+
+.school-group-danger-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ffe5e8 0%, #ffd7dc 100%);
+  color: #a34755;
+  font-size: 26px;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(163, 71, 85, 0.12);
+}
+
+.school-group-danger-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  padding: 12px 14px;
+  border: 1px solid #f0dfe2;
+  border-radius: 14px;
+  background: #fff;
+  color: #6d4d53;
+}
+
+.school-group-danger-summary strong {
+  font-size: 18px;
+  color: #8a3d48;
+}
+
+.school-group-danger-list {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #f0dfe2;
+  color: #5d4c50;
+}
+
+.school-group-danger-list p {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #7d3640;
+}
+
+.school-group-danger-list ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.school-group-danger-list li + li {
+  margin-top: 6px;
+}
+
+.school-group-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #eadde0;
+}
+
+.school-group-modal-actions .btn-primary,
+.school-group-modal-actions .btn-secondary {
+  min-height: 34px;
+  padding: 8px 14px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.school-group-danger-button-strong {
+  background: #c65060;
+  border-color: #c65060;
+  color: #fff;
+}
+
+.school-group-danger-button-strong:hover:not(:disabled) {
+  background: #ae4050;
+  border-color: #ae4050;
+}
+
+.user-management-inline-feedback p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .user-management-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-management-inline-actions,
+  .school-group-inline-actions-right {
+    align-items: stretch;
+  }
+
+  .school-group-delete-button,
+  .school-group-search-field,
+  .school-group-select-field {
+    max-width: none;
+    width: 100%;
+  }
+
+  .school-group-inline-actions-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .user-management-checkbox-card {
+    width: 100%;
+  }
+}

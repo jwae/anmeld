@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import type { AnmeldeStatus, Anmeldeverfahren, Anmeldeverfahrenstyp, BeteiligteSchule } from "../types";
+import type { AnmeldeStatus, Anmeldeverfahren, Anmeldeverfahrenstyp } from "../types";
 
 type AuthConfig = {
   headers?: Record<string, string>;
@@ -10,6 +10,20 @@ type VerfahrenPayload = {
   bezeichnung: string;
   verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
+};
+
+export type VerfahrenSchulgruppe = {
+  id: number;
+  name: string;
+  beschreibung: string;
+  aktiv: boolean;
+  rolle: "Quellschulen" | "Zielschulen";
+  schoolSnrs: string[];
+};
+
+export type VerfahrenSchulgruppenResponse = {
+  quellschulen: VerfahrenSchulgruppe[];
+  zielschulen: VerfahrenSchulgruppe[];
 };
 
 function buildAuthConfig(token?: string): AuthConfig {
@@ -57,18 +71,27 @@ export const anmeldeverfahrenService = {
     return resp.data;
   },
 
-  async listParticipatingSchools(id: number, token?: string) {
-    const resp = await apiClient.get<{ rows: BeteiligteSchule[] }>(
-      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/beteiligte-schulen`,
+  async listSchoolGroups(id: number, token?: string) {
+    const resp = await apiClient.get<VerfahrenSchulgruppenResponse>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/schulgruppen`,
       buildAuthConfig(token),
     );
-    return resp.data.rows || [];
+    return resp.data;
   },
 
-  async syncParticipatingSchools(id: number, snrList: string[], token?: string) {
-    const resp = await apiClient.put<{ rows: BeteiligteSchule[]; message: string }>(
-      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/beteiligte-schulen`,
-      { schulen: snrList },
+  async syncSourceSchoolGroups(id: number, schoolGroupIds: number[], token?: string) {
+    const resp = await apiClient.put<{ schoolGroups: VerfahrenSchulgruppenResponse; message: string }>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/schulgruppen/quellschulen`,
+      { schulgruppen: schoolGroupIds },
+      buildAuthConfig(token),
+    );
+    return resp.data;
+  },
+
+  async syncTargetSchoolGroups(id: number, schoolGroupIds: number[], token?: string) {
+    const resp = await apiClient.put<{ schoolGroups: VerfahrenSchulgruppenResponse; message: string }>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/schulgruppen/zielschulen`,
+      { schulgruppen: schoolGroupIds },
       buildAuthConfig(token),
     );
     return resp.data;

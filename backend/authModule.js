@@ -2819,12 +2819,13 @@ function createAuthModule(poolProvider) {
     const conn = getPool();
     await ensureDashboardCatalog(conn);
 
-    const [dashboards, groups, users, schools, schoolSources, snapshots, terms] = await Promise.all([
+    const [dashboards, groups, users, schools, schoolSources, schoolGroups, snapshots, terms] = await Promise.all([
       fetchAdminDashboards(conn),
       fetchAdminGroups(conn),
       fetchAdminUsers(conn),
       fetchAdminSchools(conn),
       fetchAdminAnmSchools(conn),
+      fetchAdminSchoolGroups(conn),
       fetchAdminSnapshots(conn),
       fetchAdminTerms(conn),
     ]);
@@ -2835,6 +2836,7 @@ function createAuthModule(poolProvider) {
       users,
       schools,
       school_sources: schoolSources,
+      school_groups: schoolGroups,
       snapshots,
       terms,
       stats: {
@@ -2846,6 +2848,8 @@ function createAuthModule(poolProvider) {
         total_schools: schools.length,
         total_school_sources: schoolSources.length,
         active_school_sources: schoolSources.filter((source) => source.is_active).length,
+        total_school_groups: schoolGroups.length,
+        active_school_groups: schoolGroups.filter((group) => group.aktiv).length,
         total_snapshots: snapshots.length,
         total_snapshot_schools: new Set(
           snapshots
@@ -2889,6 +2893,138 @@ function createAuthModule(poolProvider) {
     );
     if (!rows || !rows[0]) {
       const error = new Error("Die Gruppe wurde nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+    return rows[0];
+  }
+
+  async function ensureSchoolGroupTables(conn) {
+    await ensureAnmSchulenTable(conn);
+    await conn.query(
+      `
+      CREATE TABLE IF NOT EXISTS anm_schulgruppe (
+        id BIGINT NOT NULL AUTO_INCREMENT,
+        name VARCHAR(255) NOT NULL,
+        beschreibung TEXT NULL,
+        aktiv TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_anm_schulgruppe_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `,
+    );
+    await conn.query(
+      `
+      CREATE TABLE IF NOT EXISTS anm_schulgruppe_schule (
+        id BIGINT NOT NULL AUTO_INCREMENT,
+        schulgruppe_id BIGINT NOT NULL,
+        snr CHAR(6) NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_schulgruppe_schule (schulgruppe_id, snr),
+        KEY idx_schulgruppe_schule_snr (snr),
+        CONSTRAINT fk_schulgruppe_schule_gruppe
+          FOREIGN KEY (schulgruppe_id) REFERENCES anm_schulgruppe(id) ON DELETE CASCADE,
+        CONSTRAINT fk_schulgruppe_schule_schule
+          FOREIGN KEY (snr) REFERENCES anm_schulen(snr)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `,
+    );
+  }
+
+  async function fetchAdminSchoolGroups(conn) {
+    await ensureSchoolGroupTables(conn);
+    const [rows] = await conn.query(
+      `
+      SELECT
+        g.id,
+        g.name,
+        g.beschreibung,
+        g.aktiv,
+        g.created_at,
+        g.updated_at,
+        sgs.snr
+      FROM anm_schulgruppe g
+      LEFT JOIN anm_schulgruppe_schule sgs
+        ON sgs.schulgruppe_id = g.id
+      ORDER BY g.name, sgs.snr
+      `,
+    );
+
+    const groups = new Map();
+    for (const row of rows || []) {
+      const groupId = Number(row.id || 0);
+      if (!groupId) continue;
+      if (!groups.has(groupId)) {
+        groups.set(groupId, {
+          id: groupId,
+          name: String(row.name || "").trim(),
+          beschreibung: toNullableText(row.beschreibung),
+          aktiv: Number(row.aktiv) === 1,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          schoolSnrs: [],
+        });
+      }
+      const snr = String(row.snr || "").trim();
+      if (snr) groups.get(groupId).schoolSnrs.push(snr);
+    }
+    return [...groups.values()];
+  }
+
+  async function ensureSchoolGroupExists(conn, groupId) {
+    await ensureSchoolGroupTables(conn);
+    const [rows] = await conn.query(
+      `
+      SELECT id, name, beschreibung, aktiv
+      FROM anm_schulgruppe
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [groupId],
+    );
+    if (!rows || !rows[0]) {
+      const error = new Error("Die Schulgruppe wurde nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+    return rows[0];
+  }
+
+  async function ensureUniqueSchoolGroupName(conn, name, excludeId = 0) {
+    const params = [String(name || "").trim()];
+    let query = `
+      SELECT id
+      FROM anm_schulgruppe
+      WHERE LOWER(name) = LOWER(?)
+    `;
+    if (excludeId) {
+      query += " AND id <> ?";
+      params.push(excludeId);
+    }
+    query += " LIMIT 1";
+    const [rows] = await conn.query(query, params);
+    if (Array.isArray(rows) && rows.length) {
+      const error = new Error("Eine Schulgruppe mit diesem Namen ist bereits vorhanden.");
+      error.statusCode = 409;
+      throw error;
+    }
+  }
+
+  async function ensureAnmSchoolExists(conn, schoolSnr) {
+    await ensureAnmSchulenTable(conn);
+    const [rows] = await conn.query(
+      `
+      SELECT snr, name
+      FROM anm_schulen
+      WHERE snr = ?
+      LIMIT 1
+      `,
+      [schoolSnr],
+    );
+    if (!rows || !rows[0]) {
+      const error = new Error("Die Schule wurde nicht gefunden.");
       error.statusCode = 404;
       throw error;
     }
@@ -3719,6 +3855,91 @@ function createAuthModule(poolProvider) {
     }
   });
 
+  router.post("/admin/school-groups", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await ensureSchoolGroupTables(conn);
+      const name = toRequiredText(req.body?.name, "Name", 255);
+      const beschreibung = toNullableText(req.body?.beschreibung, 4000);
+      const aktiv = toFlag(req.body?.aktiv, 1);
+      await ensureUniqueSchoolGroupName(conn, name);
+
+      await conn.beginTransaction();
+      await conn.query(
+        `
+        INSERT INTO anm_schulgruppe (name, beschreibung, aktiv)
+        VALUES (?, ?, ?)
+        `,
+        [name, beschreibung, aktiv],
+      );
+      await conn.commit();
+      res.status(201).json(await fetchAdminBootstrap());
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      return adminErrorResponse(res, error, "Die Schulgruppe konnte nicht gespeichert werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.delete("/admin/school-groups/:groupId", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
+      await ensureSchoolGroupExists(conn, groupId);
+      await conn.query("DELETE FROM anm_schulgruppe WHERE id = ?", [groupId]);
+      res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Schulgruppe konnte nicht geloescht werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.post("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
+      const snr = toRequiredText(req.params.snr, "SNR", 6);
+      await ensureSchoolGroupExists(conn, groupId);
+      await ensureAnmSchoolExists(conn, snr);
+      await conn.query(
+        `
+        INSERT INTO anm_schulgruppe_schule (schulgruppe_id, snr)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE snr = VALUES(snr)
+        `,
+        [groupId, snr],
+      );
+      res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Schulzuordnung konnte nicht gespeichert werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.delete("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
+      const snr = toRequiredText(req.params.snr, "SNR", 6);
+      await ensureSchoolGroupExists(conn, groupId);
+      await conn.query(
+        `
+        DELETE FROM anm_schulgruppe_schule
+        WHERE schulgruppe_id = ? AND snr = ?
+        `,
+        [groupId, snr],
+      );
+      res.json(await fetchAdminBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Schulzuordnung konnte nicht entfernt werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
   router.post("/admin/school-sources", authenticateToken, requireAdmin, async (req, res) => {
     const conn = await getPool().getConnection();
     try {
@@ -4068,7 +4289,22 @@ function createAuthModule(poolProvider) {
         throw error;
       }
 
+      await ensureSchoolGroupTables(conn);
+
       if (snr !== targetSnr) {
+        const [groupAssignmentRows] = await conn.query(
+          `
+          SELECT COUNT(*) AS total
+          FROM anm_schulgruppe_schule
+          WHERE snr = ?
+          `,
+          [targetSnr],
+        );
+        if (Number(groupAssignmentRows?.[0]?.total || 0) > 0) {
+          const error = new Error("Die SNR kann nicht geaendert werden, solange die Schule Schulgruppen zugeordnet ist.");
+          error.statusCode = 409;
+          throw error;
+        }
         const [duplicateRows] = await conn.query("SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1", [snr]);
         if (Array.isArray(duplicateRows) && duplicateRows.length) {
           const error = new Error("Fuer diese SNR existiert bereits ein Eintrag.");
@@ -4100,6 +4336,7 @@ function createAuthModule(poolProvider) {
     const conn = await getPool().getConnection();
     try {
       await ensureAnmSchulenTable(conn);
+      await ensureSchoolGroupTables(conn);
       const snr = toRequiredText(req.params.snr, "SNR", 6);
       const [existingRows] = await conn.query("SELECT snr FROM anm_schulen WHERE snr = ? LIMIT 1", [snr]);
       if (!Array.isArray(existingRows) || !existingRows.length) {
@@ -4107,6 +4344,7 @@ function createAuthModule(poolProvider) {
         error.statusCode = 404;
         throw error;
       }
+      await conn.query("DELETE FROM anm_schulgruppe_schule WHERE snr = ?", [snr]);
       await conn.query("DELETE FROM anm_schulen WHERE snr = ?", [snr]);
       return res.json(await fetchAdminBootstrap());
     } catch (error) {
@@ -4120,6 +4358,8 @@ function createAuthModule(poolProvider) {
     const conn = await getPool().getConnection();
     try {
       await ensureAnmSchulenTable(conn);
+      await ensureSchoolGroupTables(conn);
+      await conn.query("DELETE FROM anm_schulgruppe_schule");
       await conn.query("DELETE FROM anm_schulen");
       return res.json(await fetchAdminBootstrap());
     } catch (error) {

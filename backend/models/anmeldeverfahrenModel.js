@@ -1,5 +1,6 @@
 const STATUS_VALUES = ["geplant", "aktiv", "abgeschlossen"];
 const VERFAHRENSTYP_VALUES = ["GS", "SEK1"];
+const SCHOOL_GROUP_ROLE_VALUES = ["Quellschulen", "Zielschulen"];
 
 async function querySingleValue(pool, sql, params = []) {
   const [rows] = await pool.query(sql, params);
@@ -92,13 +93,23 @@ async function hasDuplicateSchoolYear(pool, schuljahr, excludeId = null) {
   return Array.isArray(rows) && rows.length > 0;
 }
 
-function mapParticipatingSchoolRow(row) {
+function mapSchoolGroupRoleKey(role) {
+  return String(role || "").trim() === "Quellschulen" ? "quellschulen" : "zielschulen";
+}
+
+function mapProcedureSchoolGroupRow(row) {
+  const schoolSnrs = String(row.school_snrs || "")
+    .split(",")
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
+
   return {
-    snr: String(row.snr || "").trim(),
+    id: Number(row.id || 0),
     name: String(row.name || "").trim(),
-    ort: String(row.ort || "").trim(),
-    schulform: String(row.schulform || "").trim(),
-    selected: Number(row.selected || 0) === 1,
+    beschreibung: String(row.beschreibung || "").trim(),
+    aktiv: Number(row.aktiv || 0) === 1,
+    rolle: String(row.rolle || "").trim(),
+    schoolSnrs,
   };
 }
 
@@ -113,32 +124,68 @@ async function update(pool, id, payload) {
   return findById(pool, id);
 }
 
-async function listParticipatingSchools(pool, verfahrenId) {
+async function listProcedureSchoolGroups(pool, verfahrenId) {
   const [rows] = await pool.query(
     `SELECT
-      s.snr,
-      s.name,
-      COALESCE(NULLIF(TRIM(s.ort), ''), NULLIF(TRIM(s.plz), ''), '') AS ort,
-      COALESCE(NULLIF(TRIM(sf.sf_kurz), ''), NULLIF(TRIM(s.sf_id), ''), '') AS schulform,
-      CASE WHEN vs.snr IS NULL THEN 0 ELSE 1 END AS selected
-    FROM anm_schulen s
-    LEFT JOIN anm_kat_sf sf
-      ON sf.code = s.sf_id
-    LEFT JOIN anm_verfahren_schule vs
-      ON vs.verfahren_id = ?
-     AND vs.snr = s.snr
-    ORDER BY s.name ASC, s.snr ASC`,
+      vsg.rolle,
+      sg.id,
+      sg.name,
+      sg.beschreibung,
+      sg.aktiv,
+      GROUP_CONCAT(DISTINCT sgs.snr ORDER BY sgs.snr SEPARATOR ',') AS school_snrs
+    FROM anm_verfahren_schulgruppe vsg
+    JOIN anm_schulgruppe sg
+      ON sg.id = vsg.schulgruppe_id
+    LEFT JOIN anm_schulgruppe_schule sgs
+      ON sgs.schulgruppe_id = sg.id
+    WHERE vsg.verfahren_id = ?
+    GROUP BY
+      vsg.rolle,
+      sg.id,
+      sg.name,
+      sg.beschreibung,
+      sg.aktiv
+    ORDER BY
+      CASE vsg.rolle
+        WHEN 'Quellschulen' THEN 1
+        WHEN 'Zielschulen' THEN 2
+        ELSE 9
+      END,
+      sg.name ASC,
+      sg.id ASC`,
     [verfahrenId],
   );
-  return (rows || []).map(mapParticipatingSchoolRow);
+
+  return (rows || []).reduce((result, row) => {
+    const mappedRow = mapProcedureSchoolGroupRow(row);
+    const targetKey = mapSchoolGroupRoleKey(mappedRow.rolle);
+    result[targetKey].push(mappedRow);
+    return result;
+  }, {
+    quellschulen: [],
+    zielschulen: [],
+  });
 }
 
-async function syncParticipatingSchools(pool, verfahrenId, snrList = []) {
-  const normalizedSnrList = Array.from(new Set(
-    (snrList || [])
-      .map((value) => String(value || "").trim())
-      .filter((value) => value.length > 0),
+async function syncProcedureSchoolGroupsByRole(pool, verfahrenId, role, schoolGroupIds = []) {
+  const normalizedRole = String(role || "").trim();
+  if (!SCHOOL_GROUP_ROLE_VALUES.includes(normalizedRole)) {
+    const error = new Error(`Ungueltige Rolle. Erlaubt: ${SCHOOL_GROUP_ROLE_VALUES.join(", ")}.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedSchoolGroupIds = Array.from(new Set(
+    (schoolGroupIds || [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0),
   ));
+
+  if (normalizedSchoolGroupIds.length > 1) {
+    const error = new Error("Pro Rolle ist je Verfahren nur eine Schulgruppe erlaubt.");
+    error.statusCode = 400;
+    throw error;
+  }
 
   const connection = await pool.getConnection();
   try {
@@ -150,30 +197,35 @@ async function syncParticipatingSchools(pool, verfahrenId, snrList = []) {
     );
     if (!Array.isArray(existingVerfahren) || !existingVerfahren.length) {
       await connection.rollback();
-      return { exists: false, rows: [] };
+      return { exists: false, schoolGroups: { quellschulen: [], zielschulen: [] } };
     }
 
-    if (normalizedSnrList.length) {
-      const placeholders = normalizedSnrList.map(() => "?").join(", ");
-      const [existingSchools] = await connection.query(
-        `SELECT snr FROM anm_schulen WHERE snr IN (${placeholders})`,
-        normalizedSnrList,
+    if (normalizedSchoolGroupIds.length) {
+      const placeholders = normalizedSchoolGroupIds.map(() => "?").join(", ");
+      const [existingSchoolGroups] = await connection.query(
+        `SELECT id FROM anm_schulgruppe WHERE id IN (${placeholders})`,
+        normalizedSchoolGroupIds,
       );
-      const existingSnrSet = new Set((existingSchools || []).map((row) => String(row.snr || "").trim()));
-      const missingSnrList = normalizedSnrList.filter((snr) => !existingSnrSet.has(snr));
-      if (missingSnrList.length) {
-        const error = new Error(`Unbekannte Schulen: ${missingSnrList.join(", ")}`);
+      const existingSchoolGroupIdSet = new Set(
+        (existingSchoolGroups || []).map((row) => Number(row.id || 0)),
+      );
+      const missingSchoolGroupIds = normalizedSchoolGroupIds.filter((id) => !existingSchoolGroupIdSet.has(id));
+      if (missingSchoolGroupIds.length) {
+        const error = new Error(`Unbekannte Schulgruppen: ${missingSchoolGroupIds.join(", ")}`);
         error.statusCode = 400;
         throw error;
       }
     }
 
-    await connection.query("DELETE FROM anm_verfahren_schule WHERE verfahren_id = ?", [verfahrenId]);
+    await connection.query(
+      "DELETE FROM anm_verfahren_schulgruppe WHERE verfahren_id = ? AND rolle = ?",
+      [verfahrenId, normalizedRole],
+    );
 
-    if (normalizedSnrList.length) {
-      const values = normalizedSnrList.map((snr) => [verfahrenId, snr]);
+    if (normalizedSchoolGroupIds.length) {
+      const values = normalizedSchoolGroupIds.map((schoolGroupId) => [verfahrenId, schoolGroupId, normalizedRole]);
       await connection.query(
-        "INSERT INTO anm_verfahren_schule (verfahren_id, snr) VALUES ?",
+        "INSERT INTO anm_verfahren_schulgruppe (verfahren_id, schulgruppe_id, rolle) VALUES ?",
         [values],
       );
     }
@@ -188,7 +240,7 @@ async function syncParticipatingSchools(pool, verfahrenId, snrList = []) {
 
   return {
     exists: true,
-    rows: await listParticipatingSchools(pool, verfahrenId),
+    schoolGroups: await listProcedureSchoolGroups(pool, verfahrenId),
   };
 }
 
@@ -236,13 +288,14 @@ async function removeWithRounds(pool, verfahrenId) {
 module.exports = {
   STATUS_VALUES,
   VERFAHRENSTYP_VALUES,
+  SCHOOL_GROUP_ROLE_VALUES,
   listAll,
   findById,
   create,
   hasDuplicateSchoolYear,
   update,
-  listParticipatingSchools,
-  syncParticipatingSchools,
+  listProcedureSchoolGroups,
+  syncProcedureSchoolGroupsByRole,
   countBlockingDependencies,
   removeWithRounds,
 };

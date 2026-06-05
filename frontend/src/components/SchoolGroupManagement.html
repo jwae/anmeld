@@ -1,0 +1,221 @@
+<section class="school-group-page">
+  <div v-if="!isManagementSessionActive" class="feedback-panel feedback-panel-error">
+    <p class="error">Bitte zuerst die Verwaltung laden, damit die Schulen fuer Schulgruppen verfuegbar sind.</p>
+  </div>
+
+  <template v-else>
+    <section class="user-management-panel school-group-form-card">
+      <div class="user-management-panel-head">
+        <div>
+          <h3>Gruppe anlegen</h3>
+          <p>Lege hier eine neue Schulgruppe an. Nach dem Speichern steht sie sofort in der Auswahl bereit.</p>
+        </div>
+      </div>
+
+      <div class="user-management-form-grid school-group-form-grid">
+        <label class="field-block school-group-field-name">
+          <span class="field-label">Name</span>
+          <input v-model="groupForm.name" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block school-group-field-description">
+          <span class="field-label">Beschreibung</span>
+          <input v-model="groupForm.beschreibung" :disabled="managementSaving" />
+        </label>
+
+        <div class="field-block user-management-checkbox-field school-group-field-active">
+          <span class="field-label">Aktiv</span>
+          <label class="user-management-checkbox user-management-checkbox-card">
+            <input v-model="groupForm.aktiv" type="checkbox" :disabled="managementSaving" />
+            <span>Gruppe aktiv</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="user-management-inline-actions">
+        <button class="btn-primary" type="button" :disabled="managementSaving" @click="saveGroup">
+          {{ managementSaving ? "Speichere..." : "Gruppe speichern" }}
+        </button>
+      </div>
+
+      <transition name="feedback-fade" mode="out-in">
+        <div
+          v-if="localFeedbackError"
+          class="feedback-panel feedback-panel-error user-management-inline-feedback"
+        >
+          <p class="error">{{ localFeedbackError }}</p>
+        </div>
+        <div
+          v-else-if="localFeedbackNotice"
+          class="feedback-panel feedback-panel-success user-management-inline-feedback"
+        >
+          <p>{{ localFeedbackNotice }}</p>
+        </div>
+      </transition>
+    </section>
+
+    <section class="user-management-panel school-group-select-card">
+      <div class="user-management-panel-head">
+        <div>
+          <h3>Gruppen verwalten</h3>
+          <p>Waehle eine vorhandene Schulgruppe aus und pflege ihre Schulen direkt per Checkbox.</p>
+        </div>
+      </div>
+
+      <div class="user-management-inline-actions">
+        <label class="field-block school-group-select-field">
+          <span class="field-label">Schulgruppe auswaehlen</span>
+          <select v-model="selectedGroupId" :disabled="managementSaving">
+            <option value="">Bitte waehlen</option>
+            <option v-for="group in sortedGroups" :key="`school-group-${group.id}`" :value="group.id">
+              {{ group.name }}{{ group.aktiv ? "" : " (inaktiv)" }}
+            </option>
+          </select>
+        </label>
+
+        <div class="school-group-inline-actions-right">
+          <button class="btn-primary school-group-delete-button school-group-danger-button" type="button" :disabled="managementSaving || !selectedGroup" @click="deleteSelectedGroup">
+            Gruppe loeschen
+          </button>
+        </div>
+      </div>
+
+      <div v-if="selectedGroup" class="school-group-selected-summary">
+        Gruppe<strong>{{ selectedGroup.name }}</strong> enthaelt
+        <span>{{ selectedGroup.schoolSnrs.length }} Schule{{ selectedGroup.schoolSnrs.length === 1 ? "" : "n" }}</span>
+      </div>
+
+      <div class="school-group-table-toolbar">
+        <label class="field-block school-group-search-field">
+          <span class="field-label">Suche nach SNR, Schulname oder Ort</span>
+          <div class="school-group-search-input-wrap">
+            <input v-model="schoolSearch" type="text" placeholder="z. B. 100012, Grundschule oder Koeln" :disabled="managementSaving" />
+            <button
+              v-if="schoolSearch"
+              class="school-group-search-clear"
+              type="button"
+              :disabled="managementSaving"
+              aria-label="Filter leeren"
+              title="Filter leeren"
+              @click="clearSchoolSearch"
+            >
+              ×
+            </button>
+          </div>
+        </label>
+      </div>
+
+      <div v-if="!selectedGroup" class="school-group-empty-state">
+        Bitte zuerst eine Schulgruppe auswaehlen, damit die Zuordnungen bearbeitet werden koennen.
+      </div>
+
+      <div v-else class="school-group-table-wrap">
+        <table class="school-group-table">
+          <thead>
+            <tr>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('selected')">
+                  Auswahl <span class="school-group-sort-indicator">{{ sortIndicator("selected") }}</span>
+                </button>
+              </th>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('snr')">
+                  SNR <span class="school-group-sort-indicator">{{ sortIndicator("snr") }}</span>
+                </button>
+              </th>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('name')">
+                  Name <span class="school-group-sort-indicator">{{ sortIndicator("name") }}</span>
+                </button>
+              </th>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('school_form')">
+                  Schulform <span class="school-group-sort-indicator">{{ sortIndicator("school_form") }}</span>
+                </button>
+              </th>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('plz')">
+                  PLZ <span class="school-group-sort-indicator">{{ sortIndicator("plz") }}</span>
+                </button>
+              </th>
+              <th>
+                <button class="school-group-sort" type="button" @click="toggleSort('ort')">
+                  Ort <span class="school-group-sort-indicator">{{ sortIndicator("ort") }}</span>
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="school in visibleSchools"
+              :key="`school-group-school-${school.snr}`"
+              :class="{ 'is-selected': isAssigned(school.snr) }"
+            >
+              <td class="school-group-checkbox-cell">
+                <input
+                  :checked="isAssigned(school.snr)"
+                  :disabled="managementSaving"
+                  type="checkbox"
+                  @change="handleAssignmentChange(school.snr, $event)"
+                />
+              </td>
+              <td>{{ school.snr || "-" }}</td>
+              <td class="school-group-school-name" :title="school.name || '-'">
+                {{ (school.name || "").length > 25 ? `${String(school.name || "").slice(0, 25)}...` : (school.name || "-") }}
+              </td>
+              <td>{{ school.schoolForm || "-" }}</td>
+              <td>{{ school.plz || "-" }}</td>
+              <td>{{ school.ort || "-" }}</td>
+            </tr>
+            <tr v-if="!visibleSchools.length">
+              <td colspan="6" class="school-group-empty-cell">
+                Keine Schulen fuer den aktuellen Filter gefunden.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div
+      v-if="deleteGroupConfirmOpen"
+      class="school-group-modal-overlay"
+      @click.self="closeDeleteGroupConfirm"
+    >
+      <section class="school-group-modal school-group-danger-modal" role="dialog" aria-modal="true" aria-label="Schulgruppe loeschen">
+        <div class="school-group-danger-hero">
+          <div class="school-group-danger-badge" aria-hidden="true">!</div>
+          <div>
+            <h3>Schulgruppe wirklich loeschen?</h3>
+            <p>Diese Aktion entfernt die Gruppe und loest ihre Zuordnung zu allen Schulen auf.</p>
+          </div>
+        </div>
+
+        <div class="school-group-danger-summary">
+          <strong>{{ selectedGroup?.name || "Unbekannte Gruppe" }}</strong>
+          <span>
+            mit {{ selectedGroup?.schoolSnrs?.length || 0 }} Schule{{ Number(selectedGroup?.schoolSnrs?.length || 0) === 1 ? "" : "n" }}
+          </span>
+        </div>
+
+        <div class="school-group-danger-list">
+          <p>Folgen dieser Aktion:</p>
+          <ul>
+            <li>Die Schulgruppe wird dauerhaft geloescht.</li>
+            <li>Alle markierten Schul-Zuordnungen dieser Gruppe werden entfernt.</li>
+            <li>Die Schulen selbst bleiben in <code>anm_schulen</code> unveraendert bestehen.</li>
+          </ul>
+        </div>
+
+        <div class="school-group-modal-actions">
+          <button class="btn-secondary" type="button" @click="closeDeleteGroupConfirm" :disabled="managementSaving">
+            Abbrechen
+          </button>
+          <button class="btn-primary school-group-danger-button-strong" type="button" @click="confirmDeleteSelectedGroup" :disabled="managementSaving">
+            {{ managementSaving ? "Loesche..." : "Endgueltig loeschen" }}
+          </button>
+        </div>
+      </section>
+    </div>
+  </template>
+</section>

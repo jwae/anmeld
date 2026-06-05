@@ -163,10 +163,10 @@
               <th><button class="school-management-sort" type="button" @click="toggleSort('ort')">Ort <span v-if="sortIndicatorBadge('ort')" class="school-management-sort-indicator">{{ sortIndicatorBadge("ort") }}</span></button></th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('strasse')">Strasse <span v-if="sortIndicatorBadge('strasse')" class="school-management-sort-indicator">{{ sortIndicatorBadge("strasse") }}</span></button></th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('school_form_sf')">SF <span v-if="sortIndicatorBadge('school_form_sf')" class="school-management-sort-indicator">{{ sortIndicatorBadge("school_form_sf") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_host')">db_host <span v-if="sortIndicatorBadge('db_host')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_host") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_host')">host <span v-if="sortIndicatorBadge('db_host')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_host") }}</span></button></th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('db_name')">db_name <span v-if="sortIndicatorBadge('db_name')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_name") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_user')">db_user <span v-if="sortIndicatorBadge('db_user')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_user") }}</span></button></th>
-              <th><button class="school-management-sort" type="button" @click="toggleSort('db_password_enc')">db_password_enc <span v-if="sortIndicatorBadge('db_password_enc')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_password_enc") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_user')">db_User <span v-if="sortIndicatorBadge('db_user')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_user") }}</span></button></th>
+              <th><button class="school-management-sort" type="button" @click="toggleSort('db_password_enc')">PWD <span v-if="sortIndicatorBadge('db_password_enc')" class="school-management-sort-indicator">{{ sortIndicatorBadge("db_password_enc") }}</span></button></th>
               <th><button class="school-management-sort" type="button" @click="toggleSort('is_active')">Aktiv <span v-if="sortIndicatorBadge('is_active')" class="school-management-sort-indicator">{{ sortIndicatorBadge("is_active") }}</span></button></th>
               <th>Aktionen</th>
             </tr>
@@ -179,7 +179,11 @@
             >
               <td>{{ index + 1 }}</td>
               <td>{{ source.snr }}</td>
-              <td class="school-management-name" :title="source.name || source.school_name || 'Ohne Name'">{{ formatSchoolSourceName(source.name || source.school_name) }}</td>
+              <td class="school-management-name">
+                <span :title="source.name || source.school_name || 'Ohne Name'">
+                  {{ formatSchoolSourceName(source.name || source.school_name) }}
+                </span>
+              </td>
               <td>{{ source.plz || "-" }}</td>
               <td>{{ source.ort || "-" }}</td>
               <td>{{ source.strasse || "-" }}</td>
