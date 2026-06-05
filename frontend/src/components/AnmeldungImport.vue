@@ -61,6 +61,13 @@ async function loadSchools() {
   }
 }
 
+async function toggleExpanded() {
+  const nextExpanded = !isExpanded.value;
+  isExpanded.value = nextExpanded;
+  if (!nextExpanded) return;
+  await loadSchools();
+}
+
 function openPicker() {
   fileInput.value?.click();
 }
@@ -207,7 +214,7 @@ onMounted(() => {
             type="button"
             class="section-toggle"
             :aria-expanded="isExpanded ? 'true' : 'false'"
-            @click="isExpanded = !isExpanded"
+            @click="toggleExpanded"
           >
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>

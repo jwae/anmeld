@@ -346,6 +346,12 @@ class KapazitaetenController {
 
   async updateKapazitaet(req, res) {
     try {
+      const capacityId = Number(req.params.id);
+      const existingRecord = await this.model.findById(capacityId);
+      if (!existingRecord) {
+        return res.status(404).json({ error: 'Capacity not found' });
+      }
+
       const payload = normalizeCapacityPayload(req.body);
       const validationError = validateCapacityPayload({
         ...payload,
@@ -355,10 +361,9 @@ class KapazitaetenController {
         return res.status(400).json({ error: validationError });
       }
 
-      const affected = await this.model.update(Number(req.params.id), payload);
-      if (affected === 0) return res.status(404).json({ error: 'Capacity not found' });
+      await this.model.update(capacityId, payload);
 
-      const updatedRecord = await this.model.findById(Number(req.params.id));
+      const updatedRecord = await this.model.findById(capacityId);
       res.json(updatedRecord);
     } catch (err) {
       console.error(err);
