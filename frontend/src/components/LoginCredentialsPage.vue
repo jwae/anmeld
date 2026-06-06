@@ -33,6 +33,9 @@ const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
 const hasMenuSelectionContext = computed<boolean>(
   () => selectedVerfahrenId.value !== null || selectedRundenId.value !== null,
 );
+const hasSelectionAttentionContext = computed<boolean>(
+  () => selectedVerfahrenId.value === null || selectedRundenId.value === null,
+);
 
 function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   currentContext.value = {

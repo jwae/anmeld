@@ -283,7 +283,7 @@ button:disabled {
 }
 
 .school-management-form-grid {
-  grid-template-columns: repeat(5, minmax(100px, 160px));
+  grid-template-columns: repeat(7, minmax(100px, 160px));
   gap: 8px;
   justify-content: flex-start;
 }

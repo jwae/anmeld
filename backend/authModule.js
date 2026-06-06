@@ -1655,6 +1655,8 @@ async function ensureAnmSchulenTable(conn) {
       plz VARCHAR(20) DEFAULT NULL,
       ort VARCHAR(100) DEFAULT NULL,
       strasse VARCHAR(255) DEFAULT NULL,
+      latitude DECIMAL(10,8) DEFAULT NULL,
+      longitude DECIMAL(11,8) DEFAULT NULL,
       sf_id VARCHAR(32) DEFAULT NULL,
       db_host VARCHAR(255) DEFAULT NULL,
       db_name VARCHAR(255) DEFAULT NULL,
@@ -1680,10 +1682,111 @@ async function ensureAnmSchulenTable(conn) {
     }
   }
 
+  if (!columnNames.has("latitude")) {
+    await conn.query("ALTER TABLE anm_schulen ADD COLUMN latitude DECIMAL(10,8) DEFAULT NULL AFTER strasse");
+  }
+
+  if (!columnNames.has("longitude")) {
+    await conn.query("ALTER TABLE anm_schulen ADD COLUMN longitude DECIMAL(11,8) DEFAULT NULL AFTER latitude");
+  }
+
   const [sfColumnRows] = await conn.query("SHOW COLUMNS FROM anm_schulen LIKE 'sf_id'");
   const sfColumnType = String(sfColumnRows?.[0]?.Type || "").trim().toLowerCase();
   if (sfColumnType && !sfColumnType.startsWith("varchar")) {
     await conn.query("ALTER TABLE anm_schulen MODIFY COLUMN sf_id VARCHAR(32) DEFAULT NULL");
+  }
+}
+
+function normalizeSchoolCoordinateInput(value, { min, max }) {
+  const text = String(value ?? "").trim().replace(",", ".");
+  if (!text) return null;
+  const numeric = Number(text);
+  if (!Number.isFinite(numeric) || numeric < min || numeric > max) {
+    const error = new Error(`Ungueltiger Koordinatenwert: ${value}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return numeric;
+}
+
+function buildAnmSchoolAddressLabel(row) {
+  return [
+    String(row?.strasse || "").trim(),
+    [String(row?.plz || "").trim(), String(row?.ort || "").trim()].filter(Boolean).join(" "),
+  ].filter(Boolean).join(", ");
+}
+
+function parseAnmSchoolOrsCoordinates(payload) {
+  const feature = Array.isArray(payload?.features) && payload.features.length ? payload.features[0] : null;
+  const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+  const longitude = Number(coords?.[0]);
+  const latitude = Number(coords?.[1]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return { latitude: null, longitude: null };
+  }
+  return { latitude, longitude };
+}
+
+async function fetchAnmSchoolGeocode(row) {
+  const apiKey = String(process.env.OPENROUTESERVICE_API_KEY || process.env.ORS_API_KEY || "").trim();
+  const fetchImpl = global.fetch;
+  if (!apiKey || typeof fetchImpl !== "function") {
+    const error = new Error("ORS-Geocoding ist nicht konfiguriert. Bitte OPENROUTESERVICE_API_KEY oder ORS_API_KEY setzen.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const addressLabel = buildAnmSchoolAddressLabel(row);
+  if (!addressLabel) {
+    return {
+      ok: false,
+      latitude: null,
+      longitude: null,
+      message: "Adresse unvollstaendig.",
+    };
+  }
+
+  const params = new URLSearchParams();
+  params.set("text", addressLabel);
+  params.set("size", "1");
+
+  try {
+    const response = await fetchImpl(`https://api.openrouteservice.org/geocode/search?${params.toString()}`, {
+      method: "GET",
+      headers: { Authorization: apiKey },
+    });
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      return {
+        ok: false,
+        latitude: null,
+        longitude: null,
+        message: `ORS-Geocoding fehlgeschlagen (${response.status}).${responseText ? ` ${responseText.slice(0, 180)}` : ""}`.trim(),
+      };
+    }
+    const payload = await response.json();
+    const coordinates = parseAnmSchoolOrsCoordinates(payload);
+    if (coordinates.latitude === null || coordinates.longitude === null) {
+      return {
+        ok: false,
+        latitude: null,
+        longitude: null,
+        message: "Keine Koordinaten fuer die Adresse gefunden.",
+      };
+    }
+    return {
+      ok: true,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      message: "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      latitude: null,
+      longitude: null,
+      message: error?.message ? `ORS-Geocoding fehlgeschlagen: ${error.message}` : "ORS-Geocoding fehlgeschlagen.",
+    };
   }
 }
 
@@ -3446,6 +3549,8 @@ function createAuthModule(poolProvider) {
         a.plz,
         a.ort,
         a.strasse,
+        a.latitude,
+        a.longitude,
         a.sf_id,
         a.db_host,
         a.db_name,
@@ -3467,6 +3572,8 @@ function createAuthModule(poolProvider) {
       plz: toNullableText(row.plz, 20),
       ort: toNullableText(row.ort, 100),
       strasse: toNullableText(row.strasse, 255),
+      latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
+      longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
       sf_id: toNullableText(row.sf_id, 32),
       db_host: toNullableText(row.db_host, 255),
       db_name: toNullableText(row.db_name, 255),
@@ -4210,6 +4317,8 @@ function createAuthModule(poolProvider) {
       const plz = toNullableText(req.body?.plz, 20);
       const ort = toNullableText(req.body?.ort, 100);
       const strasse = toNullableText(req.body?.strasse, 255);
+      const latitude = normalizeSchoolCoordinateInput(req.body?.latitude, { min: -90, max: 90 });
+      const longitude = normalizeSchoolCoordinateInput(req.body?.longitude, { min: -180, max: 180 });
       const requestedSfId = toNullableText(req.body?.sf_id, 32);
       let sfId = requestedSfId;
       if (requestedSfId) {
@@ -4236,10 +4345,10 @@ function createAuthModule(poolProvider) {
 
       await conn.query(
         `
-        INSERT INTO anm_schulen (snr, name, plz, ort, strasse, sf_id, db_host, db_name, db_user, db_password_enc, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO anm_schulen (snr, name, plz, ort, strasse, latitude, longitude, sf_id, db_host, db_name, db_user, db_password_enc, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        [snr, name, plz, ort, strasse, sfId, dbHost, dbName, dbUser, dbPasswordEnc, isActive],
+        [snr, name, plz, ort, strasse, latitude, longitude, sfId, dbHost, dbName, dbUser, dbPasswordEnc, isActive],
       );
 
       await conn.commit();
@@ -4264,6 +4373,8 @@ function createAuthModule(poolProvider) {
       const plz = toNullableText(req.body?.plz, 20);
       const ort = toNullableText(req.body?.ort, 100);
       const strasse = toNullableText(req.body?.strasse, 255);
+      const latitude = normalizeSchoolCoordinateInput(req.body?.latitude, { min: -90, max: 90 });
+      const longitude = normalizeSchoolCoordinateInput(req.body?.longitude, { min: -180, max: 180 });
       const requestedSfId = toNullableText(req.body?.sf_id, 32);
       let sfId = requestedSfId;
       if (requestedSfId) {
@@ -4316,10 +4427,10 @@ function createAuthModule(poolProvider) {
       await conn.query(
         `
         UPDATE anm_schulen
-        SET snr = ?, name = ?, plz = ?, ort = ?, strasse = ?, sf_id = ?, db_host = ?, db_name = ?, db_user = ?, db_password_enc = ?, is_active = ?
+        SET snr = ?, name = ?, plz = ?, ort = ?, strasse = ?, latitude = ?, longitude = ?, sf_id = ?, db_host = ?, db_name = ?, db_user = ?, db_password_enc = ?, is_active = ?
         WHERE snr = ?
         `,
-        [snr, name, plz, ort, strasse, sfId, dbHost, dbName, dbUser, dbPasswordEnc.trim() ? dbPasswordEnc.slice(0, 4000) : String(current.db_password_enc || ""), isActive, targetSnr],
+        [snr, name, plz, ort, strasse, latitude, longitude, sfId, dbHost, dbName, dbUser, dbPasswordEnc.trim() ? dbPasswordEnc.slice(0, 4000) : String(current.db_password_enc || ""), isActive, targetSnr],
       );
 
       await conn.commit();
@@ -4327,6 +4438,83 @@ function createAuthModule(poolProvider) {
     } catch (error) {
       await conn.rollback().catch(() => {});
       return adminErrorResponse(res, error, "Die Schule konnte nicht aktualisiert werden.");
+    } finally {
+      conn.release();
+    }
+  });
+
+  router.post("/admin/anm-schools/geocode-missing", authenticateToken, requireAdmin, async (_req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      await ensureAnmSchulenTable(conn);
+
+      const [rows] = await conn.query(
+        `
+        SELECT snr, name, plz, ort, strasse, latitude, longitude
+        FROM anm_schulen
+        WHERE latitude IS NULL OR longitude IS NULL
+        ORDER BY ort, name, snr
+        `,
+      );
+
+      if (!Array.isArray(rows) || !rows.length) {
+        return res.json({
+          ...await fetchAdminBootstrap(),
+          updated_count: 0,
+          skipped_count: 0,
+          message: "Es wurden keine Schulen mit fehlenden Koordinaten gefunden.",
+          results: [],
+        });
+      }
+
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const results = [];
+
+      for (const row of rows) {
+        const result = await fetchAnmSchoolGeocode(row);
+        if (!result.ok || result.latitude === null || result.longitude === null) {
+          skippedCount += 1;
+          results.push({
+            snr: String(row?.snr || "").trim(),
+            name: toNullableText(row?.name, 255),
+            updated: false,
+            message: result.message || "Koordinaten konnten nicht berechnet werden.",
+          });
+          continue;
+        }
+
+        await conn.query(
+          `
+          UPDATE anm_schulen
+          SET latitude = ?, longitude = ?
+          WHERE snr = ?
+          `,
+          [result.latitude, result.longitude, String(row?.snr || "").trim()],
+        );
+
+        updatedCount += 1;
+        results.push({
+          snr: String(row?.snr || "").trim(),
+          name: toNullableText(row?.name, 255),
+          updated: true,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          message: "Koordinaten aktualisiert.",
+        });
+      }
+
+      return res.json({
+        ...await fetchAdminBootstrap(),
+        updated_count: updatedCount,
+        skipped_count: skippedCount,
+        results,
+        message: updatedCount
+          ? `${updatedCount} Schule(n) mit fehlenden Koordinaten aktualisiert.${skippedCount ? ` ${skippedCount} Schule(n) konnten nicht geocodiert werden.` : ""}`
+          : "Es konnten keine fehlenden Koordinaten berechnet werden.",
+      });
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die fehlenden Koordinaten konnten nicht berechnet werden.");
     } finally {
       conn.release();
     }

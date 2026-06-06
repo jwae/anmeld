@@ -63,6 +63,8 @@ const schoolSourceForm = reactive({
   plz: "",
   ort: "",
   strasse: "",
+  latitude: "",
+  longitude: "",
   sf_id: "",
   db_host: "",
   db_name: "",
@@ -207,6 +209,8 @@ function buildSchoolSourcePayload(source: any) {
     plz: String(source?.plz || "").trim(),
     ort: String(source?.ort || "").trim(),
     strasse: String(source?.strasse || "").trim(),
+    latitude: String(source?.latitude ?? "").trim(),
+    longitude: String(source?.longitude ?? "").trim(),
     sf_id: String(source?.sf_id || "").trim(),
     db_host: String(source?.db_host || "").trim(),
     db_name: String(source?.db_name || "").trim(),
@@ -315,6 +319,8 @@ function resetSchoolSourceForm() {
   schoolSourceForm.plz = "";
   schoolSourceForm.ort = "";
   schoolSourceForm.strasse = "";
+  schoolSourceForm.latitude = "";
+  schoolSourceForm.longitude = "";
   schoolSourceForm.sf_id = "";
   schoolSourceForm.db_host = "";
   schoolSourceForm.db_name = "";
@@ -516,6 +522,8 @@ watch(selectedManagementSchoolSourceId, (sourceId) => {
   schoolSourceForm.plz = source.plz || "";
   schoolSourceForm.ort = source.ort || "";
   schoolSourceForm.strasse = source.strasse || "";
+  schoolSourceForm.latitude = source.latitude == null ? "" : String(source.latitude);
+  schoolSourceForm.longitude = source.longitude == null ? "" : String(source.longitude);
   schoolSourceForm.sf_id = source.sf_id ? String(source.sf_id) : "";
   schoolSourceForm.db_host = source.db_host || "";
   schoolSourceForm.db_name = source.db_name || "";
@@ -539,6 +547,8 @@ watch(
     schoolSourceForm.plz = source.plz || "";
     schoolSourceForm.ort = source.ort || "";
     schoolSourceForm.strasse = source.strasse || "";
+    schoolSourceForm.latitude = source.latitude == null ? "" : String(source.latitude);
+    schoolSourceForm.longitude = source.longitude == null ? "" : String(source.longitude);
     schoolSourceForm.sf_id = source.sf_id ? String(source.sf_id) : "";
     schoolSourceForm.db_host = source.db_host || "";
     schoolSourceForm.db_name = source.db_name || "";
@@ -850,6 +860,37 @@ async function handleSchoolImportFileSelected(event: Event) {
     emitFeedback(e?.message || "Fehler beim Lesen der CSV-Datei.", "");
   } finally {
     if (input) input.value = "";
+  }
+}
+
+async function geocodeMissingManagementSchoolSources() {
+  managementSaving.value = true;
+  loadingOverlayOpen.value = true;
+  currentActionLabel.value = "Ich berechne fehlende Koordinaten fuer Schulen ohne Latitude/Longitude.";
+  emitFeedback("", "");
+
+  try {
+    const resp = await apiClient.post(
+      "/api/auth/admin/anm-schools/geocode-missing",
+      {},
+      { headers: managementAuthHeaders() },
+    );
+    const bootstrap = Array.isArray(resp.data?.school_sources)
+      ? (resp.data || {})
+      : await fetchManagementBootstrap();
+    emit("bootstrap-updated", bootstrap);
+    emitFeedback("", resp.data?.message || "Fehlende Koordinaten wurden berechnet.");
+  } catch (e: any) {
+    emitFeedback(
+      e?.response?.data?.error ||
+      e?.message ||
+      "Die fehlenden Koordinaten konnten nicht berechnet werden.",
+      "",
+    );
+  } finally {
+    managementSaving.value = false;
+    loadingOverlayOpen.value = false;
+    currentActionLabel.value = "";
   }
 }
 

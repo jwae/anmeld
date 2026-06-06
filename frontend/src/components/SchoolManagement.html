@@ -63,9 +63,16 @@
           <span class="field-label">Strasse</span>
           <input v-model="schoolSourceForm.strasse" :disabled="managementSaving" />
         </label>
-      </div>
 
-      <div class="user-management-form-grid school-management-form-grid">
+        <label class="field-block">
+          <span class="field-label">Latitude</span>
+          <input v-model="schoolSourceForm.latitude" inputmode="decimal" :disabled="managementSaving" />
+        </label>
+
+        <label class="field-block">
+          <span class="field-label">Longitude</span>
+          <input v-model="schoolSourceForm.longitude" inputmode="decimal" :disabled="managementSaving" />
+        </label>
         <label class="field-block">
           <span class="field-label">Schulform (sf)</span>
           <input v-model="schoolSourceForm.sf_id" :disabled="managementSaving" />
@@ -116,6 +123,14 @@
             :disabled="managementSaving"
           >
             Schulen importieren
+          </button>
+          <button
+            class="btn-secondary"
+            type="button"
+            @click="geocodeMissingManagementSchoolSources"
+            :disabled="managementSaving || !managementSchoolSources.length"
+          >
+            Fehlende Koordinaten berechnen
           </button>
           <button
             class="btn-secondary school-management-delete-all"

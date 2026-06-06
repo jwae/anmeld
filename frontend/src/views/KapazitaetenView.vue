@@ -317,7 +317,7 @@ onBeforeUnmount(() => {
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
           <span class="kapazitaeten-step">1.</span>
-          Kapazitäten pro Verfahren verwalten
+          Kapazitäten der aufnehmenden Schulen verwalten
         </h2>
         <p class="kapazitaeten-intro">
           Verwalte Schulen, Jahrgänge und Kapazitäten für das aktuelle Anmeldeverfahren. Schulen ohne Eintrag werden weiterhin angezeigt.
