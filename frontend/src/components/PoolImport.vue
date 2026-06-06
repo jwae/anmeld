@@ -36,6 +36,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  title?: string;
 }>();
 
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -56,6 +57,12 @@ const poolFoerderbedarfFilter = ref("alle");
 const poolZieldifferentFilter = ref("alle");
 const poolSortKey = ref<PoolSortKey>("nachname");
 const poolSortDirection = ref<"asc" | "desc">("asc");
+
+const poolCountLabel = computed(() => (
+  String(props.title || "").startsWith("GS ")
+    ? "Kinder im GS-Pool:"
+    : "Kinder im Pool:"
+));
 
 const selectedValidRows = computed(() => (
   previewRows.value.filter((row) => !!row?.selected && !!row?.valid)
@@ -169,6 +176,13 @@ function formatDate(value: string | null | undefined) {
     return `${day}.${month}.${year}`;
   }
   return text;
+}
+
+function truncateText(value: unknown, maxLength = 12) {
+  const text = normalizeText(value);
+  if (!text) return "-";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
 }
 
 function displayHerkunft(row: PoolSchuelerRow) {
@@ -287,11 +301,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
           <span class="import-step">2.</span>
-          Schuelerpool importieren (CSV, EWO-Datei) 
+          {{ title || "Schuelerpool importieren (CSV, EWO-Datei)" }}
         </h3>
         <p>CSV-Datei laden, Vorschau pruefen und gueltige Zeilen in den Schuelerpool uebernehmen.</p>
         <p v-show="isExpanded" class="pool-info-line">
-          Kinder im Pool:
+          {{ poolCountLabel }}
           <strong>{{ poolCount === null ? "-" : poolCount }}</strong>
         </p>
       </div>
@@ -351,22 +365,23 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <th>Zeile</th>
               <th>Status</th>
               <th>Fehler</th>
-              <th>Schueler-ID</th>
+              <th>SNR</th>
+              <th>S-ID</th>
               <th>Vorname</th>
               <th>Nachname</th>
               <th>Geburtsdatum</th>
-              <th>Adresse</th>
-              <th>Erzieher</th>
-              <th>Foerderbedarf</th>
-              <th>Zieldifferent</th>
-              <th>Empfehlung</th>
-              <th>Fallgrund</th>
+              <th>Strasse</th>
+              <th>PLZ</th>
+              <th>Ort</th>
+              <th>LE</th>
+              <th>ZD</th>
+              <th>Empf.</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in previewRows" :key="`pool-preview-${row.row_number}`" :class="{ 'is-invalid': !row.valid }">
+            <tr v-for="(row, index) in previewRows" :key="`pool-preview-${row.row_number}`" :class="{ 'is-invalid': !row.valid }">
               <td><input v-model="row.selected" type="checkbox" :disabled="loading || !row.valid" /></td>
-              <td>{{ row.row_number }}</td>
+              <td>{{ index + 1 }}</td>
               <td>
                 <span v-if="!row.valid" class="badge badge-danger">Fehler</span>
                 <span v-else-if="row.import_status === 'NEU'" class="badge badge-success">Neu</span>
@@ -375,16 +390,17 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
                 <span v-else class="badge badge-success">Gueltig</span>
               </td>
               <td>{{ Array.isArray(row.errors) && row.errors.length ? row.errors.join(", ") : "-" }}</td>
+              <td>{{ row.data?.snr || "-" }}</td>
               <td>{{ row.data?.schueler_id || "-" }}</td>
               <td>{{ row.data?.vorname || "-" }}</td>
               <td>{{ row.data?.nachname || "-" }}</td>
               <td>{{ row.data?.geburtsdatum || "-" }}</td>
-              <td>{{ row.data?.adresse || "-" }}</td>
-              <td>{{ row.data?.erzieher || "-" }}</td>
+              <td>{{ truncateText(row.data?.strasse) }}</td>
+              <td>{{ row.data?.plz || "-" }}</td>
+              <td>{{ truncateText(row.data?.ort) }}</td>
               <td>{{ row.data?.foerderbedarf || "-" }}</td>
               <td>{{ row.data?.zieldifferent || "-" }}</td>
-              <td>{{ row.data?.empfehlung_code || "-" }}</td>
-              <td>{{ row.data?.fallgrund_code || "-" }}</td>
+              <td>{{ row.data?.empfehlung || "-" }}</td>
             </tr>
           </tbody>
         </table>

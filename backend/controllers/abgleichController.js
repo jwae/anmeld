@@ -641,7 +641,10 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       END
     `
     : "0";
-  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const assignedFilters = [...filters, `${statusExpr} NOT IN ('', 'ohne')`];
+  const assignedWhereClause = assignedFilters.length ? `WHERE ${assignedFilters.join(" AND ")}` : "";
+  const ohneFilters = [...filters, `${statusExpr} IN ('', 'ohne')`];
+  const ohneWhereClause = ohneFilters.length ? `WHERE ${ohneFilters.join(" AND ")}` : "";
   const capacityJoin = kapazitaetColumns.has("verfahren_id") && kapazitaetColumns.has("snr")
     ? `
       LEFT JOIN (
@@ -661,7 +664,8 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
         ON 1 = 0
     `;
 
-  const [rows] = await pool.query(
+  const assignedParams = [...(kapazitaetColumns.has("verfahren_id") && kapazitaetColumns.has("snr") ? [verfahrenId] : []), ...params];
+  const [assignedRows] = await pool.query(
     `
     SELECT
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
@@ -670,7 +674,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       COUNT(*) AS gesamt,
       COALESCE(SUM(CASE WHEN ${statusExpr} = 'neuaufnahme' THEN 1 ELSE 0 END), 0) AS neuaufnahme,
       COALESCE(SUM(CASE WHEN ${statusExpr} = 'warteliste' THEN 1 ELSE 0 END), 0) AS warteliste,
-      COALESCE(SUM(CASE WHEN ${statusExpr} IN ('', 'ohne') THEN 1 ELSE 0 END), 0) AS ohne,
+      0 AS ohne,
       COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
       COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
     FROM anm_schueler s
@@ -679,14 +683,26 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     LEFT JOIN school sref
       ON sref.snr = ${schoolColumn}
     ${capacityJoin}
-    ${whereClause}
+    ${assignedWhereClause}
     GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0)
     ORDER BY COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule') ASC
     `,
-    [...(kapazitaetColumns.has("verfahren_id") && kapazitaetColumns.has("snr") ? [verfahrenId] : []), ...params],
+    assignedParams,
   );
 
-  return (rows || []).map((row) => ({
+  const [ohneRows] = await pool.query(
+    `
+    SELECT
+      COUNT(*) AS gesamt,
+      COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
+      COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
+    FROM anm_schueler s
+    ${ohneWhereClause}
+    `,
+    params,
+  );
+
+  const resultRows = (assignedRows || []).map((row) => ({
     schulnummer: normalizeText(row?.schulnummer),
     schule: normalizeText(row?.schule) || "Ohne Schule",
     kapazitaet: Number(row?.kapazitaet || 0),
@@ -697,6 +713,23 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     foerderbedarf: Number(row?.foerderbedarf || 0),
     zieldifferent: Number(row?.zieldifferent || 0),
   }));
+
+  const ohneGesamt = Number(ohneRows?.[0]?.gesamt || 0);
+  if (ohneGesamt > 0) {
+    resultRows.push({
+      schulnummer: "",
+      schule: "Ohne Zuordnung",
+      kapazitaet: 0,
+      gesamt: ohneGesamt,
+      neuaufnahme: 0,
+      warteliste: 0,
+      ohne: ohneGesamt,
+      foerderbedarf: Number(ohneRows?.[0]?.foerderbedarf || 0),
+      zieldifferent: Number(ohneRows?.[0]?.zieldifferent || 0),
+    });
+  }
+
+  return resultRows;
 }
 
 function createAbgleichController({ getPool }) {

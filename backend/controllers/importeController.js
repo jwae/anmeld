@@ -287,6 +287,10 @@ async function loadTableColumns(pool, tableName) {
 }
 
 async function loadProcedureSchoolLookup(pool, verfahrenId) {
+  return loadProcedureSchoolLookupByRole(pool, verfahrenId, "Zielschulen");
+}
+
+async function loadProcedureSchoolLookupByRole(pool, verfahrenId, rolle) {
   const [rows] = await pool.query(
     `
     SELECT s.snr, s.name, s.is_active
@@ -296,11 +300,11 @@ async function loadProcedureSchoolLookup(pool, verfahrenId) {
       JOIN anm_schulgruppe_schule sgs
         ON sgs.schulgruppe_id = vsg.schulgruppe_id
       WHERE vsg.verfahren_id = ?
-        AND vsg.rolle = 'Zielschulen'
+        AND vsg.rolle = ?
     ) vzs
     JOIN anm_schulen s ON s.snr = vzs.snr
     `,
-    [verfahrenId],
+    [verfahrenId, rolle],
   );
   const lookup = new Map();
   for (const row of rows || []) {
@@ -313,6 +317,19 @@ async function loadProcedureSchoolLookup(pool, verfahrenId) {
     });
   }
   return lookup;
+}
+
+async function loadProcedureType(pool, verfahrenId) {
+  const [rows] = await pool.query(
+    `
+    SELECT verfahrenstyp
+    FROM anm_verfahren
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [verfahrenId],
+  );
+  return normalizeText(rows?.[0]?.verfahrenstyp) || "GS";
 }
 
 async function loadLatestImportProtocolBySchool(pool, verfahrenId) {
@@ -933,13 +950,18 @@ async function upsertStudent(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
   const row = payload?.row || {};
+  const snr = normalizeText(row?.snr);
   const csvId = normalizeText(row?.schueler_id);
   const vorname = normalizeText(row?.vorname);
   const nachname = normalizeText(row?.nachname);
   const geburtsdatum = normalizeDate(row?.geburtsdatum);
+  const strasse = normalizeText(row?.strasse);
+  const plz = normalizeText(row?.plz);
+  const ort = normalizeText(row?.ort);
   const foerderbedarf = normalizeText(row?.foerderbedarf);
   const zieldifferent = normalizeBoolean(row?.zieldifferent);
-  const empfehlung = normalizeText(row?.empfehlung_code) || null;
+  const empfehlung = normalizeText(row?.empfehlung) || normalizeText(row?.empfehlung_code) || "KEINE";
+  const verfahrenstyp = await loadProcedureType(pool, verfahrenId);
   const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
 
   const anmeldungsTreffer = await findApplicationBySchuelerNr(pool, verfahrenId, rundeId, csvId);
@@ -991,6 +1013,30 @@ async function upsertStudent(pool, payload) {
       zieldifferent,
       normalizeText(row?.notiz) || null,
     ];
+    if (verfahrenstyp !== "SEK1" && schuelerColumns.has("schul_nr")) {
+      assignments.push("schul_nr = ?");
+      values.push(snr || null);
+    }
+    if (verfahrenstyp === "SEK1" && schuelerColumns.has("quell_snr")) {
+      assignments.push("quell_snr = ?");
+      values.push(snr || null);
+    }
+    if (verfahrenstyp === "SEK1" && schuelerColumns.has("quell_schueler_nr")) {
+      assignments.push("quell_schueler_nr = ?");
+      values.push(csvId || null);
+    }
+    if (schuelerColumns.has("strasse")) {
+      assignments.push("strasse = ?");
+      values.push(strasse || null);
+    }
+    if (schuelerColumns.has("plz")) {
+      assignments.push("plz = ?");
+      values.push(plz || null);
+    }
+    if (schuelerColumns.has("ort")) {
+      assignments.push("ort = ?");
+      values.push(ort || null);
+    }
     if (schuelerColumns.has("herkunft")) {
       assignments.push("herkunft = ?");
       values.push("Pool");
@@ -1038,6 +1084,36 @@ async function upsertStudent(pool, payload) {
     zieldifferent,
     normalizeText(row?.notiz) || null,
   ];
+  if (verfahrenstyp !== "SEK1" && schuelerColumns.has("schul_nr")) {
+    insertColumns.push("schul_nr");
+    placeholders.push("?");
+    values.push(snr || null);
+  }
+  if (verfahrenstyp === "SEK1" && schuelerColumns.has("quell_snr")) {
+    insertColumns.push("quell_snr");
+    placeholders.push("?");
+    values.push(snr || null);
+  }
+  if (verfahrenstyp === "SEK1" && schuelerColumns.has("quell_schueler_nr")) {
+    insertColumns.push("quell_schueler_nr");
+    placeholders.push("?");
+    values.push(csvId || null);
+  }
+  if (schuelerColumns.has("strasse")) {
+    insertColumns.push("strasse");
+    placeholders.push("?");
+    values.push(strasse || null);
+  }
+  if (schuelerColumns.has("plz")) {
+    insertColumns.push("plz");
+    placeholders.push("?");
+    values.push(plz || null);
+  }
+  if (schuelerColumns.has("ort")) {
+    insertColumns.push("ort");
+    placeholders.push("?");
+    values.push(ort || null);
+  }
   if (schuelerColumns.has("herkunft")) {
     insertColumns.push("herkunft");
     placeholders.push("?");
@@ -1086,30 +1162,36 @@ async function ensureOpenCase(pool, payload) {
   return { created: true };
 }
 
-function buildPoolPreviewRow(parsedRow, empfehlungByCode, fallgrundByCode) {
+function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
+  const empfehlungText = normalizeText(parsedRow.getValue(["empfehlung", "empfehlung_code"])) || "KEINE";
   const data = {
-    schueler_id: normalizeText(parsedRow.getValue("schueler_id")),
+    snr: normalizeText(parsedRow.getValue(["snr", "schul_nr"])),
+    schueler_id: normalizeText(parsedRow.getValue(["schueler_id", "schueler_nr"])),
     vorname: normalizeText(parsedRow.getValue("vorname")),
     nachname: normalizeText(parsedRow.getValue("nachname")),
     geburtsdatum: normalizeDate(parsedRow.getValue("geburtsdatum")),
-    adresse: normalizeText(parsedRow.getValue("adresse")),
-    erzieher: normalizeText(parsedRow.getValue("erzieher")),
+    strasse: normalizeText(parsedRow.getValue(["strasse", "straße", "street"])),
+    plz: normalizeText(parsedRow.getValue(["plz", "postleitzahl"])),
+    ort: normalizeText(parsedRow.getValue(["ort", "city"])),
     foerderbedarf: normalizeText(parsedRow.getValue("foerderbedarf")),
     zieldifferent: normalizeText(parsedRow.getValue("zieldifferent")),
-    empfehlung_code: normalizeText(parsedRow.getValue("empfehlung_code")),
-    notiz: normalizeText(parsedRow.getValue("notiz")),
-    fallgrund_code: normalizeText(parsedRow.getValue("fallgrund_code")),
+    empfehlung: empfehlungText,
   };
 
   const errors = [];
+  const school = schoolBySnr.get(data.snr) || null;
+  if (!data.snr) errors.push("snr fehlt.");
+  if (!school && data.snr) errors.push("snr gehoert nicht zu einer Schule im Verfahren.");
   if (data.schueler_id && !normalizeInteger(data.schueler_id)) errors.push("schueler_id ist ungueltig.");
+  if (!data.schueler_id) errors.push("schueler_id fehlt.");
   if (!data.vorname) errors.push("vorname fehlt.");
   if (!data.nachname) errors.push("nachname fehlt.");
-  if (data.empfehlung_code && !empfehlungByCode.has(normalizeTextLower(data.empfehlung_code))) {
-    errors.push("empfehlung_code ist unbekannt.");
-  }
-  if (data.fallgrund_code && !fallgrundByCode.has(normalizeTextLower(data.fallgrund_code))) {
-    errors.push("fallgrund_code ist unbekannt.");
+  if (!data.geburtsdatum) errors.push("geburtsdatum fehlt.");
+  if (!data.strasse) errors.push("strasse fehlt.");
+  if (!data.plz) errors.push("plz fehlt.");
+  if (!data.ort) errors.push("ort fehlt.");
+  if (!empfehlungByCode.has(normalizeTextLower(data.empfehlung))) {
+    errors.push("empfehlung ist unbekannt.");
   }
 
   return {
@@ -1592,22 +1674,51 @@ function createImporteController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
         const parsedRows = parseCsvText(csvText, [
-          "schueler_id",
+          ["snr", "schul_nr"],
+          ["schueler_id", "schueler_nr"],
           "vorname",
           "nachname",
+          "geburtsdatum",
+          ["strasse", "straße", "street"],
+          ["plz", "postleitzahl"],
+          ["ort", "city"],
         ]);
         const pool = getPool();
+        const verfahrenstyp = await loadProcedureType(pool, verfahrenId);
+        const requiredSchoolRole = verfahrenstyp === "SEK1" ? "Quellschulen" : "Zielschulen";
+        const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, requiredSchoolRole);
         const empfehlungByCode = await loadCatalogByCode(pool, "anm_kat_empfehlung");
-        const fallgrundByCode = await loadCatalogByCode(pool, "anm_kat_fallgrund");
+        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+        const schoolSnrColumn = verfahrenstyp === "SEK1" && schuelerColumns.has("quell_snr")
+          ? "quell_snr"
+          : (schuelerColumns.has("schul_nr") ? "schul_nr" : "");
 
         const ids = parsedRows
-          .map((row) => normalizeInteger(row.getValue("schueler_id")))
+          .map((row) => normalizeInteger(row.getValue(["schueler_id", "schueler_nr"])))
           .filter(Boolean);
 
         let existingStudents = [];
         if (ids.length > 0) {
+          const existingSelect = [
+            "id",
+            "schueler_id",
+            "schueler_nr",
+            "vorname",
+            "nachname",
+            "geburtsdatum",
+            "foerderbedarf",
+            "zieldifferent",
+            "bemerkung",
+            "anmeldestatus",
+            "abgleich_status",
+            schuelerColumns.has("empfehlung") ? "empfehlung" : "'' AS empfehlung",
+            schoolSnrColumn ? `${schoolSnrColumn} AS source_school_snr` : "'' AS source_school_snr",
+            schuelerColumns.has("strasse") ? "strasse" : "'' AS strasse",
+            schuelerColumns.has("plz") ? "plz" : "'' AS plz",
+            schuelerColumns.has("ort") ? "ort" : "'' AS ort",
+          ];
           const [dbRows] = await pool.query(
-            `SELECT id, schueler_id, schueler_nr, vorname, nachname, geburtsdatum, foerderbedarf, zieldifferent, bemerkung, anmeldestatus, abgleich_status
+            `SELECT ${existingSelect.join(", ")}
              FROM anm_schueler
              WHERE verfahren_id = ?
                AND runde_id = ?
@@ -1619,7 +1730,7 @@ function createImporteController({ getPool }) {
         const studentMap = new Map(existingStudents.map((s) => [normalizeText(s.schueler_id), s]));
 
         const rows = parsedRows.map((row) => {
-          const previewRow = buildPoolPreviewRow(row, empfehlungByCode, fallgrundByCode);
+          const previewRow = buildPoolPreviewRow(row, schoolBySnr, empfehlungByCode);
 
           const idVal = normalizeText(previewRow.data.schueler_id);
           if (!idVal || !studentMap.has(idVal)) {
@@ -1631,9 +1742,13 @@ function createImporteController({ getPool }) {
             const matchesBirth = normalizeDate(existing.geburtsdatum) === normalizeDate(previewRow.data.geburtsdatum);
             const matchesFoerderbedarf = normalizeText(existing.foerderbedarf).toLowerCase() === normalizeText(previewRow.data.foerderbedarf).toLowerCase();
             const matchesZieldifferent = Number(existing.zieldifferent || 0) === normalizeBoolean(previewRow.data.zieldifferent);
-            const matchesBemerkung = normalizeText(existing.bemerkung).toLowerCase() === normalizeText(previewRow.data.notiz).toLowerCase();
+            const matchesEmpfehlung = normalizeText(existing.empfehlung).toLowerCase() === normalizeText(previewRow.data.empfehlung).toLowerCase();
+            const matchesSnr = normalizeText(existing.source_school_snr).toLowerCase() === normalizeText(previewRow.data.snr).toLowerCase();
+            const matchesStrasse = normalizeText(existing.strasse).toLowerCase() === normalizeText(previewRow.data.strasse).toLowerCase();
+            const matchesPlz = normalizeText(existing.plz).toLowerCase() === normalizeText(previewRow.data.plz).toLowerCase();
+            const matchesOrt = normalizeText(existing.ort).toLowerCase() === normalizeText(previewRow.data.ort).toLowerCase();
 
-            if (matchesName && matchesSurname && matchesBirth && matchesFoerderbedarf && matchesZieldifferent && matchesBemerkung) {
+            if (matchesName && matchesSurname && matchesBirth && matchesFoerderbedarf && matchesZieldifferent && matchesEmpfehlung && matchesSnr && matchesStrasse && matchesPlz && matchesOrt) {
               previewRow.import_status = "VORHANDEN";
             } else {
               previewRow.import_status = "UPDATE";

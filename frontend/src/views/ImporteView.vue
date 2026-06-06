@@ -4,11 +4,13 @@ import importService from "../services/importService";
 import KapazitaetenView from "./KapazitaetenView.vue";
 import PoolImport from "../components/PoolImport.vue";
 import AnmeldungImport from "../components/AnmeldungImport.vue";
+import type { Anmeldeverfahrenstyp } from "../types";
 
 const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  verfahrenstyp: Anmeldeverfahrenstyp | null;
   context: {
     verfahren: string;
     runde: string;
@@ -52,10 +54,21 @@ async function handleDeleteAll() {
     />
 
     <PoolImport
-      :key="`pool-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
+      v-if="verfahrenstyp === 'GS'"
+      :key="`pool-gs-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
+      title="KiTa Schuelerpool importieren (CSV, EWO-Datei)"
+    />
+
+    <PoolImport
+      v-else-if="verfahrenstyp === 'SEK1'"
+      :key="`pool-sek1-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
+      :token="token"
+      :verfahren-id="verfahrenId"
+      :runde-id="rundeId"
+      title="GS Schuelerpool importieren (CSV, EWO-Datei)"
     />
 
     <AnmeldungImport
