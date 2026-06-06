@@ -36,6 +36,7 @@ type SchoolOverviewRow = {
   kapazitaet: number;
   gesamt: number;
   neuaufnahme: number;
+  freie_plaetze?: number;
   warteliste: number;
   ohne: number;
   foerderbedarf: number;
@@ -53,7 +54,9 @@ const props = defineProps<{
 }>();
 
 const loading = ref(false);
+const geocoding = ref(false);
 const errorMessage = ref("");
+const successMessage = ref("");
 const schuelerRows = ref<SchuelerRow[]>([]);
 const schoolOverviewRows = ref<SchoolOverviewRow[]>([]);
 
@@ -161,8 +164,14 @@ const filteredRows = computed(() => {
 });
 
 const schoolOverview = computed(() => {
-  if (schuleFilter.value === "alle") return schoolOverviewRows.value;
-  return schoolOverviewRows.value.filter((row) => normalizeText(row.schule) === schuleFilter.value);
+  const rows = schuleFilter.value === "alle"
+    ? schoolOverviewRows.value
+    : schoolOverviewRows.value.filter((row) => normalizeText(row.schule) === schuleFilter.value);
+
+  return rows.map((row) => ({
+    ...row,
+    freie_plaetze: Number(row.kapazitaet || 0) - Number(row.neuaufnahme || 0),
+  }));
 });
 
 const sortedRows = computed(() => {
@@ -216,7 +225,35 @@ async function loadData() {
   }
 }
 
+async function handleUpdateGeocoding() {
+  if (!props.verfahrenId || !props.rundeId) {
+    errorMessage.value = "Bitte zuerst ein Verfahren und eine Runde auswaehlen.";
+    return;
+  }
+
+  try {
+    geocoding.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    const response = await abgleichService.updateSchuelerGeocoding(props.verfahrenId, props.rundeId, props.token);
+    const summaryData = response?.summary || {};
+    successMessage.value = [
+      response?.message || "ORS-Geocoding abgeschlossen.",
+      `Erfolgreich: ${Number(summaryData.success_count || 0)}`,
+      `Fehler: ${Number(summaryData.error_count || 0)}`,
+      `Ohne Adresse: ${Number(summaryData.skipped_count || 0)}`,
+    ].join(" | ");
+    await loadData();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Das ORS-Geocoding ist fehlgeschlagen.";
+  } finally {
+    geocoding.value = false;
+  }
+}
+
 watch(() => [props.verfahrenId, props.rundeId], () => {
+  successMessage.value = "";
+  errorMessage.value = "";
   loadData();
 }, { immediate: true });
 </script>
@@ -247,6 +284,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
     </div>
 
     <template v-else>
+      <div v-if="successMessage" class="feedback-panel feedback-panel-success">
+        <p class="feedback-title">Erfolg</p>
+        <p>{{ successMessage }}</p>
+      </div>
+
       <section class="summary-card">
         <div class="section-head">
           <div>
@@ -321,30 +363,49 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
           <table class="overview-table">
             <thead>
               <tr>
-                <th>Schul-Nr</th>
+                <th>SNr</th>
                 <th>Schule</th>
                 <th>Kapazitaet</th>
-                <th>Gesamt</th>
+                <th>Anm.-Gesamt</th>
                 <th>Neuaufnahme</th>
+                <th>Freie Plaetze</th>
                 <th>Warteliste</th>
                 <th>Ohne</th>
-                <th>Foerderbedarf</th>
-                <th>Zieldifferent</th>
+                <th>LE</th>
+                <th>ZD</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="9" class="table-empty">Daten werden geladen...</td>
+                <td colspan="10" class="table-empty">Daten werden geladen...</td>
               </tr>
               <tr v-else-if="!schoolOverview.length">
-                <td colspan="9" class="table-empty">Keine Schulen fuer die aktuellen Filter gefunden.</td>
+                <td colspan="10" class="table-empty">Keine Schulen fuer die aktuellen Filter gefunden.</td>
               </tr>
-              <tr v-for="row in schoolOverview" :key="`${row.schulnummer}-${row.schule}`">
+              <tr
+                v-for="row in schoolOverview"
+                :key="`${row.schulnummer}-${row.schule}`"
+                :class="{ 'overview-row-has-capacity': Number(row.freie_plaetze || 0) > 0 }"
+              >
                 <td>{{ row.schulnummer || "-" }}</td>
                 <td>{{ row.schule }}</td>
                 <td>{{ row.kapazitaet }}</td>
                 <td>{{ row.gesamt }}</td>
                 <td>{{ row.neuaufnahme }}</td>
+                <td>
+                  <span
+                    :class="[
+                      'status-badge',
+                      Number(row.freie_plaetze || 0) > 0
+                        ? 'status-badge-positive'
+                        : Number(row.freie_plaetze || 0) < 0
+                          ? 'status-badge-negative'
+                          : 'status-badge-muted',
+                    ]"
+                  >
+                    {{ row.freie_plaetze }}
+                  </span>
+                </td>
                 <td>{{ row.warteliste }}</td>
                 <td>{{ row.ohne }}</td>
                 <td>{{ row.foerderbedarf }}</td>
@@ -361,7 +422,17 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
             <p class="section-eyebrow">3</p>
             <h3>Schuelerliste im Anmeldeverfahren</h3>
           </div>
-          <span class="table-count">{{ sortedRows.length }} Treffer</span>
+          <div class="section-head-actions">
+            <span class="table-count">{{ sortedRows.length }} Treffer</span>
+            <button
+              class="btn-secondary"
+              type="button"
+              :disabled="loading || geocoding || !verfahrenId || !rundeId"
+              @click="handleUpdateGeocoding"
+            >
+              {{ geocoding ? "Entfernungen werden aktualisiert..." : "Entfernungen aktualisieren" }}
+            </button>
+          </div>
         </div>
         <div class="table-wrap detail-table-wrap">
           <table class="detail-table">
@@ -549,6 +620,13 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
 }
 
+.section-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .metric-card {
   padding: 8px 10px;
   border: 1px solid #cfe0f5;
@@ -641,6 +719,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   cursor: pointer;
 }
 
+.overview-table tbody tr.overview-row-has-capacity td {
+  background: rgba(22, 101, 52, 0.06);
+}
+
 .table-empty {
   text-align: center;
   color: #6b7f99;
@@ -678,6 +760,16 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #1d4f91;
 }
 
+.status-badge-positive {
+  background: #e9f6ec;
+  color: #21653a;
+}
+
+.status-badge-negative {
+  background: #fdecec;
+  color: #b42318;
+}
+
 .status-badge-muted {
   background: #eef2f7;
   color: #6b7f99;
@@ -709,6 +801,12 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 .feedback-panel-warning {
   border: 1px solid #d9d9c8;
   background: #fffdf3;
+}
+
+.feedback-panel-success {
+  border: 1px solid #b7e3c6;
+  background: #f2fbf5;
+  color: #21653a;
 }
 
 @media (max-width: 900px) {

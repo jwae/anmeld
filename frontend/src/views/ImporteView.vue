@@ -18,6 +18,7 @@ const props = defineProps<{
 const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+const refreshVersion = ref(0);
 
 async function handleDeleteAll() {
   const firstConfirm = confirm("Moechten Sie wirklich alle Schuelerdaten aus der Tabelle 'anm_schueler' loeschen?");
@@ -33,6 +34,7 @@ async function handleDeleteAll() {
 
     const res = await importService.clearSchueler(props.token);
     successMessage.value = res?.message || "Alle Schuelerdaten wurden erfolgreich geloescht.";
+    refreshVersion.value += 1;
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Das Loeschen der Schuelerdaten ist fehlgeschlagen.";
   } finally {
@@ -44,17 +46,20 @@ async function handleDeleteAll() {
 <template>
   <section class="importe-view">
     <KapazitaetenView
+      :key="`kapazitaeten-${verfahrenId ?? 'kein-verfahren'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
     />
 
     <PoolImport
+      :key="`pool-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
     />
 
     <AnmeldungImport
+      :key="`anmeldungen-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
@@ -63,8 +68,8 @@ async function handleDeleteAll() {
     <section class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
         <p class="importe-eyebrow">Gefahrenbereich</p>
-        <h3>Schuelerdaten loeschen (aus anm_schueler, fuer Testzwecke)</h3>
-        <p>Diese Aktion loescht alle Datensaetze direkt aus der Tabelle anm_schueler.</p>
+        <h3>Schuelerdaten loeschen (fuer Testzwecke)</h3>
+        <p>Diese Aktion loescht alle Schuelerdaten aus den Import-, Abgleich- und Falltabellen.</p>
       </div>
 
       <button

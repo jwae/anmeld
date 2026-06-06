@@ -32,4 +32,12 @@ export default {
     });
     return response.data;
   },
+
+  async updateSchuelerGeocoding(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.post("/api/abgleich/schueler-uebersicht/geocoding", {
+      verfahren_id: verfahrenId,
+      runde_id: rundeId,
+    }, buildAuthConfig(token));
+    return response.data;
+  },
 };

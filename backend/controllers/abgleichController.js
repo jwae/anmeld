@@ -39,6 +39,97 @@ async function loadTableColumns(pool, tableName) {
   return columns;
 }
 
+function createAddressLabel(row) {
+  return [
+    normalizeText(row?.strasse),
+    [normalizeText(row?.plz), normalizeText(row?.ort)].filter(Boolean).join(" "),
+  ].filter(Boolean).join(", ");
+}
+
+function buildOrsSearchParams(row) {
+  const params = new URLSearchParams();
+  params.set("text", createAddressLabel(row));
+  params.set("size", "1");
+  return params;
+}
+
+function parseOrsCoordinates(payload) {
+  const feature = Array.isArray(payload?.features) && payload.features.length ? payload.features[0] : null;
+  const coords = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+  const longitude = Number(coords?.[0]);
+  const latitude = Number(coords?.[1]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return { latitude: null, longitude: null };
+  }
+  return { latitude, longitude };
+}
+
+async function fetchOrsGeocode(addressRow) {
+  const apiKey = normalizeText(process.env.OPENROUTESERVICE_API_KEY || process.env.ORS_API_KEY);
+  const fetchImpl = global.fetch;
+  if (!apiKey || typeof fetchImpl !== "function") {
+    const error = new Error("ORS-Geocoding ist nicht konfiguriert. Bitte OPENROUTESERVICE_API_KEY oder ORS_API_KEY setzen.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const addressLabel = createAddressLabel(addressRow);
+  if (!addressLabel) {
+    return {
+      ok: false,
+      latitude: null,
+      longitude: null,
+      message: "Adresse unvollstaendig.",
+    };
+  }
+
+  const params = buildOrsSearchParams(addressRow);
+
+  try {
+    const response = await fetchImpl(`https://api.openrouteservice.org/geocode/search?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      return {
+        ok: false,
+        latitude: null,
+        longitude: null,
+        message: `ORS-Geocoding fehlgeschlagen (${response.status}).${responseText ? ` ${responseText.slice(0, 180)}` : ""}`.trim(),
+      };
+    }
+
+    const payload = await response.json();
+    const coordinates = parseOrsCoordinates(payload);
+    if (coordinates.latitude === null || coordinates.longitude === null) {
+      return {
+        ok: false,
+        latitude: null,
+        longitude: null,
+        message: "Keine Koordinaten fuer die Adresse gefunden.",
+      };
+    }
+
+    return {
+      ok: true,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      message: "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      latitude: null,
+      longitude: null,
+      message: error?.message ? `ORS-Geocoding fehlgeschlagen: ${error.message}` : "ORS-Geocoding fehlgeschlagen.",
+    };
+  }
+}
+
 async function tableExists(pool, tableName) {
   const [rows] = await pool.query("SHOW TABLES LIKE ?", [tableName]);
   return Array.isArray(rows) && rows.length > 0;
@@ -345,6 +436,88 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
   }));
 }
 
+async function loadStudentsForGeocoding(pool, verfahrenId, rundeId) {
+  const columns = await loadTableColumns(pool, "anm_schueler");
+  if (!columns.size) return { rows: [], columns };
+
+  const whereParts = [];
+  const params = [];
+
+  if (columns.has("verfahren_id")) {
+    whereParts.push("verfahren_id = ?");
+    params.push(verfahrenId);
+  }
+  if (columns.has("runde_id")) {
+    whereParts.push("runde_id = ?");
+    params.push(rundeId);
+  }
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      id,
+      COALESCE(vorname, '') AS vorname,
+      COALESCE(nachname, '') AS nachname,
+      ${columns.has("strasse") ? "COALESCE(strasse, '')" : "''"} AS strasse,
+      ${columns.has("plz") ? "COALESCE(plz, '')" : "''"} AS plz,
+      ${columns.has("ort") ? "COALESCE(ort, '')" : "''"} AS ort
+    FROM anm_schueler
+    ${whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : ""}
+    ORDER BY COALESCE(nachname, '') ASC, COALESCE(vorname, '') ASC, COALESCE(id, 0) ASC
+    `,
+    params,
+  );
+
+  return {
+    columns,
+    rows: (rows || []).map((row) => ({
+      id: Number(row?.id || 0),
+      vorname: normalizeText(row?.vorname),
+      nachname: normalizeText(row?.nachname),
+      strasse: normalizeText(row?.strasse),
+      plz: normalizeText(row?.plz),
+      ort: normalizeText(row?.ort),
+    })),
+  };
+}
+
+async function updateStudentGeocoding(connection, columns, update) {
+  const assignments = [];
+  const values = [];
+
+  if (columns.has("latitude")) {
+    assignments.push("latitude = ?");
+    values.push(update.latitude);
+  }
+  if (columns.has("longitude")) {
+    assignments.push("longitude = ?");
+    values.push(update.longitude);
+  }
+  if (columns.has("geocoding_status")) {
+    assignments.push("geocoding_status = ?");
+    values.push(update.status);
+  }
+  if (columns.has("geocoding_fehler")) {
+    assignments.push("geocoding_fehler = ?");
+    values.push(update.errorMessage);
+  }
+  if (columns.has("geocoded_at")) {
+    assignments.push("geocoded_at = NOW()");
+  }
+
+  if (!assignments.length) return;
+
+  values.push(update.id);
+  await connection.query(
+    `
+    UPDATE anm_schueler
+    SET ${assignments.join(", ")}
+    WHERE id = ?
+    `,
+    values,
+  );
+}
+
 async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) {
@@ -579,6 +752,96 @@ function createAbgleichController({ getPool }) {
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");
+      }
+    },
+
+    schuelerGeocoding: async (req, res) => {
+      const connection = await getPool().getConnection();
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        const context = await loadProcedureAndRound(connection, verfahrenId, rundeId);
+        if (!context) return sendError(res, 404, "Verfahren oder Runde nicht gefunden.");
+
+        const { columns, rows } = await loadStudentsForGeocoding(connection, verfahrenId, rundeId);
+        if (!rows.length) {
+          return res.json({
+            summary: {
+              total_rows: 0,
+              updated_count: 0,
+              error_count: 0,
+              success_count: 0,
+              skipped_count: 0,
+            },
+            message: "Keine Schueler fuer das ausgewaehlte Verfahren und die ausgewaehlte Runde gefunden.",
+          });
+        }
+
+        const missingColumns = ["latitude", "longitude"].filter((column) => !columns.has(column));
+        if (missingColumns.length) {
+          return sendError(
+            res,
+            500,
+            `Die Tabelle anm_schueler enthaelt die erforderlichen Spalten nicht: ${missingColumns.join(", ")}.`,
+          );
+        }
+
+        const updates = [];
+        let successCount = 0;
+        let errorCount = 0;
+        let skippedCount = 0;
+
+        for (const row of rows) {
+          const addressLabel = createAddressLabel(row);
+          if (!addressLabel) {
+            skippedCount += 1;
+            updates.push({
+              id: row.id,
+              latitude: null,
+              longitude: null,
+              status: columns.has("geocoding_status") ? "Fehler" : "",
+              errorMessage: "Adresse unvollstaendig.",
+            });
+            continue;
+          }
+
+          const result = await fetchOrsGeocode(row);
+          if (result.ok) successCount += 1;
+          else errorCount += 1;
+          updates.push({
+            id: row.id,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            status: columns.has("geocoding_status") ? (result.ok ? "OK" : "Fehler") : "",
+            errorMessage: result.ok ? null : result.message,
+          });
+        }
+
+        await connection.beginTransaction();
+        for (const update of updates) {
+          await updateStudentGeocoding(connection, columns, update);
+        }
+        await connection.commit();
+
+        return res.json({
+          summary: {
+            total_rows: rows.length,
+            updated_count: updates.length,
+            success_count: successCount,
+            error_count: errorCount,
+            skipped_count: skippedCount,
+          },
+          message: `${updates.length} Schuelerdatensaetze fuer ${context.verfahren.bezeichnung || context.verfahren.schuljahr} / ${context.runde.bezeichnung || `Runde ${context.runde.runden_nummer}`} verarbeitet.`,
+        });
+      } catch (error) {
+        await connection.rollback().catch(() => {});
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Das ORS-Geocoding der Schueleradressen ist fehlgeschlagen.");
+      } finally {
+        connection.release();
       }
     },
   };

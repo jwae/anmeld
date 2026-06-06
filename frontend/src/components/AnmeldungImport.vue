@@ -258,10 +258,11 @@ onMounted(() => {
         <table class="import-table school-table">
           <thead>
             <tr>
-              <th>Schulnummer</th>
+              <th>SNr</th>
               <th>Schulname</th>
               <th>Kapazitaet</th>
-              <th>Anmeldungen</th>
+              <th>Neuaufnahme</th>
+              <th>Warteliste</th>
               <th>Freie Plaetze</th>
               <th>Aktion</th>
             </tr>
@@ -270,10 +271,11 @@ onMounted(() => {
             <tr v-for="school in schools" :key="school.snr">
               <td class="school-snr-cell">{{ school.snr }}</td>
               <td>
-                <strong>{{ school.name }}</strong>
+                <strong :title="String(school.name || '').trim()">{{ school.name }}</strong>
               </td>
               <td>{{ Number(school.kapazitaet || 0) }}</td>
-              <td>{{ Number(school.anmeldungen || 0) }}</td>
+              <td>{{ Number(school.neuaufnahme || 0) }}</td>
+              <td>{{ Number(school.warteliste || 0) }}</td>
               <td :class="{ 'is-negative': Number(school.freie_plaetze || 0) < 0 }">
                 {{ Number(school.freie_plaetze || 0) }}
               </td>

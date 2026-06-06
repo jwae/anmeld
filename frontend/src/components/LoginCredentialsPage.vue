@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import UserSessionCard from "./UserSessionCard.vue";
 import AnmeldeverfahrenView from "../views/AnmeldeverfahrenView.vue";
 import ImporteView from "../views/ImporteView.vue";
@@ -30,6 +30,9 @@ const selectedVerfahrenId = ref<number | null>(null);
 const selectedVerfahrenstyp = ref<Anmeldeverfahrenstyp | null>(null);
 const selectedRundenId = ref<number | null>(null);
 const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
+const hasMenuSelectionContext = computed<boolean>(
+  () => selectedVerfahrenId.value !== null || selectedRundenId.value !== null,
+);
 
 function handleContextUpdate(payload: { verfahren: string; runde: string }) {
   currentContext.value = {
@@ -49,6 +52,12 @@ function handleSelectionUpdate(payload: {
   selectedRundenId.value = payload?.rundeId ?? null;
   selectedRundenStatus.value = payload?.rundeStatus ?? null;
 }
+
+watch(hasMenuSelectionContext, (isAvailable) => {
+  if (!isAvailable && activeCredentialsMenu.value !== "verfahren") {
+    activeCredentialsMenu.value = "verfahren";
+  }
+});
 </script>
 
 <template src="./LoginCredentialsPage.html"></template>

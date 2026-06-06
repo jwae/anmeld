@@ -1492,8 +1492,8 @@ async function importAnmeldungenForSchool(connection, payload) {
     if (successfulRows === 0) {
       const detailText = rowErrors.slice(0, 3).map((entry) => `Zeile ${entry.row_number}: ${entry.message}`).join(" | ");
       const error = new Error(detailText
-        ? `Es konnte keine Rueckmeldung in anm_anmeldung gespeichert werden. ${detailText}`
-        : "Es konnte keine Rueckmeldung in anm_anmeldung gespeichert werden.");
+        ? `Keine neue Anmeldung. ${detailText}`
+        : "Keine neue Anmeldung.");
       error.statusCode = 422;
       throw error;
     }
@@ -1733,10 +1733,6 @@ function createImporteController({ getPool }) {
           schuelerFilters.push("s.runde_id = ?");
           schuelerParams.push(rundeId);
         }
-        if (schuelerCols.has("anmeldestatus")) {
-          schuelerFilters.push("LOWER(TRIM(s.anmeldestatus)) IN ('neuaufnahme', 'warteliste')");
-        }
-
         const schuelerWhereClause = schuelerFilters.length
           ? `WHERE ${schuelerFilters.join(" AND ")}`
           : "";
@@ -1745,7 +1741,8 @@ function createImporteController({ getPool }) {
           LEFT JOIN (
             SELECT
               s.${schuelerSchoolColumn} AS snr,
-              COUNT(*) AS anmeldungen
+              SUM(CASE WHEN LOWER(TRIM(COALESCE(s.anmeldestatus, ''))) = 'neuaufnahme' THEN 1 ELSE 0 END) AS neuaufnahme,
+              SUM(CASE WHEN LOWER(TRIM(COALESCE(s.anmeldestatus, ''))) = 'warteliste' THEN 1 ELSE 0 END) AS warteliste
             FROM anm_schueler s
             ${schuelerWhereClause}
             GROUP BY s.${schuelerSchoolColumn}
@@ -1754,7 +1751,7 @@ function createImporteController({ getPool }) {
           `
           : `
           LEFT JOIN (
-            SELECT NULL AS snr, 0 AS anmeldungen
+            SELECT NULL AS snr, 0 AS neuaufnahme, 0 AS warteliste
           ) stat
             ON 1 = 0
           `;
@@ -1763,7 +1760,8 @@ function createImporteController({ getPool }) {
           SELECT
             vzs.snr,
             COALESCE(cap.kapazitaet, 0) AS kapazitaet,
-            COALESCE(stat.anmeldungen, 0) AS anmeldungen
+            COALESCE(stat.neuaufnahme, 0) AS neuaufnahme,
+            COALESCE(stat.warteliste, 0) AS warteliste
           FROM (
             SELECT DISTINCT sgs.snr
             FROM anm_verfahren_schulgruppe vsg
@@ -1791,18 +1789,21 @@ function createImporteController({ getPool }) {
           const snr = normalizeText(row?.snr);
           if (!snr) continue;
           const kapazitaet = Number(row?.kapazitaet || 0);
-          const anmeldungen = Number(row?.anmeldungen || 0);
+          const neuaufnahme = Number(row?.neuaufnahme || 0);
+          const warteliste = Number(row?.warteliste || 0);
           metricsBySnr.set(snr, {
             kapazitaet,
-            anmeldungen,
-            freie_plaetze: kapazitaet - anmeldungen,
+            neuaufnahme,
+            warteliste,
+            freie_plaetze: kapazitaet - neuaufnahme,
           });
         }
 
         const rows = [...schoolBySnr.values()].map((school) => {
           const metrics = metricsBySnr.get(school.snr) || {
             kapazitaet: 0,
-            anmeldungen: 0,
+            neuaufnahme: 0,
+            warteliste: 0,
             freie_plaetze: 0,
           };
           return {
@@ -1812,7 +1813,8 @@ function createImporteController({ getPool }) {
             last_import_at: latestBySnr.get(school.snr) || null,
             connection_status: buildConnectionStatus(school),
             kapazitaet: metrics.kapazitaet,
-            anmeldungen: metrics.anmeldungen,
+            neuaufnahme: metrics.neuaufnahme,
+            warteliste: metrics.warteliste,
             freie_plaetze: metrics.freie_plaetze,
           };
         });
@@ -1974,7 +1976,7 @@ function createImporteController({ getPool }) {
         }
 
         if (totalImportedRows + totalUpdatedRows === 0) {
-          return sendError(res, 422, "Es konnte keine Rueckmeldung in anm_anmeldung gespeichert werden.", {
+          return sendError(res, 422, "Keine neue Anmeldung.", {
             schools: resultBySchool,
           });
         }
@@ -2004,15 +2006,35 @@ function createImporteController({ getPool }) {
       try {
         await connection.beginTransaction();
 
+        const tableDeletionOrder = [
+          "anm_schueler_abgleich",
+          "anm_offener_fall",
+          "anm_anmeldung",
+          "anm_schueler_anmeldung",
+          "anm_schueler",
+          "anm_schueler_pool",
+        ];
+        const deletedByTable = {};
         let deletedRows = 0;
-        const schuelerCols = await loadTableColumns(connection, "anm_schueler");
-        if (schuelerCols.size > 0) {
-          const [result] = await connection.query("DELETE FROM anm_schueler");
-          deletedRows = result.affectedRows || 0;
+
+        for (const tableName of tableDeletionOrder) {
+          const tableColumns = await loadTableColumns(connection, tableName);
+          if (tableColumns.size === 0) continue;
+
+          const [result] = await connection.query(`DELETE FROM ${tableName}`);
+          const affectedRows = Number(result?.affectedRows || 0);
+          deletedByTable[tableName] = affectedRows;
+          deletedRows += affectedRows;
         }
 
         await connection.commit();
-        return res.json({ success: true, message: `Alle Schuelerdaten (${deletedRows} Datensaetze) wurden erfolgreich geloescht.` });
+        poolPreviewSessions.clear();
+        anmeldungsPreviewSessions.clear();
+        return res.json({
+          success: true,
+          message: `Alle Schuelerdaten (${deletedRows} Datensaetze) wurden erfolgreich geloescht.`,
+          deleted_by_table: deletedByTable,
+        });
       } catch (error) {
         await connection.rollback();
         console.error("Error clearing student data:", error);
