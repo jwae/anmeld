@@ -97,6 +97,29 @@ function displayHerkunft(row: SchuelerRow) {
   return normalizeText(row.herkunft) || "-";
 }
 
+function abgleichStatusHoverText(value: unknown) {
+  const status = normalizeText(value);
+  if (status === "Pool + Anm") return "Kind aus Pool mit Anmeldung";
+  if (status === "Nur Anmeldung") return "Neuanmeldung (-zugang) an der Schule";
+  return "";
+}
+
+function abgleichStatusBadgeClass(value: unknown) {
+  const status = normalizeText(value);
+  if (status === "Nur Anmeldung") return "status-chip status-chip-positive";
+  if (status === "Pool + Anm") return "status-chip status-chip-info";
+  if (status === "Nur Pool") return "status-chip status-chip-muted";
+  return "";
+}
+
+function anmeldestatusBadgeClass(value: unknown) {
+  const status = normalizeStatus(value);
+  if (status === "Ohne") return "status-chip status-chip-negative";
+  if (status === "Zugeordnet") return "status-chip status-chip-info";
+  if (status === "Warteliste") return "status-chip status-chip-waiting";
+  return "status-chip status-chip-muted";
+}
+
 function hasPositiveFoerderbedarf(value: unknown) {
   const text = normalizeText(value).toLowerCase();
   return text === "1";
@@ -183,6 +206,20 @@ const sortedRows = computed(() => {
   });
 });
 
+const duplicateNameBirthKeys = computed(() => {
+  const counts = new Map<string, number>();
+  for (const row of filteredRows.value) {
+    const key = duplicateNameBirthKey(row);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return new Set(
+    Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([key]) => key),
+  );
+});
+
 function setSort(nextKey: keyof SchuelerRow) {
   if (sortKey.value === nextKey) {
     sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
@@ -195,6 +232,19 @@ function setSort(nextKey: keyof SchuelerRow) {
 function sortMarker(key: keyof SchuelerRow) {
   if (sortKey.value !== key) return "";
   return sortDirection.value === "asc" ? " ▲" : " ▼";
+}
+
+function duplicateNameBirthKey(row: SchuelerRow) {
+  const nachname = normalizeText(row.nachname).toLowerCase();
+  const vorname = normalizeText(row.vorname).toLowerCase();
+  const geburtsdatum = normalizeText(row.geburtsdatum).toLowerCase();
+  if (!nachname || !vorname || !geburtsdatum) return "";
+  return `${nachname}|${vorname}|${geburtsdatum}`;
+}
+
+function hasDuplicateNameBirth(row: SchuelerRow) {
+  const key = duplicateNameBirthKey(row);
+  return key ? duplicateNameBirthKeys.value.has(key) : false;
 }
 
 async function loadData() {
@@ -461,7 +511,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <tr v-for="(row, index) in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}-${index}`">
                 <td>{{ index + 1 }}</td>
                 <td>{{ row.schueler_schul_id || "-" }}</td>
-                <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
+                <td
+                  :class="{ 'cell-duplicate-name': hasDuplicateNameBirth(row) }"
+                  :title="hasDuplicateNameBirth(row) ? 'Name und Geburtsdatum kommen mehrfach vor' : ''"
+                >{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
                 <td>{{ formatDate(row.geburtsdatum) }}</td>
                 <td>
                   <span
@@ -474,15 +527,17 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
                   <span v-if="normalizeText(row.zieldifferent) === '1'" class="status-badge status-badge-zd">ja</span>
                 </td>
                 <td>{{ displayHerkunft(row) }}</td>
-                <td>{{ row.abgleich_status || "-" }}</td>
                 <td>
                   <span
-                    :class="[
-                      'status-chip',
-                      normalizeStatus(row.anmeldestatus) === 'Ohne' ? 'status-chip-ohne' : '',
-                      normalizeStatus(row.anmeldestatus) === 'Zugeordnet' ? 'status-chip-zugeordnet' : '',
-                      normalizeStatus(row.anmeldestatus) === 'Warteliste' ? 'status-chip-warteliste' : '',
-                    ]"
+                    v-if="abgleichStatusBadgeClass(row.abgleich_status)"
+                    :class="abgleichStatusBadgeClass(row.abgleich_status)"
+                    :title="abgleichStatusHoverText(row.abgleich_status)"
+                  >{{ row.abgleich_status }}</span>
+                  <template v-else>{{ row.abgleich_status || "-" }}</template>
+                </td>
+                <td>
+                  <span
+                    :class="anmeldestatusBadgeClass(row.anmeldestatus)"
                   >
                     {{ normalizeStatus(row.anmeldestatus) }}
                   </span>
@@ -719,6 +774,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   cursor: pointer;
 }
 
+.cell-duplicate-name {
+  background: #fee2e2;
+}
+
 .overview-table tbody tr.overview-row-has-capacity td {
   background: rgba(22, 101, 52, 0.06);
 }
@@ -765,37 +824,42 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #21653a;
 }
 
-.status-badge-negative {
-  background: #fdecec;
-  color: #b42318;
-}
-
-.status-badge-muted {
-  background: #eef2f7;
-  color: #6b7f99;
-}
-
 .status-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 36px;
   min-height: 24px;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.status-chip-ohne {
-  background: #fdecec;
-  color: #b42318;
+.status-chip-positive {
+  background: #e9f6ec;
+  color: #21653a;
 }
 
-.status-chip-zugeordnet {
+.status-chip-info {
   background: #e7f0ff;
   color: #1d4ed8;
 }
 
-.status-chip-warteliste {
+.status-chip-negative {
+  background: #fdecec;
+  color: #b42318;
+}
+
+.status-chip-waiting {
   background: #fff4e5;
   color: #9a5b00;
+}
+
+.status-chip-muted {
+  background: #eef2f7;
+  color: #6b7f99;
 }
 
 .feedback-panel-warning {

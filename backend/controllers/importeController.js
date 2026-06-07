@@ -201,8 +201,8 @@ async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
     filters.push("s.runde_id = ?");
     params.push(rundeId);
   }
-  if (schuelerCols.has("herkunft")) {
-    filters.push("LOWER(TRIM(COALESCE(s.herkunft, ''))) = 'pool'");
+  if (schuelerCols.has("abgleich_status")) {
+    filters.push("TRIM(COALESCE(s.abgleich_status, '')) IN ('Nur Pool', 'Pool + Anm')");
   }
   const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
   const [rows] = await pool.query(

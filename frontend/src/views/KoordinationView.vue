@@ -19,8 +19,12 @@ type StudentRow = {
   vorname: string;
   nachname: string;
   empfehlung: string;
+  foerderbedarf: string;
+  zieldifferent: string;
   anmeldestatus: string;
   abgleich_status: string;
+  geocoding_status: string;
+  geocoding_fehler: string;
   koordinierte_snr: string;
   koordinierte_schule: string;
   entfernung_km: number | null;
@@ -69,9 +73,30 @@ function normalizeStatus(value: unknown) {
   return normalizeText(value) || "Ohne";
 }
 
+function isPositiveFlag(value: unknown) {
+  return normalizeText(value) === "1";
+}
+
 function formatDistance(value: number | null) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return `${Number(value).toFixed(1)} km`;
+}
+
+function displayDistance(student: StudentRow, hasSelectedSchool: boolean) {
+  if (!hasSelectedSchool) return "-";
+  if (normalizeText(student.geocoding_fehler)) return "Adresse fehlerhaft";
+  if (student.entfernung_km === null || student.entfernung_km === undefined || Number.isNaN(Number(student.entfernung_km))) {
+    return "Adresse fehlerhaft";
+  }
+  return formatDistance(student.entfernung_km);
+}
+
+function distanceTitle(student: StudentRow, hasSelectedSchool: boolean) {
+  if (!hasSelectedSchool) return "";
+  if (student.entfernung_km === null || student.entfernung_km === undefined || Number.isNaN(Number(student.entfernung_km))) {
+    return normalizeText(student.geocoding_fehler) || "Adresse fehlerhaft";
+  }
+  return "";
 }
 
 function schoolFreePlacesClass(value: number) {
@@ -198,12 +223,19 @@ watch(
 
 <template>
   <section class="koordination-view">
+    <div v-if="loading && verfahrenId && rundeId" class="loading-overlay" role="status" aria-live="polite">
+      <div class="loading-overlay-card">
+        <p class="loading-overlay-title">Koordination wird geladen</p>
+        <p>Fehlende Geokoordinaten werden ermittelt.</p>
+      </div>
+    </div>
+
     <div class="koordination-toolbar">
       <div>
         <p class="koordination-eyebrow">Koordination</p>
         <h2>Manuelle Verteilung auf freie Schulplaetze</h2>
         <p class="koordination-intro">
-          Waehle links eine Schule aus. Rechts werden alle Schueler ohne Neuaufnahme nach Entfernung zur ausgewaehlten Schule sortiert angezeigt.
+          Waehle eine Schule aus. Die Schueler werden nach Entfernung zur ausgewaehlten Schule sortiert angezeigt.
         </p>
       </div>
       <button class="btn-secondary" type="button" @click="loadData(selectedSchoolSnr)" :disabled="loading">
@@ -232,7 +264,7 @@ watch(
           <div class="section-head">
             <div>
               <p class="section-eyebrow">1</p>
-              <h3>Schulen</h3>
+              <h4>Schulen aus dem Verfahren mit freien Kapazitaeten</h4>
             </div>
             <span class="section-meta">{{ schools.length }} Schulen</span>
           </div>
@@ -281,7 +313,7 @@ watch(
           <div class="section-head">
             <div>
               <p class="section-eyebrow">2</p>
-              <h3>Schueler</h3>
+              <h4>Schueler ohne Anmeldung oder Aufnahme</h4>
             </div>
             <span class="section-meta">
               {{ students.length }} Eintraege
@@ -325,9 +357,11 @@ watch(
                       @change="toggleSelectAllStudents"
                     />
                   </th>
-                  <th>Schueler-ID</th>
+                  <th>ID</th>
                   <th>Name</th>
                   <th>Empf.</th>
+                  <th>LE</th>
+                  <th>ZD</th>
                   <th>Anmeldestatus</th>
                   <th>Abgleichstatus</th>
                   <th>Koordinierte Schule</th>
@@ -336,10 +370,10 @@ watch(
               </thead>
               <tbody>
                 <tr v-if="loading && !students.length">
-                  <td colspan="8" class="table-empty">Daten werden geladen...</td>
+                  <td colspan="10" class="table-empty">Daten werden geladen...</td>
                 </tr>
                 <tr v-else-if="!students.length">
-                  <td colspan="8" class="table-empty">Keine passenden Schueler fuer die Koordination gefunden.</td>
+                  <td colspan="10" class="table-empty">Keine passenden Schueler fuer die Koordination gefunden.</td>
                 </tr>
                 <tr
                   v-for="student in students"
@@ -361,12 +395,18 @@ watch(
                     [student.nachname, student.vorname].filter((value) => normalizeText(value)).join(", ") || "-"
                   }}</td>
                   <td>{{ student.empfehlung || "-" }}</td>
+                  <td>
+                    <span v-if="isPositiveFlag(student.foerderbedarf)" class="status-badge status-badge-le">ja</span>
+                  </td>
+                  <td>
+                    <span v-if="isPositiveFlag(student.zieldifferent)" class="status-badge status-badge-zd">ja</span>
+                  </td>
                   <td><span :class="statusClass(student.anmeldestatus)">{{ normalizeStatus(student.anmeldestatus) }}</span></td>
                   <td>{{ student.abgleich_status || "-" }}</td>
                   <td :title="student.koordinierte_schule || student.koordinierte_snr || '-'">{{
-                    normalizeText(student.koordinierte_schule || student.koordinierte_snr).slice(0, 15) || "-"
+                    normalizeText(student.koordinierte_schule || student.koordinierte_snr).slice(0, 25) || "-"
                   }}</td>
-                  <td>{{ selectedSchool ? formatDistance(student.entfernung_km) : "-" }}</td>
+                  <td :title="distanceTitle(student, !!selectedSchool)">{{ displayDistance(student, !!selectedSchool) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -379,8 +419,46 @@ watch(
 
 <style scoped>
 .koordination-view {
+  position: relative;
   display: grid;
   gap: 18px;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  padding-top: 72px;
+  background: rgba(248, 251, 255, 0.82);
+  backdrop-filter: blur(2px);
+  border-radius: 24px;
+}
+
+.loading-overlay-card {
+  max-width: 360px;
+  padding: 14px 18px;
+  border: 1px solid #cfe0f5;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fd 100%);
+  box-shadow: 0 18px 42px rgba(19, 54, 102, 0.12);
+  color: #17385f;
+  text-align: center;
+}
+
+.loading-overlay-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #17385f;
+}
+
+.loading-overlay-card p:last-child {
+  margin: 0;
+  line-height: 1.45;
+  color: #4a607e;
 }
 
 .koordination-toolbar,
@@ -432,7 +510,7 @@ watch(
 .koordination-board {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .section-head {
@@ -464,6 +542,10 @@ watch(
   max-height: 680px;
 }
 
+.student-table-wrap {
+  max-height: 320px;
+}
+
 .school-table,
 .student-table {
   width: 100%;
@@ -488,6 +570,12 @@ watch(
   text-align: left;
   vertical-align: middle;
   line-height: 1.2;
+}
+
+.student-table th,
+.student-table td {
+  padding: 4px 8px;
+  line-height: 1.1;
 }
 
 .school-table th,
@@ -586,6 +674,36 @@ watch(
   border-radius: 999px;
   background: #eff4fb;
   color: #3f5878;
+}
+
+.student-table .status-chip {
+  min-height: 20px;
+  padding: 2px 7px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.status-badge-le {
+  background: #e9f6ec;
+  color: #21653a;
+}
+
+.status-badge-zd {
+  background: #e7f0ff;
+  color: #1d4ed8;
 }
 
 .status-chip-ohne {

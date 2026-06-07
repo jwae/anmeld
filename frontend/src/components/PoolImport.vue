@@ -81,7 +81,6 @@ const filteredPoolSchuelerRows = computed(() => {
   return poolSchuelerRows.value.filter((row) => {
     const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
     if (searchText && !fullName.includes(searchText) && !normalizeText(row.schueler_schul_id).toLowerCase().includes(searchText)) return false;
-    if (displayHerkunft(row) !== "Pool") return false;
     if (poolStatusFilter.value !== "alle" && normalizeText(row.anmeldestatus) !== poolStatusFilter.value) return false;
     if (poolFoerderbedarfFilter.value === "ja" && !isPositiveFlag(row.foerderbedarf)) return false;
     if (poolFoerderbedarfFilter.value === "nein" && isPositiveFlag(row.foerderbedarf)) return false;
@@ -484,7 +483,17 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               </td>
               <td>{{ displayHerkunft(row) }}</td>
               <td>{{ row.abgleich_status || "-" }}</td>
-              <td>{{ row.anmeldestatus || "-" }}</td>
+              <td>
+                <span
+                  v-if="normalizeText(row.anmeldestatus) === 'Zugeordnet'"
+                  class="status-badge status-badge-assigned"
+                >{{ row.anmeldestatus }}</span>
+                <span
+                  v-else-if="normalizeText(row.anmeldestatus) === 'Ohne'"
+                  class="status-badge status-badge-without"
+                >{{ row.anmeldestatus }}</span>
+                <template v-else>{{ row.anmeldestatus || "-" }}</template>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -799,6 +808,16 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 .status-badge-zd {
   background: #fdf1d8;
   color: #9a5a00;
+}
+
+.status-badge-assigned {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-badge-without {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 @media (max-width: 900px) {
