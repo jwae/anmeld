@@ -299,7 +299,6 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
           >
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
-          <span class="import-step">2.</span>
           {{ title || "Schuelerpool importieren (CSV, EWO-Datei)" }}
         </h3>
         <p>CSV-Datei laden, Vorschau pruefen und gueltige Zeilen in den Schuelerpool uebernehmen.</p>
@@ -530,20 +529,6 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.import-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #e8f1fd;
-  color: #1459a8;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .section-panel {

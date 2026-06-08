@@ -114,6 +114,8 @@ function formatTimestamp(value: string) {
 .anm-card-head h3 {
   margin: 0;
   color: #19385e;
+  font-size: 1.12rem;
+  line-height: 1.25;
 }
 
 .anm-card-head p {

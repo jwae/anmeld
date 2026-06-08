@@ -5,7 +5,8 @@ import {
   computed,
   watch,
 } from "vue";
-import { loadToken } from "./authStore";
+import { loadToken, authStore } from "./authStore";
+import { APP_PATHS, isAnmRoutePath, navigateTo, replaceRoute, routeState } from "./router";
 import { useDatabaseLogin } from "./composables/useDatabaseLogin";
 import { useDashboardNavigation } from "./composables/useDashboardNavigation";
 import { useGlobalFilters } from "./composables/useGlobalFilters";
@@ -99,11 +100,15 @@ const {
 // --- State and Computed ---
 const databaseConnectionConfirmed = ref<boolean>(false);
 const showAppManagement = ref<boolean>(false);
-const showLoginCredentialsPage = ref<boolean>(false);
 
 const isDatabaseConfigured = computed<boolean>(() => isDbConfigured.value);
 const showDatabaseConnectStep = computed<boolean>(
   () => !isDatabaseConfigured.value || !databaseConnectionConfirmed.value,
+);
+const currentPath = computed<string>(() => routeState.path);
+const isAnmRoute = computed<boolean>(() => isAnmRoutePath(currentPath.value));
+const isAuthenticatedAdmin = computed<boolean>(
+  () => String(authStore.groupName || "").trim().toLowerCase() === "admin",
 );
 const {
   activeSnapshotId,
@@ -153,7 +158,6 @@ async function initializeDashboard() {
 async function login() {
   await performLogin();
   showAppManagement.value = false;
-  showLoginCredentialsPage.value = false;
 }
 
 async function continueAfterLogin() {
@@ -161,9 +165,18 @@ async function continueAfterLogin() {
   if (nextView) {
     view.value = nextView;
     showAppManagement.value = false;
-    showLoginCredentialsPage.value = false;
+    navigateTo(APP_PATHS.home);
     await initializeDashboard();
   }
+}
+
+function openAnmeldeverfahren() {
+  const nextView = performContinueAfterLogin({ value: firstAllowedDashboard.value });
+  if (!nextView) return;
+
+  view.value = nextView;
+  showAppManagement.value = false;
+  navigateTo(APP_PATHS.anmVerfahren);
 }
 
 async function connectDatabase() {
@@ -174,9 +187,9 @@ async function connectDatabase() {
   resetDashboardData({ includeSchools: true });
   loginPassword.value = testLoginPassword;
   showAppManagement.value = false;
-  showLoginCredentialsPage.value = false;
   databaseConnectionConfirmed.value = false;
   view.value = "uebersicht";
+  navigateTo(APP_PATHS.home);
 }
 
 function continueAfterDatabaseConnect() {
@@ -189,12 +202,11 @@ function backToDatabaseConnect() {
   loginPassword.value = testLoginPassword;
   databaseConnectionConfirmed.value = false;
   showAppManagement.value = false;
-  showLoginCredentialsPage.value = false;
+  navigateTo(APP_PATHS.home);
 }
 
 function logoutPendingManagementSession() {
   showAppManagement.value = false;
-  showLoginCredentialsPage.value = false;
   pendingLogin.value = null;
   loginPassword.value = testLoginPassword;
   loginError.value = "";
@@ -204,8 +216,8 @@ async function logout() {
   await performLogout();
   resetDashboardData({ includeSchools: true });
   showAppManagement.value = false;
-  showLoginCredentialsPage.value = false;
   databaseConnectionConfirmed.value = isDatabaseConfigured.value;
+  navigateTo(APP_PATHS.home);
 }
 
 function resetDashboardData(options: { includeSchools?: boolean } = {}) {
@@ -366,9 +378,21 @@ watch(() => overview.value, () => {
   updateSchoolTrendVisibility();
 });
 
+watch([currentPath, isAuthenticated, isAuthenticatedAdmin], ([path, authenticated, admin]) => {
+  if (isAnmRoutePath(path) && (!authenticated || !admin)) {
+    replaceRoute(APP_PATHS.home);
+  }
+}, { immediate: true });
+
+watch(isAnmRoute, (isOnAnmRoute, wasOnAnmRoute) => {
+  if (wasOnAnmRoute && !isOnAnmRoute && isDatabaseConfigured.value && isAuthenticated.value) {
+    void initializeDashboard();
+  }
+});
+
 onMounted(async () => {
   await loadStatus();
-  if (isDatabaseConfigured.value && isAuthenticated.value) {
+  if (isDatabaseConfigured.value && isAuthenticated.value && !isAnmRoute.value) {
     enforceAllowedView();
     await initializeDashboard();
   }

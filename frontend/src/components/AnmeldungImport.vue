@@ -218,7 +218,6 @@ onMounted(() => {
           >
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
-          <span class="import-step">3.</span>
           Schulanmeldungen importieren (CSV, Schild3)
         </h3>
         <p>CSV-Datei fuer die aktuelle Runde pruefen, mit dem Pool abgleichen und pro Schule oder gesammelt importieren.</p>
@@ -428,20 +427,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.import-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #e8f1fd;
-  color: #1459a8;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .section-panel {

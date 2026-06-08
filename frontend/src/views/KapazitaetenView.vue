@@ -316,7 +316,7 @@ onBeforeUnmount(() => {
           >
             <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
           </button>
-          <span class="kapazitaeten-step">1.</span>
+          
           Kapazitäten der aufnehmenden Schulen verwalten
         </h2>
         <p class="kapazitaeten-intro">
@@ -494,20 +494,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.kapazitaeten-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #e8f1fd;
-  color: #1459a8;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .section-panel {

@@ -30,18 +30,6 @@
     />
   </template>
 
-  <template v-else-if="showLoginCredentialsPage && pendingLogin && isPendingAdmin">
-    <LoginCredentialsPage
-      :user="pendingLoginUser"
-      :login-user-label="pendingLoginUserLabel"
-      :connected-host="connectedHost || host"
-      :connected-port="connectedPort || port"
-      :connected-database="connectedDatabase || database"
-      :token="pendingLogin?.token || ''"
-      @close="showLoginCredentialsPage = false"
-    />
-  </template>
-
   <template v-else-if="!isAuthenticated">
     <section class="card login-card app-login-card">
       <div class="app-login-header">
@@ -98,7 +86,7 @@
             v-if="pendingLogin && isPendingAdmin"
             class="btn-secondary login-manage-users-btn"
             type="button"
-            @click="showLoginCredentialsPage = true"
+            @click="openAnmeldeverfahren"
           >
             Zum Anmeldeverfahren
           </button>
@@ -127,6 +115,17 @@
         </div>
       </div>
     </section>
+  </template>
+
+  <template v-else-if="isAnmRoute && isAuthenticatedAdmin">
+    <LoginCredentialsPage
+      :user-label="currentUserLabel"
+      :connected-host="connectedHost || host"
+      :connected-port="connectedPort || port"
+      :connected-database="connectedDatabase || database"
+      :token="authStore.token"
+      @close="logout"
+    />
   </template>
 
   <template v-else>

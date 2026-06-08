@@ -29,8 +29,11 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
   <section class="anm-card anm-verfahren-form-card" :class="{ 'is-editing': !!modelValue.id }">
     <div class="anm-card-head anm-verfahren-form-head">
       <div class="anm-verfahren-form-title">
-        <h3>{{ modelValue.id ? "Verfahren bearbeiten" : "Neues Verfahren" }}</h3>        
+        <p class="anm-verfahren-form-eyebrow">{{ modelValue.id ? "Verfahren bearbeiten" : "Neues Verfahren" }}</p>
+        <h3>{{ modelValue.id ? "Verfahren bearbeiten" : "Neues Verfahren anlegen" }}</h3>
+
       </div>
+      <span class="anm-verfahren-form-badge">{{ modelValue.id ? "Edit" : "Neu" }}</span>
     </div>
 
     <div class="anm-form-grid anm-verfahren-form-grid anm-verfahren-form-grid-top">
@@ -94,15 +97,18 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
 
 <style scoped>
 .anm-verfahren-form-card {
-  gap: 12px;
   padding: 16px;
-  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  border: 1px solid #dbe4f0;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 16px 32px rgba(23, 58, 108, 0.05);
 }
 
 .anm-verfahren-form-head {
   display: flex;
+  justify-content: space-between;
   align-items: start;
-  gap: 10px;
+  gap: 12px;
 }
 
 .anm-form-grid {
@@ -130,16 +136,38 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
   gap: 4px;
 }
 
-.anm-verfahren-form-title h3 {
-  margin: 0;
-  font-size: 1.05rem;
+.anm-verfahren-form-eyebrow {
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6680a3;
 }
 
-.anm-verfahren-form-title p {
+.anm-verfahren-form-title h3 {
   margin: 0;
+  color: #19385e;
+  font-size: 1.12rem;
+  line-height: 1.25;
+}
+
+.anm-verfahren-form-copy {
+  margin: 4px 0 0;
   color: #607794;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.anm-verfahren-form-badge {
+  min-width: 46px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef3f8;
+  color: #20476f;
+  font-weight: 800;
+  text-align: center;
+  font-size: 12px;
 }
 
 .anm-form-field {
@@ -156,7 +184,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
 
 .anm-verfahren-form-bottom {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   align-items: end;
 }
@@ -171,21 +199,43 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
   padding: 6px 10px;
   border: 1px solid #cfdceb;
   border-radius: 10px;
-  background: #fdfefe;
+  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  color: #19385e;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.anm-form-field :deep(input:disabled),
+.anm-form-field :deep(select:disabled) {
+  background: #f5f8fc;
+  color: #7d90a8;
 }
 
 .anm-verfahren-form-actions {
   align-items: center;
-  padding-top: 2px;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  min-height: 34px;
 }
 
 .anm-form-primary-btn,
 .anm-form-secondary-btn {
   min-height: 34px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-weight: 600;
+  padding: 10px 18px;
+  border: 1px solid #cfdceb;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.anm-form-primary-btn {
+  border-color: #b9d0e8;
+}
+
+.anm-form-primary-btn:hover:not(:disabled),
+.anm-form-secondary-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(23, 58, 108, 0.12);
 }
 
 @media (max-width: 760px) {
@@ -198,7 +248,8 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
   }
 
   .anm-verfahren-form-head {
-    display: block;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .anm-verfahren-form-actions {

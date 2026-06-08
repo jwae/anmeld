@@ -147,6 +147,7 @@ async function loadVerfahren(preferredSelectionId?: number | null) {
   try {
     const rows = await anmeldeverfahrenService.list(props.token);
     verfahren.value = rows;
+    loadingVerfahren.value = false;
 
     const desiredSelection = preferredSelectionId ?? selectedVerfahrenId.value;
     const stillExists = rows.some((item) => item.id === desiredSelection);
@@ -154,7 +155,7 @@ async function loadVerfahren(preferredSelectionId?: number | null) {
     selectedVerfahrenId.value = nextSelectionId;
 
     if (nextSelectionId) {
-      await loadRunden(nextSelectionId);
+      void loadRunden(nextSelectionId);
     } else {
       runden.value = [];
       selectedRundenId.value = null;
@@ -162,8 +163,11 @@ async function loadVerfahren(preferredSelectionId?: number | null) {
     }
   } catch (error) {
     showError(error, "Anmeldeverfahren konnten nicht geladen werden.");
-  } finally {
     loadingVerfahren.value = false;
+  } finally {
+    if (loadingVerfahren.value) {
+      loadingVerfahren.value = false;
+    }
   }
 }
 
@@ -621,6 +625,8 @@ onMounted(async () => {
 .anm-current-selection-card h3 {
   margin: 0;
   color: #19385e;
+  font-size: 1.12rem;
+  line-height: 1.25;
 }
 
 .anm-current-selection-card p {
@@ -696,6 +702,8 @@ onMounted(async () => {
 .anm-overlay-head h3 {
   margin: 0;
   color: #19385e;
+  font-size: 1.12rem;
+  line-height: 1.25;
 }
 
 .anm-overlay-card p {
