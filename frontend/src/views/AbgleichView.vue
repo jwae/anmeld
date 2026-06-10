@@ -176,7 +176,14 @@ const filteredRows = computed(() => {
   return schuelerRows.value.filter((row) => {
     const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
     if (searchText && !fullName.includes(searchText)) return false;
-    if (schuleFilter.value !== "alle" && normalizeText(row.schule) !== schuleFilter.value) return false;
+    if (schuleFilter.value !== "alle") {
+      const rowSchule = normalizeText(row.schule);
+      if (schuleFilter.value === "Ohne Zuordnung" || schuleFilter.value === "Ohne Schule") {
+        if (rowSchule !== "" && rowSchule !== "Ohne Zuordnung" && rowSchule !== "Ohne Schule") return false;
+      } else {
+        if (rowSchule !== schuleFilter.value) return false;
+      }
+    }
     if (anmeldestatusFilter.value !== "alle" && normalizeStatus(row.anmeldestatus) !== anmeldestatusFilter.value) return false;
     if (foerderbedarfFilter.value !== "alle" && foerderbedarfDropdownValue(row) !== foerderbedarfFilter.value) return false;
     if (herkunftFilter.value !== "alle" && displayHerkunft(row) !== herkunftFilter.value) return false;
@@ -187,9 +194,8 @@ const filteredRows = computed(() => {
 });
 
 const schoolOverview = computed(() => {
-  const rows = schuleFilter.value === "alle"
-    ? schoolOverviewRows.value
-    : schoolOverviewRows.value.filter((row) => normalizeText(row.schule) === schuleFilter.value);
+  // Zeige immer alle Schulen in der Übersicht an, damit der Benutzer bequem per Klick filtern kann.
+  const rows = schoolOverviewRows.value;
 
   return rows.map((row) => ({
     ...row,
@@ -306,6 +312,15 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   errorMessage.value = "";
   loadData();
 }, { immediate: true });
+
+function toggleSchuleFilter(schuleName: string) {
+  const normName = normalizeText(schuleName);
+  if (schuleFilter.value === normName) {
+    schuleFilter.value = "alle";
+  } else {
+    schuleFilter.value = normName;
+  }
+}
 </script>
 
 <template>
@@ -435,7 +450,12 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <tr
                 v-for="row in schoolOverview"
                 :key="`${row.schulnummer}-${row.schule}`"
-                :class="{ 'overview-row-has-capacity': Number(row.freie_plaetze || 0) > 0 }"
+                :class="{
+                  'overview-row-has-capacity': Number(row.freie_plaetze || 0) > 0,
+                  'overview-row-selected': schuleFilter === normalizeText(row.schule)
+                }"
+                @click="toggleSchuleFilter(row.schule)"
+                style="cursor: pointer;"
               >
                 <td>{{ row.schulnummer || "-" }}</td>
                 <td>{{ row.schule }}</td>
@@ -893,5 +913,16 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
     min-width: 0;
     flex-basis: auto;
   }
+}
+
+.overview-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+.overview-table tbody tr:hover td {
+  background-color: #f1f5f9;
+}
+.overview-table tbody tr.overview-row-selected td {
+  background-color: #dbeaf8 !important;
+  font-weight: 600;
 }
 </style>

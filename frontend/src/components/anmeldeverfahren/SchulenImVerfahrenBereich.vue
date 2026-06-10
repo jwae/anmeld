@@ -309,7 +309,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Abgebende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe fuer das Verfahren aus. Darunter werden die Schulen der Gruppe als Infoliste angezeigt.</p>
+          <p>Waehle eine Schulgruppe fuer das Verfahren aus.</p>
         </div>
       </div>
 
@@ -420,7 +420,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Aufnehmende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe fuer das Verfahren aus. Darunter werden die Schulen der Gruppe als Infoliste angezeigt.</p>
+          <p>Waehle eine Schulgruppe fuer das Verfahren aus.</p>
         </div>
       </div>
 

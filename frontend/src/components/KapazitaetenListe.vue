@@ -2,12 +2,15 @@
 const props = defineProps<{
   rows: any[];
   loading: boolean;
+  verfahrenId: number | null;
 }>();
 
 const emit = defineEmits<{
   (e: "add", row: any): void;
   (e: "edit", row: any): void;
   (e: "delete", id: number): void;
+  (e: "refresh"): void;
+  (e: "import"): void;
 }>();
 
 function formatNumber(value: any) {
@@ -26,14 +29,18 @@ function formatAvailableSeats(row: any) {
 
 <template>
   <section class="anm-card kapazitaeten-list-card">
+    <div class="anm-card-head-row">
+      <p class="anm-roadmap-eyebrow">Uebersicht</p>
+      <div class="kapazitaeten-list-actions">
+        <button type="button" class="btn-secondary" @click="emit('refresh')">Aktualisieren</button>
+        <button type="button" class="btn-primary" :disabled="!verfahrenId" @click="emit('import')">Kapazitaeten importieren</button>
+      </div>
+    </div>
     <div class="anm-card-head">
       <div>
-        <p class="anm-roadmap-eyebrow">Uebersicht</p>
         <h3>Schulkapazitaeten</h3>
       </div>
-      <p class="kapazitaeten-list-description">
-        Schulen ohne Kapazitaetsdatensatz werden als leere Zeilen mit einem Add-Button angezeigt.
-      </p>
+
     </div>
 
     <div v-if="loading" class="anm-loading-state">Lade Daten...</div>
@@ -140,7 +147,7 @@ function formatAvailableSeats(row: any) {
 }
 
 .anm-roadmap-eyebrow {
-  margin: 0 0 8px;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 12px;
@@ -268,9 +275,37 @@ function formatAvailableSeats(row: any) {
   padding: 8px 10px;
 }
 
+.anm-card-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
 @media (max-width: 900px) {
+  .anm-card-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
   .anm-card-head {
     flex-direction: column;
   }
+}
+
+.kapazitaeten-list-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.kapazitaeten-list-actions .btn-primary,
+.kapazitaeten-list-actions .btn-secondary {
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

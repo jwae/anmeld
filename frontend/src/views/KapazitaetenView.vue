@@ -324,10 +324,7 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
-      <div class="kapazitaeten-actions">
-        <button type="button" class="btn-secondary" @click="refreshData">Aktualisieren</button>
-        <button type="button" class="btn-primary" :disabled="!verfahrenId" @click="openKapazitaetenImportPicker">Kapazitaeten importieren</button>
-      </div>
+
     </div>
 
     <div v-show="isExpanded" class="section-panel">
@@ -367,9 +364,12 @@ onBeforeUnmount(() => {
       <KapazitaetenListe
         :rows="mergedRows"
         :loading="loading"
+        :verfahren-id="verfahrenId"
         @add="openAddForm"
         @edit="openEditForm"
         @delete="deleteKapazitaet"
+        @refresh="refreshData"
+        @import="openKapazitaetenImportPicker"
       />
     </template>
 
