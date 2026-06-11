@@ -1,9 +1,13 @@
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
 const anmeldungsPreviewSessions = new Map();
 const tableColumnCache = new Map();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
+let svwsConnectionModulePromise = null;
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -44,6 +48,17 @@ function normalizeInteger(value) {
   if (!/^\d+$/.test(text)) return null;
   const parsed = Number(text);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function getSvwsConnectionModule() {
+  if (!svwsConnectionModulePromise) {
+    const moduleUrl = pathToFileURL(path.resolve(__dirname, "..", "lib", "svwsConnection.mjs")).href;
+    svwsConnectionModulePromise = import(moduleUrl).catch((error) => {
+      svwsConnectionModulePromise = null;
+      throw error;
+    });
+  }
+  return svwsConnectionModulePromise;
 }
 
 function parseCsvLine(line) {
@@ -293,7 +308,7 @@ async function loadProcedureSchoolLookup(pool, verfahrenId) {
 async function loadProcedureSchoolLookupByRole(pool, verfahrenId, rolle) {
   const [rows] = await pool.query(
     `
-    SELECT s.snr, s.name, s.is_active
+    SELECT s.snr, s.name, s.is_active, s.db_host, s.db_name, s.db_user, s.db_password_enc
     FROM (
       SELECT DISTINCT sgs.snr
       FROM anm_verfahren_schulgruppe vsg
@@ -310,11 +325,15 @@ async function loadProcedureSchoolLookupByRole(pool, verfahrenId, rolle) {
   for (const row of rows || []) {
     const snr = normalizeText(row?.snr);
     if (!snr) continue;
-    lookup.set(snr, {
-      snr,
-      name: normalizeText(row?.name),
-      active: Number(row?.is_active || 0) === 1,
-    });
+      lookup.set(snr, {
+        snr,
+        name: normalizeText(row?.name),
+        active: Number(row?.is_active || 0) === 1,
+        db_host: normalizeText(row?.db_host),
+        db_name: normalizeText(row?.db_name),
+        db_user: normalizeText(row?.db_user),
+        db_password_enc: String(row?.db_password_enc || ""),
+      });
   }
   return lookup;
 }
@@ -370,6 +389,191 @@ async function loadLatestImportProtocolBySchool(pool, verfahrenId) {
 function buildConnectionStatus(school) {
   if (!school?.active) return "inaktiv";
   return "bereit";
+}
+
+function firstDefinedValue(entry, keys = []) {
+  for (const key of keys) {
+    if (entry && entry[key] !== undefined && entry[key] !== null) {
+      return entry[key];
+    }
+  }
+  return null;
+}
+
+function extractRestArray(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+  return payload.items || payload.data || payload.schueler || payload.students || payload.list || [];
+}
+
+function extractSchoolSections(payload) {
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      const nested = extractSchoolSections(entry);
+      if (nested.length) return nested;
+    }
+    return [];
+  }
+  if (!payload || typeof payload !== "object") return [];
+
+  const direct = payload.abschnitte || payload.sections || payload.schuljahresabschnitte || payload.items || [];
+  return Array.isArray(direct) ? direct : [];
+}
+
+function toSchoolYearLabel(schoolYear, termNo) {
+  const year = Number(schoolYear || 0);
+  const term = Number(termNo || 0);
+  if (!year || !term) return "";
+  return `${year}.${String(term).padStart(2, "0")}`;
+}
+
+function getCurrentSchoolYearLabel(date = new Date()) {
+  const currentDate = date instanceof Date ? date : new Date(date);
+  const month = currentDate.getMonth() + 1;
+  const year = currentDate.getFullYear();
+
+  if (month >= 2 && month <= 7) return `${year - 1}.02`;
+  if (month === 1) return `${year - 1}.01`;
+  return `${year}.01`;
+}
+
+function resolveExternalSectionId(sections, targetLabel) {
+  if (!targetLabel) return 0;
+
+  for (const section of Array.isArray(sections) ? sections : []) {
+    const rawSchoolYear = firstDefinedValue(section, [
+      "sj",
+      "schuljahr",
+      "schoolyear",
+      "school_year",
+      "jahr",
+      "year",
+    ]);
+    const rawTermNo = firstDefinedValue(section, [
+      "abschnitt",
+      "abschnittnummer",
+      "term",
+      "term_no",
+      "section",
+      "section_no",
+      "halbjahr",
+    ]);
+    const label = toSchoolYearLabel(rawSchoolYear, rawTermNo);
+    if (label !== targetLabel) continue;
+
+    return Number(firstDefinedValue(section, [
+      "id",
+      "idSchuljahresabschnitt",
+      "idAbschnitt",
+      "id_abschnitt",
+      "abschnitt_id",
+      "section_id",
+      "sectionId",
+      "schuljahresabschnitt_id",
+      "schuljahresabschnittId",
+    ]) || 0);
+  }
+
+  return 0;
+}
+
+function normalizeCurrentSelectionStudent(entry) {
+  const studentId = Number(firstDefinedValue(entry, ["id", "student_id", "studentId", "schueler_id", "schuelerId"]) || 0);
+  if (!studentId) return null;
+
+  return {
+    id: studentId,
+    section_id: Number(firstDefinedValue(entry, [
+      "idSchuljahresabschnitt",
+      "idAbschnitt",
+      "id_abschnitt",
+      "abschnitt_id",
+      "section_id",
+      "sectionId",
+      "schuljahresabschnitt_id",
+      "schuljahresabschnittId",
+    ]) || 0),
+    nachname: normalizeText(firstDefinedValue(entry, ["nachname", "last_name", "lastname", "name"])),
+    vorname: normalizeText(firstDefinedValue(entry, ["vorname", "first_name", "firstname"])),
+    geburtsdatum: normalizeDate(firstDefinedValue(entry, ["geburtsdatum", "birth_date", "birthDate", "geburtstag", "dateOfBirth"])),
+    zieldifferent: firstDefinedValue(entry, ["hatZieldifferentenUnterricht", "hat_zieldifferenten_unterricht", "target_different", "targetDifferent", "zieldifferent"]),
+    foerderschwerpunkt1ID: firstDefinedValue(entry, ["foerderschwerpunkt1ID", "foerderschwerpunkt1_id", "foerderschwerpunkt1Id", "support_focus1_id", "supportFocus1Id"]),
+    foerderschwerpunkt2ID: firstDefinedValue(entry, ["foerderschwerpunkt2ID", "foerderschwerpunkt2_id", "foerderschwerpunkt2Id", "support_focus2_id", "supportFocus2Id"]),
+    status: firstDefinedValue(entry, ["status", "status_id", "statusId", "schuelerstatus", "schueler_status", "schuelerStatus"]),
+  };
+}
+
+function extractSelectionStudents(payload) {
+  return extractRestArray(payload)
+    .map((entry) => normalizeCurrentSelectionStudent(entry))
+    .filter(Boolean);
+}
+
+function resolveStudentStatusValue(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = Number(String(value).trim());
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function mapSvwsStatusToAnmeldestatusCode(statusValue) {
+  const normalized = resolveStudentStatusValue(statusValue);
+  if (normalized === 0) return "NEUAUFNAHME";
+  if (normalized === 1) return "WARTELISTE";
+  return "";
+}
+
+function normalizeSvwsStudentMasterData(payload) {
+  const source = Array.isArray(payload) ? payload[0] || {} : payload || {};
+  return {
+    studentId: firstDefinedValue(source, ["id", "student_id", "studentId", "schueler_id", "schuelerId", "schuelerID"]),
+    nachname: firstDefinedValue(source, ["nachname", "last_name", "lastname", "name"]),
+    vorname: firstDefinedValue(source, ["vorname", "first_name", "firstname"]),
+    geburtsdatum: firstDefinedValue(source, ["geburtsdatum", "birth_date", "birthDate", "geburtstag", "dateOfBirth"]),
+  };
+}
+
+function normalizeSvwsStudentLearningSectionData(payload) {
+  const source = Array.isArray(payload) ? payload[0] || {} : payload || {};
+  return {
+    hatZieldifferentenUnterricht: firstDefinedValue(source, [
+      "hatZieldifferentenUnterricht",
+      "hat_zieldifferenten_unterricht",
+      "target_different",
+      "targetDifferent",
+      "zieldifferent",
+    ]),
+    foerderschwerpunkt1ID: firstDefinedValue(source, [
+      "foerderschwerpunkt1ID",
+      "foerderschwerpunkt1_id",
+      "foerderschwerpunkt1Id",
+      "support_focus1_id",
+      "supportFocus1Id",
+    ]),
+    foerderschwerpunkt2ID: firstDefinedValue(source, [
+      "foerderschwerpunkt2ID",
+      "foerderschwerpunkt2_id",
+      "foerderschwerpunkt2Id",
+      "support_focus2_id",
+      "supportFocus2Id",
+    ]),
+  };
+}
+
+async function mapWithConcurrency(items, worker, concurrency = 8) {
+  const results = new Array(items.length);
+  let index = 0;
+
+  async function consume() {
+    while (index < items.length) {
+      const currentIndex = index;
+      index += 1;
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
+  }
+
+  const runners = Array.from({ length: Math.max(1, Math.min(concurrency, items.length || 1)) }, () => consume());
+  await Promise.all(runners);
+  return results;
 }
 
 async function findStudentCandidates(pool, data) {
@@ -1203,18 +1407,7 @@ function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
   };
 }
 
-async function buildAnmeldungPreviewRow(parsedRow, schoolBySnr, statusByCode, pool, verfahrenId, rundeId) {
-  const data = {
-    snr: normalizeText(parsedRow.getValue(["schul_nr", "snr"])),
-    schueler_schul_id: normalizeText(parsedRow.getValue(["schueler_id", "schueler_schul_id", "id"])),
-    vorname: normalizeText(parsedRow.getValue("vorname")),
-    nachname: normalizeText(parsedRow.getValue("nachname")),
-    geburtsdatum: normalizeDate(parsedRow.getValue("geburtsdatum")),
-    foerderbedarf: normalizeText(parsedRow.getValue("foerderbedarf")),
-    zieldifferent: normalizeText(parsedRow.getValue("zieldifferent")),
-    anmeldestatus_code: normalizeText(parsedRow.getValue(["anmeldestatus_code", "anmeldestatus"])),
-  };
-
+async function buildAnmeldungPreviewRowFromData(rowNumber, data, schoolBySnr, statusByCode, pool, verfahrenId, rundeId) {
   const errors = [];
   const school = schoolBySnr.get(data.snr) || null;
   if (!data.snr) errors.push("schul_nr fehlt.");
@@ -1248,7 +1441,7 @@ async function buildAnmeldungPreviewRow(parsedRow, schoolBySnr, statusByCode, po
   const match = { match_status, match_hinweis };
 
   return {
-    row_number: parsedRow.row_number,
+    row_number: rowNumber,
     data,
     school_name: school?.name || "",
     valid: errors.length === 0,
@@ -1256,6 +1449,98 @@ async function buildAnmeldungPreviewRow(parsedRow, schoolBySnr, statusByCode, po
     selected: errors.length === 0,
     match,
   };
+}
+
+async function buildAnmeldungPreviewRow(parsedRow, schoolBySnr, statusByCode, pool, verfahrenId, rundeId) {
+  const data = {
+    snr: normalizeText(parsedRow.getValue(["schul_nr", "snr"])),
+    schueler_schul_id: normalizeText(parsedRow.getValue(["schueler_id", "schueler_schul_id", "id"])),
+    vorname: normalizeText(parsedRow.getValue("vorname")),
+    nachname: normalizeText(parsedRow.getValue("nachname")),
+    geburtsdatum: normalizeDate(parsedRow.getValue("geburtsdatum")),
+    foerderbedarf: normalizeText(parsedRow.getValue("foerderbedarf")),
+    zieldifferent: normalizeText(parsedRow.getValue("zieldifferent")),
+    anmeldestatus_code: normalizeText(parsedRow.getValue(["anmeldestatus_code", "anmeldestatus"])),
+  };
+
+  return buildAnmeldungPreviewRowFromData(
+    parsedRow.row_number,
+    data,
+    schoolBySnr,
+    statusByCode,
+    pool,
+    verfahrenId,
+    rundeId,
+  );
+}
+
+async function fetchSvwsAnmeldungenPreviewRowsForSchool(pool, school, verfahrenId, rundeId, statusByCode) {
+  const schoolLabel = school?.name || school?.snr || "die Schule";
+  if (!school?.db_host || !school?.db_name || !school?.db_user) {
+    const error = new Error(`Fuer ${schoolLabel} fehlen SVWS-Zugangsdaten in anm_schulen.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { createSvwsClient } = await getSvwsConnectionModule();
+  const client = createSvwsClient({
+    host: school.db_host,
+    schule: school.db_name,
+    user: school.db_user,
+    passwort: school.db_password_enc,
+  });
+  const normalizedHost = school.db_host;
+
+  const currentSectionLabel = getCurrentSchoolYearLabel();
+  const schoolMetaResponse = await client.get("/schule/stammdaten");
+  const externalSectionId = resolveExternalSectionId(extractSchoolSections(schoolMetaResponse?.data), currentSectionLabel);
+  console.log(`[Schild3-Import] Host: ${normalizedHost}`);
+  console.log(`[Schild3-Import] Aktueller Abschnitt (${currentSectionLabel}) ID: ${externalSectionId || "-"}`);
+  if (!externalSectionId) {
+    const error = new Error(`Fuer ${schoolLabel} wurde kein aktueller Abschnitt (${currentSectionLabel}) im SVWS-Server gefunden.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const selectionResponse = await client.get(`/schueler/abschnitt/${encodeURIComponent(String(externalSectionId))}/auswahlliste`);
+  const rawStudents = Array.isArray(selectionResponse?.data?.schueler) ? selectionResponse.data.schueler : extractRestArray(selectionResponse?.data);
+  console.log(`[Schild3-Import] Schueler in Auswahlliste: ${Number(rawStudents.length || 0)}`);
+  if (rawStudents.length > 0) {
+    console.log("[Schild3-Import] Erstes Schuelerobjekt aus der Auswahlliste:");
+    console.log(rawStudents[0]);
+  }
+  const eligibleStudents = rawStudents
+    .map((entry) => normalizeCurrentSelectionStudent(entry))
+    .filter(Boolean)
+    .filter((student) => ["0", "1"].includes(String(resolveStudentStatusValue(student?.status) ?? "")));
+
+  return await mapWithConcurrency(eligibleStudents, async (student, index) => {
+    const studentId = Number(student?.id || 0);
+    const masterDataResponse = await client.get(`/schueler/${encodeURIComponent(String(studentId))}/stammdaten`);
+    const masterData = normalizeSvwsStudentMasterData(masterDataResponse?.data);
+    const anmeldestatusCode = mapSvwsStatusToAnmeldestatusCode(student?.status);
+    const foerderbedarf = student?.foerderschwerpunkt1ID || student?.foerderschwerpunkt2ID ? "1" : "0";
+    const zieldifferent = normalizeBoolean(student?.zieldifferent) ? "1" : "0";
+
+    return await buildAnmeldungPreviewRowFromData(
+      index + 1,
+      {
+        snr: school.snr,
+        schueler_schul_id: normalizeText(masterData?.studentId || studentId),
+        vorname: normalizeText(masterData?.vorname || student?.vorname),
+        nachname: normalizeText(masterData?.nachname || student?.nachname),
+        geburtsdatum: normalizeDate(masterData?.geburtsdatum || student?.geburtsdatum),
+        foerderbedarf,
+        zieldifferent,
+        anmeldestatus_code: anmeldestatusCode,
+      },
+      new Map([[school.snr, school]]),
+      statusByCode,
+      pool,
+      verfahrenId,
+      rundeId,
+    );
+  }, 8);
 }
 
 async function writeImportProtocol(pool, payload) {
@@ -2101,6 +2386,7 @@ function createImporteController({ getPool }) {
         return res.status(201).json({
           schools: resultBySchool,
           total_summary: {
+            rows_read: Number((preview.rows || []).length),
             imported_rows: totalImportedRows,
             updated_rows: totalUpdatedRows,
             created_students: totalCreatedStudents,
@@ -2112,6 +2398,161 @@ function createImporteController({ getPool }) {
       } catch (error) {
         console.error(error);
         return sendError(res, error?.statusCode || 500, error?.message || "Der Import fuer alle Schulen ist fehlgeschlagen.");
+      }
+    },
+
+    anmeldungenImportSchild3: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        const pool = getPool();
+        const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
+        const statusByCode = await loadCatalogByCode(pool, "anm_kat_anmeldestatus");
+        const resultBySchool = [];
+        let totalRowsRead = 0;
+        let totalImportedRows = 0;
+        let totalUpdatedRows = 0;
+        let totalCreatedStudents = 0;
+        let totalCreatedOpenCases = 0;
+        let totalSkippedRows = 0;
+        let totalErrorRows = 0;
+
+        for (const school of schoolBySnr.values()) {
+          if (!school.active) {
+            resultBySchool.push({
+              snr: school.snr,
+              imported_rows: 0,
+              updated_rows: 0,
+              created_students: 0,
+              created_open_cases: 0,
+              skipped_rows: 0,
+              error_rows: 0,
+              rows_read: 0,
+              skipped: true,
+              message: "Schule ist inaktiv.",
+            });
+            continue;
+          }
+
+          try {
+            const previewRows = await fetchSvwsAnmeldungenPreviewRowsForSchool(
+              pool,
+              school,
+              verfahrenId,
+              rundeId,
+              statusByCode,
+            );
+            const rowsRead = Number(previewRows.length || 0);
+            const validRows = previewRows.filter((row) => row?.valid);
+            const invalidRows = previewRows.filter((row) => !row?.valid);
+            totalRowsRead += rowsRead;
+
+            if (!rowsRead) {
+              resultBySchool.push({
+                snr: school.snr,
+                imported_rows: 0,
+                updated_rows: 0,
+                created_students: 0,
+                created_open_cases: 0,
+                skipped_rows: 0,
+                error_rows: 0,
+                rows_read: 0,
+                skipped: false,
+                message: "Keine Schueler mit Status 0 oder 1 im aktuellen Abschnitt gefunden.",
+              });
+              continue;
+            }
+
+            if (!validRows.length) {
+              totalErrorRows += invalidRows.length;
+              resultBySchool.push({
+                snr: school.snr,
+                imported_rows: 0,
+                updated_rows: 0,
+                created_students: 0,
+                created_open_cases: 0,
+                skipped_rows: 0,
+                error_rows: invalidRows.length,
+                rows_read: rowsRead,
+                skipped: false,
+                message: invalidRows[0]?.errors?.join(", ") || "Keine gueltigen SVWS-Anmeldungen gefunden.",
+              });
+              continue;
+            }
+
+            const connection = await pool.getConnection();
+            try {
+              const payload = await importAnmeldungenForSchool(connection, {
+                verfahren_id: verfahrenId,
+                runde_id: rundeId,
+                snr: school.snr,
+                preview: {
+                  verfahren_id: verfahrenId,
+                  runde_id: rundeId,
+                  rows: previewRows,
+                },
+              });
+              const importedRows = Number(payload?.imported_rows || 0);
+              const updatedRows = Number(payload?.updated_rows || 0);
+              const createdStudents = Number(payload?.created_students || 0);
+              const createdOpenCases = Number(payload?.created_open_cases || 0);
+              const skippedRows = Number(payload?.skipped_rows || 0);
+              const errorRows = Number(payload?.error_rows || 0);
+              totalImportedRows += importedRows;
+              totalUpdatedRows += updatedRows;
+              totalCreatedStudents += createdStudents;
+              totalCreatedOpenCases += createdOpenCases;
+              totalSkippedRows += skippedRows;
+              totalErrorRows += errorRows;
+              resultBySchool.push({
+                snr: school.snr,
+                imported_rows: importedRows,
+                updated_rows: updatedRows,
+                created_students: createdStudents,
+                created_open_cases: createdOpenCases,
+                skipped_rows: skippedRows,
+                error_rows: errorRows,
+                rows_read: Number(payload?.rows_read || rowsRead),
+                skipped: false,
+                message: "",
+              });
+            } finally {
+              connection.release();
+            }
+          } catch (error) {
+            resultBySchool.push({
+              snr: school.snr,
+              imported_rows: 0,
+              updated_rows: 0,
+              created_students: 0,
+              created_open_cases: 0,
+              skipped_rows: 0,
+              error_rows: 0,
+              rows_read: 0,
+              skipped: false,
+              message: error?.message || "SVWS-Import fehlgeschlagen.",
+            });
+          }
+        }
+
+        return res.status(201).json({
+          schools: resultBySchool,
+          total_summary: {
+            rows_read: totalRowsRead,
+            imported_rows: totalImportedRows,
+            updated_rows: totalUpdatedRows,
+            created_students: totalCreatedStudents,
+            created_open_cases: totalCreatedOpenCases,
+            skipped_rows: totalSkippedRows,
+            error_rows: totalErrorRows,
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Schild3-Import ist fehlgeschlagen.");
       }
     },
 

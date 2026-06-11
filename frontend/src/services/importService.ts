@@ -77,6 +77,11 @@ export const importService = {
     return response.data;
   },
 
+  async importAnmeldungenSchild3(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anmeldungen/schild3", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
   async clearSchueler(token?: string) {
     const response = await apiClient.delete("/api/importe/schueler/alle", buildAuthConfig(token));
     return response.data;

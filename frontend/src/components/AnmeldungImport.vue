@@ -72,6 +72,32 @@ function openPicker() {
   fileInput.value?.click();
 }
 
+async function importSchild3() {
+  if (!props.verfahrenId || !props.rundeId) {
+    errorMessage.value = "Bitte zuerst Verfahren und Runde auswaehlen.";
+    return;
+  }
+
+  try {
+    importing.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    importSummary.value = null;
+    resetPreview();
+    const response = await importService.importAnmeldungenSchild3({
+      verfahren_id: props.verfahrenId,
+      runde_id: props.rundeId,
+    }, props.token);
+    importSummary.value = response;
+    successMessage.value = "Anmeldungen aus Schild3 wurden importiert.";
+    await loadSchools();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Import aus Schild3 ist fehlgeschlagen.";
+  } finally {
+    importing.value = false;
+  }
+}
+
 function resetPreview() {
   previewRows.value = [];
   previewToken.value = "";
@@ -233,6 +259,9 @@ onMounted(() => {
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loadingPreview || importing" @click="openPicker">
           CSV hochladen
         </button>
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importSchild3">
+          Import aus Schild3
+        </button>
         <button class="btn-primary" type="button" :disabled="!selectedValidRows.length || importing" @click="importAll">
           {{ importing ? "Importiere..." : "Anmeldungen importieren" }}
         </button>
@@ -296,7 +325,7 @@ onMounted(() => {
 
     <div v-if="importSummary" class="import-summary">
       <template v-if="Array.isArray(importSummary.schools)">
-        <div><strong>Gelesen:</strong> {{ previewRows.length || 0 }}</div>
+        <div><strong>Gelesen:</strong> {{ importSummary.total_summary?.rows_read || previewRows.length || 0 }}</div>
         <div><strong>Importiert:</strong> {{ importSummary.total_summary?.imported_rows || 0 }}</div>
         <div><strong>Aktualisiert:</strong> {{ importSummary.total_summary?.updated_rows || 0 }}</div>
         <div><strong>Neue Schueler:</strong> {{ importSummary.total_summary?.created_students || 0 }}</div>

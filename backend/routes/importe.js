@@ -16,6 +16,7 @@ function createImporteRouter({ authenticateToken, requireAdmin, getPool }) {
   router.get("/anmeldungen/schulen", controller.anmeldungenSchulen);
   router.post("/anmeldungen/vorschau", controller.anmeldungenPreview);
   router.post("/anmeldungen/alle", controller.anmeldungenImportAll);
+  router.post("/anmeldungen/schild3", controller.anmeldungenImportSchild3);
   router.post("/anmeldungen/:snr", controller.anmeldungenImportSchool);
 
   return router;
