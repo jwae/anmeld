@@ -33,6 +33,15 @@ export const importService = {
     return response.data;
   },
 
+  async updatePoolSchueler(id: number, payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.patch(
+      `/api/importe/pool/schueler/${encodeURIComponent(String(id))}`,
+      payload,
+      buildAuthConfig(token),
+    );
+    return response.data;
+  },
+
   async previewPool(payload: Record<string, unknown>, token?: string) {
     const response = await apiClient.post(
       "/api/importe/pool/vorschau",

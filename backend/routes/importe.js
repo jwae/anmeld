@@ -9,6 +9,7 @@ function createImporteRouter({ authenticateToken, requireAdmin, getPool }) {
 
   router.get("/pool/statistik", controller.poolStats);
   router.get("/pool/schueler", controller.poolSchuelerList);
+  router.patch("/pool/schueler/:id", controller.updatePoolSchueler);
   router.post("/pool/vorschau", controller.poolPreview);
   router.post("/pool", controller.poolImport);
   router.post("/pool/schild/jg4", controller.importJg4ausSchild);

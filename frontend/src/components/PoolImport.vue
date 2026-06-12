@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
 
 type PoolSchuelerRow = {
@@ -12,10 +12,18 @@ type PoolSchuelerRow = {
   foerder_id?: string | number | null;
   foerder_label?: string | null;
   zieldifferent: string;
+  ef: string;
+  quell_snr: string;
+  quell_schueler_nr?: string;
   herkunft?: string;
   abgleich_status: string;
   anmeldestatus: string;
+  teilnahmestatus?: string;
   schulnummer: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
+  bemerkung?: string;
   schule: string;
 };
 
@@ -26,6 +34,8 @@ type PoolSortKey =
   | "geburtsdatum"
   | "foerderbedarf"
   | "zieldifferent"
+  | "ef"
+  | "quell_snr"
   | "herkunft"
   | "abgleich_status"
   | "anmeldestatus"
@@ -48,6 +58,18 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const summary = ref<any | null>(null);
 const isExpanded = ref(false);
+const showSchildImportOverlay = ref(false);
+const showEditPoolOverlay = ref(false);
+const savingEditPool = ref(false);
+const editPoolForm = ref<Record<string, string | number | null>>({});
+const showDuplicateConflictsOverlay = ref(false);
+const duplicateConflicts = ref<Array<{
+  schueler_id: string;
+  nachname: string;
+  vorname: string;
+  schul_nr: string;
+  schulname: string;
+}>>([]);
 const poolCount = ref<number | null>(null);
 const poolSchuelerRows = ref<PoolSchuelerRow[]>([]);
 const loadingPoolSchueler = ref(false);
@@ -62,6 +84,29 @@ const poolCountLabel = computed(() => (
   String(props.title || "").startsWith("GS ")
     ? "Kinder im GS-Pool:"
     : "Kinder im Pool:"
+));
+
+const herkunftOptions = ["Pool", "Anmeldung", "Manuell"];
+const abgleichStatusOptions = ["Nur Pool", "Nur Anmeldung", "Pool + Anm"];
+const anmeldestatusEditOptions = ["Neuaufnahme", "Warteliste", "Zugeordnet", "Abgelehnt", "Ohne"];
+const teilnahmestatusOptions = ["Aktiv", "Wegzug", "Abgemeldet", "Verstorben"];
+
+const currentSchoolYearSectionLabel = computed(() => {
+  const currentDate = new Date();
+  const month = currentDate.getMonth() + 1;
+  const year = currentDate.getFullYear();
+
+  if (month >= 2 && month <= 7) return `${year - 1}.02`;
+  if (month === 1) return `${year - 1}.01`;
+  return `${year}.01`;
+});
+
+const currentSchoolYearLabel = computed(() => (
+  currentSchoolYearSectionLabel.value.split(".")[0] || "-"
+));
+
+const currentSectionNo = computed(() => (
+  currentSchoolYearSectionLabel.value.split(".")[1] || "-"
 ));
 
 const selectedValidRows = computed(() => (
@@ -80,7 +125,16 @@ const filteredPoolSchuelerRows = computed(() => {
   const searchText = normalizeText(poolSearch.value).toLowerCase();
   return poolSchuelerRows.value.filter((row) => {
     const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
-    if (searchText && !fullName.includes(searchText) && !normalizeText(row.schueler_schul_id).toLowerCase().includes(searchText)) return false;
+    const schoolId = normalizeText(row.schueler_schul_id).toLowerCase();
+    const sourceSchoolNo = normalizeText(row.quell_snr).toLowerCase();
+    const schoolName = normalizeText(row.schule).toLowerCase();
+    if (
+      searchText
+      && !fullName.includes(searchText)
+      && !schoolId.includes(searchText)
+      && !sourceSchoolNo.includes(searchText)
+      && !schoolName.includes(searchText)
+    ) return false;
     if (poolStatusFilter.value !== "alle" && normalizeText(row.anmeldestatus) !== poolStatusFilter.value) return false;
     if (poolFoerderbedarfFilter.value === "ja" && !isPositiveFlag(row.foerderbedarf)) return false;
     if (poolFoerderbedarfFilter.value === "nein" && isPositiveFlag(row.foerderbedarf)) return false;
@@ -89,6 +143,42 @@ const filteredPoolSchuelerRows = computed(() => {
     return true;
   });
 });
+
+const poolMetricCards = computed(() => {
+  const rows = filteredPoolSchuelerRows.value;
+  return [
+    { label: "Kinder im Pool", value: rows.length },
+    { label: "LE", value: rows.filter((row) => isPositiveFlag(row.foerderbedarf)).length },
+    { label: "ZD", value: rows.filter((row) => isPositiveFlag(row.zieldifferent)).length },
+    { label: "EF", value: rows.filter((row) => isPositiveFlag(row.ef)).length },
+  ];
+});
+
+const duplicatePoolChildKeys = computed(() => {
+  const counts = new Map<string, number>();
+  for (const row of filteredPoolSchuelerRows.value) {
+    const key = buildDuplicatePoolChildKey(row);
+    if (!key) continue;
+    counts.set(key, Number(counts.get(key) || 0) + 1);
+  }
+  return counts;
+});
+
+const duplicatePoolStudentIds = computed(() => {
+  const counts = new Map<string, number>();
+  for (const row of filteredPoolSchuelerRows.value) {
+    const id = normalizeText(row.schueler_id);
+    if (!id) continue;
+    counts.set(id, Number(counts.get(id) || 0) + 1);
+  }
+  return counts;
+});
+
+const hasOpenOverlay = computed(() => (
+  showSchildImportOverlay.value
+  || showEditPoolOverlay.value
+  || showDuplicateConflictsOverlay.value
+));
 
 const sortedPoolSchuelerRows = computed(() => {
   const factor = poolSortDirection.value === "asc" ? 1 : -1;
@@ -99,6 +189,8 @@ const sortedPoolSchuelerRows = computed(() => {
           return isPositiveFlag(row.foerderbedarf) ? "1" : "0";
         case "zieldifferent":
           return isPositiveFlag(row.zieldifferent) ? "1" : "0";
+        case "ef":
+          return isPositiveFlag(row.ef) ? "1" : "0";
         case "herkunft":
           return displayHerkunft(row);
         default:
@@ -167,6 +259,17 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function normalizeDateKey(value: string | null | undefined) {
+  const text = normalizeText(value);
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) {
+    const [day, month, year] = text.split(".");
+    return `${year}-${month}-${day}`;
+  }
+  return text.toLowerCase();
+}
+
 function formatDate(value: string | null | undefined) {
   const text = normalizeText(value);
   if (!text) return "-";
@@ -186,6 +289,26 @@ function truncateText(value: unknown, maxLength = 12) {
 
 function displayHerkunft(row: PoolSchuelerRow) {
   return normalizeText(row.herkunft) || "-";
+}
+
+function buildDuplicatePoolChildKey(row: PoolSchuelerRow) {
+  const nachname = normalizeText(row.nachname).toLowerCase();
+  const vorname = normalizeText(row.vorname).toLowerCase();
+  const geburtsdatum = normalizeDateKey(row.geburtsdatum);
+  if (!nachname || !vorname || !geburtsdatum) return "";
+  return `${nachname}::${vorname}::${geburtsdatum}`;
+}
+
+function isDuplicatePoolChild(row: PoolSchuelerRow) {
+  const key = buildDuplicatePoolChildKey(row);
+  const hasDuplicateIdentity = key
+    ? Number(duplicatePoolChildKeys.value.get(key) || 0) > 1
+    : false;
+  const studentId = normalizeText(row.schueler_id);
+  const hasDuplicateStudentId = studentId
+    ? Number(duplicatePoolStudentIds.value.get(studentId) || 0) > 1
+    : false;
+  return hasDuplicateIdentity || hasDuplicateStudentId;
 }
 
 function isPositiveFlag(value: unknown) {
@@ -293,6 +416,15 @@ async function importJg4ausSchild() {
       runde_id: props.rundeId,
     }, props.token);
     summary.value = response?.total_summary || response;
+    duplicateConflicts.value = Array.isArray(response?.duplicate_id_conflicts)
+      ? response.duplicate_id_conflicts
+      : Array.isArray(response?.total_summary?.duplicate_id_conflicts)
+        ? response.total_summary.duplicate_id_conflicts
+        : [];
+    showDuplicateConflictsOverlay.value = duplicateConflicts.value.length > 0;
+    if (duplicateConflicts.value.length > 0) {
+      errorMessage.value = `${duplicateConflicts.value.length} doppelte schueler_id${duplicateConflicts.value.length === 1 ? "" : "s"} wurden uebersprungen. Details im Hinweisfenster.`;
+    }
     successMessage.value = "Pooldaten aus Schild wurden importiert.";
     await loadPoolSchueler();
     await loadPoolStats();
@@ -303,14 +435,131 @@ async function importJg4ausSchild() {
   }
 }
 
+function openSchildImportOverlay() {
+  if (!props.verfahrenId || !props.rundeId || loading.value) return;
+  showSchildImportOverlay.value = true;
+}
+
+function closeSchildImportOverlay() {
+  if (loading.value) return;
+  showSchildImportOverlay.value = false;
+}
+
+function closeDuplicateConflictsOverlay() {
+  showDuplicateConflictsOverlay.value = false;
+}
+
+function handleEditPoolRow(row: PoolSchuelerRow) {
+  errorMessage.value = "";
+  successMessage.value = "";
+  applyEditPoolRow(row);
+  showEditPoolOverlay.value = true;
+}
+
+function applyEditPoolRow(row: PoolSchuelerRow) {
+  editPoolForm.value = {
+    id: row.schueler_id,
+    schueler_id: row.schueler_schul_id,
+    quell_schueler_nr: row.quell_schueler_nr || row.schueler_schul_id,
+    vorname: row.vorname || "",
+    nachname: row.nachname || "",
+    geburtsdatum: row.geburtsdatum || "",
+    foerderbedarf: isPositiveFlag(row.foerderbedarf) ? "1" : "0",
+    zieldifferent: isPositiveFlag(row.zieldifferent) ? "1" : "0",
+    ef: isPositiveFlag(row.ef) ? "1" : "0",
+    quell_snr: row.quell_snr || "",
+    schul_nr: row.schulnummer || "",
+    herkunft: row.herkunft || "",
+    abgleich_status: row.abgleich_status || "",
+    anmeldestatus: row.anmeldestatus || "",
+    teilnahmestatus: row.teilnahmestatus || "Aktiv",
+    strasse: row.strasse || "",
+    plz: row.plz || "",
+    ort: row.ort || "",
+    bemerkung: row.bemerkung || "",
+    schule: row.schule || "",
+  };
+}
+
+function currentEditPoolIndex() {
+  const currentId = Number(editPoolForm.value.id || 0);
+  if (!currentId) return -1;
+  return sortedPoolSchuelerRows.value.findIndex((row) => Number(row.schueler_id) === currentId);
+}
+
+const canEditPreviousPoolRow = computed(() => currentEditPoolIndex() > 0);
+const canEditNextPoolRow = computed(() => {
+  const index = currentEditPoolIndex();
+  return index >= 0 && index < sortedPoolSchuelerRows.value.length - 1;
+});
+
+function openAdjacentPoolRow(direction: -1 | 1) {
+  const currentIndex = currentEditPoolIndex();
+  if (currentIndex < 0) return;
+  const nextRow = sortedPoolSchuelerRows.value[currentIndex + direction];
+  if (!nextRow) return;
+  applyEditPoolRow(nextRow);
+}
+
+function handleDeletePoolRow(row: PoolSchuelerRow) {
+  successMessage.value = "";
+  errorMessage.value = `Loeschen fuer ${[row.nachname, row.vorname].filter(Boolean).join(", ") || row.schueler_schul_id || "den Datensatz"} ist noch nicht implementiert.`;
+}
+
+function closeEditPoolOverlay() {
+  if (savingEditPool.value) return;
+  showEditPoolOverlay.value = false;
+}
+
+async function saveEditPoolRow() {
+  const rowId = Number(editPoolForm.value.id || 0);
+  if (!rowId) {
+    errorMessage.value = "Der Datensatz konnte nicht gespeichert werden: ID fehlt.";
+    return;
+  }
+  try {
+    savingEditPool.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    await importService.updatePoolSchueler(rowId, editPoolForm.value, props.token);
+    showEditPoolOverlay.value = false;
+    successMessage.value = "Datensatz wurde gespeichert.";
+    await loadPoolSchueler();
+    await loadPoolStats();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Datensatz konnte nicht gespeichert werden.";
+  } finally {
+    savingEditPool.value = false;
+  }
+}
+
+async function confirmSchildImport() {
+  showSchildImportOverlay.value = false;
+  await importJg4ausSchild();
+}
+
 watch(() => [props.verfahrenId, props.rundeId], () => {
   resetPreview();
   summary.value = null;
   successMessage.value = "";
   errorMessage.value = "";
+  showSchildImportOverlay.value = false;
+  showEditPoolOverlay.value = false;
+  showDuplicateConflictsOverlay.value = false;
+  duplicateConflicts.value = [];
   loadPoolStats();
   loadPoolSchueler();
 }, { immediate: true });
+
+watch(hasOpenOverlay, (isOpen) => {
+  if (typeof document === "undefined") return;
+  document.body.style.overflow = isOpen ? "hidden" : "";
+}, { immediate: true });
+
+onUnmounted(() => {
+  if (typeof document === "undefined") return;
+  document.body.style.overflow = "";
+});
 </script>
 
 <template>
@@ -345,7 +594,7 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openPicker">
           CSV hochladen
         </button>
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="importJg4ausSchild">
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
           Import Pooldaten aus Schild
         </button>
       </div>
@@ -369,6 +618,9 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
       <div><strong>Offene Faelle:</strong> {{ summary.created_open_cases }}</div>
       <div><strong>Uebersprungen:</strong> {{ summary.skipped_rows }}</div>
       <div><strong>Fehler:</strong> {{ summary.error_rows }}</div>
+      <div v-if="summary.le_count !== undefined"><strong>LE:</strong> {{ summary.le_count }}</div>
+      <div v-if="summary.zd_count !== undefined"><strong>ZD:</strong> {{ summary.zd_count }}</div>
+      <div v-if="summary.ef_count !== undefined"><strong>EF:</strong> {{ summary.ef_count }}</div>
     </div>
 
     <div v-if="previewRows.length" class="import-preview">
@@ -443,10 +695,29 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         </div>
       </div>
 
+      <div class="pool-metric-cards">
+        <article v-for="card in poolMetricCards" :key="card.label" class="pool-metric-card">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </article>
+      </div>
+
       <div class="pool-table-toolbar">
         <label class="pool-search-field">
           <span>Suche</span>
-          <input v-model="poolSearch" type="search" placeholder="Name oder Schueler-ID" />
+          <div class="pool-search-input-wrap">
+            <input v-model="poolSearch" type="search" placeholder="Name, Schueler-ID, Quell-SNR oder Schule" />
+            <button
+              v-if="poolSearch"
+              type="button"
+              class="pool-search-clear"
+              aria-label="Suche loeschen"
+              title="Suche loeschen"
+              @click="poolSearch = ''"
+            >
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+          </div>
         </label>
         <label>
           <span>Anmeldestatus</span>
@@ -483,22 +754,32 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('geburtsdatum')">Geburtsdatum{{ poolSortMarker('geburtsdatum') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('foerderbedarf')">LE{{ poolSortMarker('foerderbedarf') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('zieldifferent')">ZD{{ poolSortMarker('zieldifferent') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('ef')">EF{{ poolSortMarker('ef') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('quell_snr')">Quell-SNR / Schule{{ poolSortMarker('quell_snr') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('herkunft')">Herkunft{{ poolSortMarker('herkunft') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('abgleich_status')">Abgleichstatus{{ poolSortMarker('abgleich_status') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('anmeldestatus')">Anmeldestatus{{ poolSortMarker('anmeldestatus') }}</button></th>
+              <th class="detail-actions-head">Aktionen</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loadingPoolSchueler">
-              <td colspan="9" class="table-empty">Daten werden geladen...</td>
+              <td colspan="12" class="table-empty">Daten werden geladen...</td>
             </tr>
             <tr v-else-if="!sortedPoolSchuelerRows.length">
-              <td colspan="9" class="table-empty">Keine Datensaetze in anm_schueler gefunden.</td>
+              <td colspan="12" class="table-empty">Keine Datensaetze in anm_schueler gefunden.</td>
             </tr>
-            <tr v-for="(row, index) in sortedPoolSchuelerRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${index}`">
+            <tr
+              v-for="(row, index) in sortedPoolSchuelerRows"
+              :key="`${row.schueler_id}-${row.schueler_schul_id}-${index}`"
+              :class="{ 'is-duplicate-child': isDuplicatePoolChild(row) }"
+            >
               <td>{{ index + 1 }}</td>
               <td>{{ row.schueler_schul_id || "-" }}</td>
-              <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
+              <td>
+                {{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}
+                <span v-if="isDuplicatePoolChild(row)" class="duplicate-hint">Dublette</span>
+              </td>
               <td>{{ formatDate(row.geburtsdatum) }}</td>
               <td>
                 <span
@@ -510,6 +791,10 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
               <td>
                 <span v-if="isPositiveFlag(row.zieldifferent)" class="status-badge status-badge-zd">ja</span>
               </td>
+              <td>
+                <span v-if="isPositiveFlag(row.ef)" class="status-badge status-badge-ef">ja</span>
+              </td>
+              <td>{{ row.quell_snr || "-" }}<template v-if="row.schule"> / {{ truncateText(row.schule, 25) }}</template></td>
               <td>{{ displayHerkunft(row) }}</td>
               <td>{{ row.abgleich_status || "-" }}</td>
               <td>
@@ -523,11 +808,241 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
                 >{{ row.anmeldestatus }}</span>
                 <template v-else>{{ row.anmeldestatus || "-" }}</template>
               </td>
+              <td class="detail-actions-cell">
+                <button
+                  class="btn-secondary pool-icon-btn"
+                  type="button"
+                  title="Datensatz bearbeiten"
+                  aria-label="Datensatz bearbeiten"
+                  @click="handleEditPoolRow(row)"
+                >
+                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                </button>
+                <button
+                  class="btn-secondary pool-icon-btn pool-icon-btn-danger"
+                  type="button"
+                  title="Datensatz loeschen"
+                  aria-label="Datensatz loeschen"
+                  @click="handleDeletePoolRow(row)"
+                >
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+    </div>
+
+    <div
+      v-if="showSchildImportOverlay"
+      class="pool-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pool-import-overlay-title"
+      @click.self="closeSchildImportOverlay"
+    >
+      <section class="pool-import-overlay-card">
+        <div class="pool-import-overlay-head">
+          <h3 id="pool-import-overlay-title">Import Pooldaten aus Schild</h3>
+        </div>
+        <div class="pool-import-overlay-copy">
+          <p>
+            Es werden fuer alle abgebenden Schulen dieses Verfahrens die Daten der Schuelerinnen und Schueler aus Jahrgang 4
+            abgerufen und in den Schuelerpool uebernommen oder aktualisiert.
+          </p>
+          <p>
+            Grundlage sind die in den Schulstammdaten hinterlegten SVWS-Zugangsdaten. Vorhandene Eintraege
+            im Pool werden aktualisiert.
+          </p>
+          <p>
+            Der Abruf erfolgt fuer das aktuelle Schuljahr {{ currentSchoolYearLabel }} Abschnitt {{ currentSectionNo }}.
+          </p>
+        </div>
+        <div class="pool-import-overlay-actions">
+          <button class="btn-secondary" type="button" :disabled="loading" @click="closeSchildImportOverlay">
+            Abbrechen
+          </button>
+          <button class="btn-primary" type="button" :disabled="loading" @click="confirmSchildImport">
+            Weiter
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="showEditPoolOverlay"
+      class="pool-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pool-edit-overlay-title"
+      @click.self="closeEditPoolOverlay"
+    >
+      <section class="pool-import-overlay-card pool-edit-overlay-card">
+        <div class="pool-import-overlay-head">
+          <h3 id="pool-edit-overlay-title">Pool-Datensatz bearbeiten</h3>
+          <div class="pool-overlay-nav" aria-label="Datensatznavigation">
+            <button
+              type="button"
+              class="head-icon-button"
+              :disabled="savingEditPool || !canEditPreviousPoolRow"
+              aria-label="Vorherigen Datensatz bearbeiten"
+              title="Vorheriger Datensatz"
+              @click="openAdjacentPoolRow(-1)"
+            >
+              <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
+              class="head-icon-button"
+              :disabled="savingEditPool || !canEditNextPoolRow"
+              aria-label="Naechsten Datensatz bearbeiten"
+              title="Naechster Datensatz"
+              @click="openAdjacentPoolRow(1)"
+            >
+              <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <div class="pool-edit-overlay-body">
+          <div class="pool-edit-form-grid">
+          <label>
+            <span>Schueler-ID</span>
+            <input v-model="editPoolForm.schueler_id" type="text" />
+          </label>
+          <label>
+            <span>Quell-Schueler-Nr</span>
+            <input v-model="editPoolForm.quell_schueler_nr" type="text" />
+          </label>
+          <label>
+            <span>Vorname</span>
+            <input v-model="editPoolForm.vorname" class="pool-edit-input-soft" type="text" />
+          </label>
+          <label>
+            <span>Nachname</span>
+            <input v-model="editPoolForm.nachname" class="pool-edit-input-soft" type="text" />
+          </label>
+          <label>
+            <span>Geburtsdatum</span>
+            <input v-model="editPoolForm.geburtsdatum" type="date" />
+          </label>
+          <label>
+            <span>Quell-SNR</span>
+            <input v-model="editPoolForm.quell_snr" type="text" />
+          </label>
+          <label>
+            <span>Schul-Nr</span>
+            <input v-model="editPoolForm.schul_nr" type="text" />
+          </label>
+          <label>
+            <span>Schulname</span>
+            <input v-model="editPoolForm.schule" type="text" disabled />
+          </label>
+          <label>
+            <span>Strasse</span>
+            <input v-model="editPoolForm.strasse" type="text" />
+          </label>
+          <label>
+            <span>PLZ</span>
+            <input v-model="editPoolForm.plz" type="text" />
+          </label>
+          <label>
+            <span>Ort</span>
+            <input v-model="editPoolForm.ort" type="text" />
+          </label>
+          <label>
+            <span>Herkunft</span>
+            <select v-model="editPoolForm.herkunft">
+              <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Abgleichstatus</span>
+            <select v-model="editPoolForm.abgleich_status">
+              <option v-for="option in abgleichStatusOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Anmeldestatus</span>
+            <select v-model="editPoolForm.anmeldestatus">
+              <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </label>
+          <label>
+            <span>Teilnahmestatus</span>
+            <select v-model="editPoolForm.teilnahmestatus">
+              <option v-for="option in teilnahmestatusOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </label>
+          <label>
+            <span>LE</span>
+            <select v-model="editPoolForm.foerderbedarf">
+              <option value="0">Nein</option>
+              <option value="1">Ja</option>
+            </select>
+          </label>
+          <label>
+            <span>ZD</span>
+            <select v-model="editPoolForm.zieldifferent">
+              <option value="0">Nein</option>
+              <option value="1">Ja</option>
+            </select>
+          </label>
+          <label>
+            <span>EF</span>
+            <select v-model="editPoolForm.ef">
+              <option value="0">Nein</option>
+              <option value="1">Ja</option>
+            </select>
+          </label>
+          <label class="pool-edit-form-full">
+            <span>Bemerkung</span>
+            <textarea v-model="editPoolForm.bemerkung" rows="4"></textarea>
+          </label>
+          </div>
+        </div>
+        <div class="pool-import-overlay-actions">
+          <button class="btn-secondary" type="button" :disabled="savingEditPool" @click="closeEditPoolOverlay">
+            Abbrechen
+          </button>
+          <button class="btn-primary" type="button" :disabled="savingEditPool" @click="saveEditPoolRow">
+            {{ savingEditPool ? "Speichere..." : "Speichern" }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="showDuplicateConflictsOverlay"
+      class="pool-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pool-import-duplicate-conflicts-title"
+      @click.self="closeDuplicateConflictsOverlay"
+    >
+      <section class="pool-import-overlay-card pool-import-updates-card">
+        <div class="pool-import-overlay-head">
+          <h3 id="pool-import-duplicate-conflicts-title"><span class="warning-icon" aria-hidden="true">!</span>Doppelte Schueler-IDs</h3>
+        </div>
+        <div class="pool-import-overlay-copy">
+          <p>Diese Datensaetze wurden nicht importiert, weil die `schueler_id` bereits in `anm_schueler` vorhanden ist.</p>
+          <div class="pool-import-updates-list">
+            <div
+              v-for="(entry, index) in duplicateConflicts"
+              :key="`${entry.schueler_id}-${entry.schul_nr}-${entry.nachname}-${entry.vorname}`"
+              class="pool-import-updates-item"
+            >
+              {{ index + 1 }}. {{ entry.schueler_id }} | {{ entry.nachname }} | {{ entry.vorname }} | {{ entry.schul_nr }} | {{ entry.schulname || "-" }}
+            </div>
+          </div>
+        </div>
+        <div class="pool-import-overlay-actions">
+          <button class="btn-primary" type="button" @click="closeDuplicateConflictsOverlay">
+            Schliessen
+          </button>
+        </div>
+      </section>
     </div>
   </section>
 </template>
@@ -619,6 +1134,43 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   display: none;
 }
 
+.import-head-controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.head-icon-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: #eef4fd;
+  color: #1459a8;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.head-icon-button:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.head-icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.head-icon-button i {
+  font-size: 18px;
+}
+
 .import-head-actions {
   display: flex;
   gap: 10px;
@@ -674,14 +1226,83 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 
 .pool-table-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, 1fr));
+  grid-template-columns: minmax(320px, 2fr) repeat(3, minmax(130px, 1fr));
   gap: 8px;
   align-items: end;
+}
+
+.pool-metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.pool-metric-card {
+  padding: 12px 14px;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  color: #17385f;
+}
+
+.pool-metric-card span,
+.pool-metric-card strong {
+  display: block;
+}
+
+.pool-metric-card span {
+  color: #5a7393;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pool-metric-card strong {
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .pool-table-toolbar label {
   display: grid;
   gap: 4px;
+}
+
+.pool-search-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.pool-search-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.pool-search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b7f99;
+  cursor: pointer;
+}
+
+.pool-search-clear:hover {
+  background: #e7eef8;
+  color: #17385f;
+}
+
+.pool-search-clear i {
+  font-size: 12px;
 }
 
 .pool-table-toolbar span {
@@ -779,11 +1400,24 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   vertical-align: middle;
 }
 
+.detail-table tr.is-duplicate-child {
+  background: #fff7ed;
+}
+
 .detail-table th {
   color: #5a7393;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.detail-actions-head {
+  text-align: right !important;
+}
+
+.detail-actions-cell {
+  white-space: nowrap;
+  text-align: right !important;
 }
 
 .table-sort-btn {
@@ -825,6 +1459,11 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #9a5a00;
 }
 
+.status-badge-ef {
+  background: #fce7f3;
+  color: #be185d;
+}
+
 .status-badge-assigned {
   background: #dbeafe;
   color: #1d4ed8;
@@ -835,6 +1474,212 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   color: #b91c1c;
 }
 
+.duplicate-hint {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #fed7aa;
+  color: #9a3412;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.pool-icon-btn {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin-left: 6px;
+  border: 1px solid #d7e2ef;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pool-icon-btn i {
+  font-size: 14px;
+}
+
+.pool-icon-btn-danger {
+  color: #b91c1c;
+  background: #fff5f5;
+}
+
+.pool-icon-btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.pool-import-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.pool-import-overlay-card {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  border-radius: 24px;
+  border: 1px solid rgba(219, 228, 240, 0.9);
+  background:
+    radial-gradient(circle at top right, rgba(143, 187, 233, 0.22), transparent 34%),
+    linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.2);
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.pool-import-updates-card {
+  width: min(760px, 100%);
+}
+
+.pool-edit-overlay-card {
+  width: min(920px, 100%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.pool-import-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pool-import-overlay-head h3 {
+  margin: 0;
+  color: #19365b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pool-overlay-nav {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.warning-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pool-import-overlay-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.pool-import-overlay-copy p {
+  margin: 0;
+  color: #4a607e;
+  line-height: 1.6;
+}
+
+.pool-edit-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.pool-edit-overlay-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.pool-edit-form-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.pool-edit-form-grid span {
+  color: #5a7393;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pool-edit-form-grid input,
+.pool-edit-form-grid select,
+.pool-edit-form-grid textarea {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #d7e2ef;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #17385f;
+  font-size: 13px;
+}
+
+.pool-edit-form-grid textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.pool-edit-form-grid input:disabled {
+  background: #f3f7fb;
+  color: #6b7f99;
+}
+
+.pool-edit-input-soft {
+  background: #f7fbff;
+  font-weight: 700;
+}
+
+.pool-edit-form-full {
+  grid-column: 1 / -1;
+}
+
+.pool-import-overlay-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pool-import-updates-list {
+  margin-top: 12px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.pool-import-updates-item {
+  padding: 7px 10px;
+  border-bottom: 1px solid #e5edf6;
+  color: #17385f;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.pool-import-updates-item:last-child {
+  border-bottom: 0;
+}
+
 @media (max-width: 900px) {
   .import-card-head,
   .import-preview-head {
@@ -843,6 +1688,19 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
 
   .pool-table-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .pool-import-overlay-card {
+    padding: 20px;
+  }
+
+  .pool-import-overlay-actions {
+    justify-content: center;
+  }
+
+  .pool-import-overlay-actions .btn-primary,
+  .pool-import-overlay-actions .btn-secondary {
+    min-width: 140px;
   }
 }
 

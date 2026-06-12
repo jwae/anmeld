@@ -292,6 +292,8 @@ CREATE TABLE `anm_runde` (
 
 -- anmeld.anm_schueler_pool definition
 
+-- anmeld.anm_schueler definition
+
 CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
@@ -300,7 +302,7 @@ CREATE TABLE `anm_schueler` (
   `schueler_nr` varchar(50) DEFAULT NULL,
   `quell_snr` varchar(50) DEFAULT NULL COMMENT 'Herkunftsschule / abgebende Grundschule',
   `quell_schueler_nr` varchar(50) DEFAULT NULL COMMENT 'Schueler-Nr an der Quellschule',
-  `schul_nr` varchar(50) DEFAULT NULL,
+  `schul_nr` varchar(50) DEFAULT NULL COMMENT 'Aufnahmende Schule',
   `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
   `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL,
   `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne',
@@ -309,6 +311,7 @@ CREATE TABLE `anm_schueler` (
   `vorname` varchar(100) DEFAULT NULL,
   `nachname` varchar(100) DEFAULT NULL,
   `geburtsdatum` date DEFAULT NULL,
+  `ef` tinyint(4) DEFAULT 0 COMMENT 'Ist das Kind in der EF?',
   `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
   `foerder_id` smallint(6) DEFAULT NULL,
   `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
@@ -327,7 +330,7 @@ CREATE TABLE `anm_schueler` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `quell_jahrgang` varchar(10) DEFAULT NULL COMMENT 'Jahrgang an der Herkunftsschule',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
+  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`,`schul_nr`),
   KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
   KEY `idx_schueler_id` (`schueler_id`),
   KEY `idx_schul_nr` (`schul_nr`),
@@ -341,8 +344,7 @@ CREATE TABLE `anm_schueler` (
   CONSTRAINT `fk_anm_schueler_foerder` FOREIGN KEY (`foerder_id`) REFERENCES `anm_kat_foerderbedarf` (`foerder_id`),
   CONSTRAINT `fk_anm_schueler_quell_schule` FOREIGN KEY (`quell_snr`) REFERENCES `anm_schulen` (`snr`),
   CONSTRAINT `fk_anm_schueler_ziel_schule` FOREIGN KEY (`schul_nr`) REFERENCES `anm_schulen` (`snr`)
-) ENGINE=InnoDB AUTO_INCREMENT=208 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+) ENGINE=InnoDB AUTO_INCREMENT=708 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- anmeld.anm_schulen definition
 
 CREATE TABLE `anm_schulen` (
