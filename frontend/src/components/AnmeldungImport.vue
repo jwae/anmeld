@@ -72,7 +72,7 @@ function openPicker() {
   fileInput.value?.click();
 }
 
-async function importSchild3() {
+async function importiereAnmeldungenAusSchild3() {
   if (!props.verfahrenId || !props.rundeId) {
     errorMessage.value = "Bitte zuerst Verfahren und Runde auswaehlen.";
     return;
@@ -84,7 +84,7 @@ async function importSchild3() {
     successMessage.value = "";
     importSummary.value = null;
     resetPreview();
-    const response = await importService.importAnmeldungenSchild3({
+    const response = await importService.importiereAnmeldungenAusSchild3({
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
     }, props.token);
@@ -259,7 +259,7 @@ onMounted(() => {
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loadingPreview || importing" @click="openPicker">
           CSV hochladen
         </button>
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importSchild3">
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3
         </button>
         <button class="btn-primary" type="button" :disabled="!selectedValidRows.length || importing" @click="importAll">

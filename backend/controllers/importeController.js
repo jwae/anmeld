@@ -500,6 +500,9 @@ function normalizeCurrentSelectionStudent(entry) {
     foerderschwerpunkt1ID: firstDefinedValue(entry, ["foerderschwerpunkt1ID", "foerderschwerpunkt1_id", "foerderschwerpunkt1Id", "support_focus1_id", "supportFocus1Id"]),
     foerderschwerpunkt2ID: firstDefinedValue(entry, ["foerderschwerpunkt2ID", "foerderschwerpunkt2_id", "foerderschwerpunkt2Id", "support_focus2_id", "supportFocus2Id"]),
     status: firstDefinedValue(entry, ["status", "status_id", "statusId", "schuelerstatus", "schueler_status", "schuelerStatus"]),
+    year_group_id: firstDefinedValue(entry, ["idJahrgang", "jahrgangID", "jahrgangId"]),
+    jahrgang: firstDefinedValue(entry, ["jahrgang", "grade", "grade_level", "year"]),
+    klassenart: firstDefinedValue(entry, ["klassenart", "klassenArt", "Klassenart", "class_type", "classType"]),
   };
 }
 
@@ -520,6 +523,40 @@ function mapSvwsStatusToAnmeldestatusCode(statusValue) {
   if (normalized === 0) return "NEUAUFNAHME";
   if (normalized === 1) return "WARTELISTE";
   return "";
+}
+
+function normalizeYearGroupEntries(payload) {
+  return extractRestArray(payload)
+    .map((entry) => ({
+      external_id: String(firstDefinedValue(entry, ["idJahrgang", "jahrgangID", "jahrgangId", "id", "ID"]) ?? "").trim(),
+      statistik_code: String(firstDefinedValue(entry, ["kuerzelstatistik", "kuerzelStatistik", "KuerzelStatistik", "jahrgang", "grade"]) ?? "").trim(),
+    }))
+    .filter((entry) => entry.external_id);
+}
+
+function buildYearGroupLookup(entries) {
+  const byId = new Map();
+  for (const entry of entries || []) {
+    const externalId = String(entry?.external_id || "").trim();
+    if (!externalId) continue;
+    byId.set(externalId, String(entry?.statistik_code || "").trim());
+  }
+  return byId;
+}
+
+function normalizeGradeValue(value) {
+  const text = normalizeText(value);
+  if (!text) return "";
+  const match = text.match(/\d+/);
+  return match ? String(Number(match[0])) : text.toUpperCase();
+}
+
+function resolveStudentGrade(student, yearGroupLookup = null) {
+  const mappedYearGroup = yearGroupLookup instanceof Map
+    ? normalizeGradeValue(yearGroupLookup.get(String(student?.year_group_id ?? "").trim()) || "")
+    : "";
+  if (mappedYearGroup) return mappedYearGroup;
+  return normalizeGradeValue(student?.jahrgang);
 }
 
 function normalizeSvwsStudentMasterData(payload) {
@@ -555,6 +592,13 @@ function normalizeSvwsStudentLearningSectionData(payload) {
       "foerderschwerpunkt2Id",
       "support_focus2_id",
       "supportFocus2Id",
+    ]),
+    klassenart: firstDefinedValue(source, [
+      "klassenart",
+      "klassenArt",
+      "Klassenart",
+      "class_type",
+      "classType",
     ]),
   };
 }
@@ -1543,6 +1587,110 @@ async function fetchSvwsAnmeldungenPreviewRowsForSchool(pool, school, verfahrenI
   }, 8);
 }
 
+function buildPoolImportRowFromData(rowNumber, data, schoolBySnr) {
+  const errors = [];
+  const school = schoolBySnr.get(data.snr) || null;
+  if (!data.snr) errors.push("snr fehlt.");
+  if (!school && data.snr) errors.push("snr gehoert nicht zu einer Schule im Verfahren.");
+  if (!data.schueler_id) errors.push("schueler_id fehlt.");
+  if (data.schueler_id && !normalizeInteger(data.schueler_id)) errors.push("schueler_id ist ungueltig.");
+  if (!data.vorname) errors.push("vorname fehlt.");
+  if (!data.nachname) errors.push("nachname fehlt.");
+
+  return {
+    row_number: rowNumber,
+    data,
+    valid: errors.length === 0,
+    errors,
+    selected: errors.length === 0,
+  };
+}
+
+async function fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId) {
+  const schoolLabel = school?.name || school?.snr || "die Schule";
+  console.log(`[Pool-Schild-Import] Starte SVWS-Abruf fuer ${schoolLabel} (SNR ${school?.snr || "-"}) | Verfahren ${verfahrenId} | Runde ${rundeId}`);
+  if (!school?.db_host || !school?.db_name || !school?.db_user) {
+    const error = new Error(`Fuer ${schoolLabel} fehlen SVWS-Zugangsdaten in anm_schulen.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { createSvwsClient } = await getSvwsConnectionModule();
+  const client = createSvwsClient({
+    host: school.db_host,
+    schule: school.db_name,
+    user: school.db_user,
+    passwort: school.db_password_enc,
+  });
+
+  const currentSectionLabel = getCurrentSchoolYearLabel();
+  const [schoolMetaResponse, yearGroupsResponse] = await Promise.all([
+    client.get("/schule/stammdaten"),
+    client.get("/jahrgaenge/jahrgangsdaten"),
+  ]);
+  const externalSectionId = resolveExternalSectionId(extractSchoolSections(schoolMetaResponse?.data), currentSectionLabel);
+  console.log(`[Pool-Schild-Import] ${schoolLabel}: aktueller Abschnitt ${currentSectionLabel}, externe Abschnitts-ID ${externalSectionId || "-"}`);
+  if (!externalSectionId) {
+    const error = new Error(`Fuer ${schoolLabel} wurde kein aktueller Abschnitt (${currentSectionLabel}) im SVWS-Server gefunden.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const yearGroupLookup = buildYearGroupLookup(normalizeYearGroupEntries(yearGroupsResponse?.data));
+  const selectionResponse = await client.get(`/schueler/abschnitt/${encodeURIComponent(String(externalSectionId))}/auswahlliste`);
+  const rawStudents = Array.isArray(selectionResponse?.data?.schueler) ? selectionResponse.data.schueler : extractRestArray(selectionResponse?.data);
+  console.log(`[Pool-Schild-Import] ${schoolLabel}: Auswahlliste enthaelt ${Number(rawStudents.length || 0)} Schueler`);
+  const eligibleStudents = rawStudents
+    .map((entry) => normalizeCurrentSelectionStudent(entry))
+    .filter(Boolean)
+    .filter((student) => resolveStudentStatusValue(student?.status) === 2)
+    .filter((student) => resolveStudentGrade(student, yearGroupLookup) === "4");
+  console.log(`[Pool-Schild-Import] ${schoolLabel}: ${eligibleStudents.length} Schueler mit Jahrgang 4 und Status 2 gefunden`);
+
+  return await mapWithConcurrency(eligibleStudents, async (student, index) => {
+    const studentId = Number(student?.id || 0);
+    const masterDataResponse = await client.get(`/schueler/${encodeURIComponent(String(studentId))}/stammdaten`);
+    let learningSectionResponse = { data: null };
+    try {
+      learningSectionResponse = await client.get(
+        `/schueler/${encodeURIComponent(String(studentId))}/abschnitt/${encodeURIComponent(String(externalSectionId))}/lernabschnittsdaten`,
+      );
+    } catch (error) {
+      console.warn(
+        `[Pool-Schild-Import] ${schoolLabel}: lernabschnittsdaten fuer Schueler ${studentId} konnten nicht geladen werden. Verwende Fallback aus Auswahlliste. Grund: ${error?.message || error}`,
+      );
+    }
+    const masterData = normalizeSvwsStudentMasterData(masterDataResponse?.data);
+    const learningSection = normalizeSvwsStudentLearningSectionData(learningSectionResponse?.data);
+    const foerderschwerpunktId = firstDefinedValue(learningSection, ["foerderschwerpunkt1ID", "foerderschwerpunkt2ID"])
+      || firstDefinedValue(student, ["foerderschwerpunkt1ID", "foerderschwerpunkt2ID"]);
+    console.log(
+      `[Pool-Schild-Import] ${schoolLabel}: Kandidat ${index + 1}/${eligibleStudents.length} | ID ${studentId} | ${normalizeText(masterData?.nachname || student?.nachname)}, ${normalizeText(masterData?.vorname || student?.vorname)} | Foerder ${foerderschwerpunktId ? "1" : "0"} | ZD ${normalizeBoolean(learningSection?.hatZieldifferentenUnterricht ?? student?.zieldifferent) ? "1" : "0"}`,
+    );
+
+    return buildPoolImportRowFromData(
+      index + 1,
+      {
+        snr: school.snr,
+        schueler_id: normalizeText(masterData?.studentId || studentId),
+        vorname: normalizeText(masterData?.vorname || student?.vorname),
+        nachname: normalizeText(masterData?.nachname || student?.nachname),
+        geburtsdatum: normalizeDate(masterData?.geburtsdatum || student?.geburtsdatum),
+        strasse: "",
+        plz: "",
+        ort: "",
+        foerderbedarf: foerderschwerpunktId ? "1" : "0",
+        zieldifferent: normalizeBoolean(
+          learningSection?.hatZieldifferentenUnterricht ?? student?.zieldifferent,
+        ) ? "1" : "0",
+        klassenart: normalizeText(learningSection?.klassenart || student?.klassenart),
+        foerderschwerpunkt_id: normalizeText(foerderschwerpunktId),
+      },
+      new Map([[school.snr, school]]),
+    );
+  }, 8);
+}
+
 async function writeImportProtocol(pool, payload) {
   const columns = await loadTableColumns(pool, "anm_abgleich_protokoll");
   if (!columns.size) return;
@@ -2109,6 +2257,166 @@ function createImporteController({ getPool }) {
       }
     },
 
+    importJg4ausSchild: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        console.log(`[Pool-Schild-Import] Starte Import fuer Verfahren ${verfahrenId}, Runde ${rundeId}`);
+        const pool = getPool();
+        const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, "Quellschulen");
+        console.log(`[Pool-Schild-Import] ${schoolBySnr.size} Quellschulen fuer das Verfahren gefunden`);
+        const resultBySchool = [];
+        let totalRowsRead = 0;
+        let totalImportedStudents = 0;
+        let totalUpdatedStudents = 0;
+        let totalSkippedRows = 0;
+        let totalErrorRows = 0;
+
+        for (const school of schoolBySnr.values()) {
+          console.log(`[Pool-Schild-Import] Verarbeite Schule ${school.name || "-"} (${school.snr}) | aktiv=${school.active ? "ja" : "nein"}`);
+          if (!school.active) {
+            resultBySchool.push({
+              snr: school.snr,
+              imported_students: 0,
+              updated_students: 0,
+              created_open_cases: 0,
+              skipped_rows: 0,
+              error_rows: 0,
+              rows_read: 0,
+              skipped: true,
+              message: "Schule ist inaktiv.",
+            });
+            continue;
+          }
+
+          try {
+            const rows = await fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId);
+            const rowsRead = Number(rows.length || 0);
+            const validRows = rows.filter((row) => row?.valid);
+            const invalidRows = rows.filter((row) => !row?.valid);
+            console.log(`[Pool-Schild-Import] ${school.snr}: ${rowsRead} Zeilen gelesen | ${validRows.length} gueltig | ${invalidRows.length} ungueltig`);
+            totalRowsRead += rowsRead;
+
+            if (!rowsRead) {
+              console.log(`[Pool-Schild-Import] ${school.snr}: keine passenden Schueler gefunden`);
+              resultBySchool.push({
+                snr: school.snr,
+                imported_students: 0,
+                updated_students: 0,
+                created_open_cases: 0,
+                skipped_rows: 0,
+                error_rows: 0,
+                rows_read: 0,
+                skipped: false,
+                message: "Keine Schueler mit Jahrgang 4 und Status 2 im aktuellen Abschnitt gefunden.",
+              });
+              continue;
+            }
+
+            if (!validRows.length) {
+              totalErrorRows += invalidRows.length;
+              console.log(`[Pool-Schild-Import] ${school.snr}: keine gueltigen Datensaetze fuer den Import`);
+              resultBySchool.push({
+                snr: school.snr,
+                imported_students: 0,
+                updated_students: 0,
+                created_open_cases: 0,
+                skipped_rows: 0,
+                error_rows: invalidRows.length,
+                rows_read: rowsRead,
+                skipped: false,
+                message: invalidRows[0]?.errors?.join(", ") || "Keine gueltigen Schild-Pooldaten gefunden.",
+              });
+              continue;
+            }
+
+            const connection = await pool.getConnection();
+            try {
+              await connection.beginTransaction();
+              let importedStudents = 0;
+              let updatedStudents = 0;
+
+              for (const row of validRows) {
+                console.log(
+                  `[Pool-Schild-Import] ${school.snr}: importiere Schueler ${row?.data?.schueler_id || "-"} | ${row?.data?.nachname || "-"}, ${row?.data?.vorname || "-"}`,
+                );
+                const studentResult = await upsertStudent(connection, {
+                  verfahren_id: verfahrenId,
+                  runde_id: rundeId,
+                  row: row.data,
+                });
+                if (studentResult.updated) {
+                  updatedStudents += 1;
+                  console.log(`[Pool-Schild-Import] ${school.snr}: Schueler ${row?.data?.schueler_id || "-"} aktualisiert`);
+                } else {
+                  importedStudents += 1;
+                  console.log(`[Pool-Schild-Import] ${school.snr}: Schueler ${row?.data?.schueler_id || "-"} neu angelegt`);
+                }
+              }
+
+              await connection.commit();
+              console.log(`[Pool-Schild-Import] ${school.snr}: Commit erfolgreich | neu=${importedStudents} | update=${updatedStudents}`);
+              totalImportedStudents += importedStudents;
+              totalUpdatedStudents += updatedStudents;
+              totalSkippedRows += invalidRows.length;
+              totalErrorRows += invalidRows.length;
+              resultBySchool.push({
+                snr: school.snr,
+                imported_students: importedStudents,
+                updated_students: updatedStudents,
+                created_open_cases: 0,
+                skipped_rows: invalidRows.length,
+                error_rows: invalidRows.length,
+                rows_read: rowsRead,
+                skipped: false,
+                message: "",
+              });
+            } catch (error) {
+              await connection.rollback().catch(() => {});
+              console.error(`[Pool-Schild-Import] ${school.snr}: Rollback wegen Fehler: ${error?.message || error}`);
+              throw error;
+            } finally {
+              connection.release();
+            }
+          } catch (error) {
+            console.error(`[Pool-Schild-Import] ${school.snr}: Fehler: ${error?.message || error}`);
+            resultBySchool.push({
+              snr: school.snr,
+              imported_students: 0,
+              updated_students: 0,
+              created_open_cases: 0,
+              skipped_rows: 0,
+              error_rows: 0,
+              rows_read: 0,
+              skipped: false,
+              message: error?.message || "Schild-Poolimport fehlgeschlagen.",
+            });
+          }
+        }
+
+        console.log(
+          `[Pool-Schild-Import] Fertig | gelesen=${totalRowsRead} | neu=${totalImportedStudents} | update=${totalUpdatedStudents} | skipped=${totalSkippedRows} | fehler=${totalErrorRows}`,
+        );
+        return res.status(201).json({
+          schools: resultBySchool,
+          total_summary: {
+            rows_read: totalRowsRead,
+            imported_students: totalImportedStudents,
+            updated_students: totalUpdatedStudents,
+            created_open_cases: 0,
+            skipped_rows: totalSkippedRows,
+            error_rows: totalErrorRows,
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Schild-Poolimport ist fehlgeschlagen.");
+      }
+    },
+
     anmeldungenSchulen: async (req, res) => {
       try {
         const verfahrenId = Number(req.query.verfahren_id || 0);
@@ -2401,7 +2709,7 @@ function createImporteController({ getPool }) {
       }
     },
 
-    anmeldungenImportSchild3: async (req, res) => {
+    importiereAnmeldungenAusSchild3: async (req, res) => {
       try {
         const verfahrenId = Number(req.body?.verfahren_id || 0);
         const rundeId = Number(req.body?.runde_id || 0);

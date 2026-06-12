@@ -47,6 +47,11 @@ export const importService = {
     return response.data;
   },
 
+  async importJg4ausSchild(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/pool/schild/jg4", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
   async getAnmeldungsSchulen(verfahrenId: number, rundeId?: number | null, token?: string) {
     const response = await apiClient.get("/api/importe/anmeldungen/schulen", {
       params: {
@@ -77,7 +82,7 @@ export const importService = {
     return response.data;
   },
 
-  async importAnmeldungenSchild3(payload: Record<string, unknown>, token?: string) {
+  async importiereAnmeldungenAusSchild3(payload: Record<string, unknown>, token?: string) {
     const response = await apiClient.post("/api/importe/anmeldungen/schild3", payload, buildAuthConfig(token));
     return response.data;
   },

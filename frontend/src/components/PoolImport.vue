@@ -276,6 +276,33 @@ async function startImport() {
   }
 }
 
+async function importJg4ausSchild() {
+  if (!props.verfahrenId || !props.rundeId) {
+    errorMessage.value = "Bitte zuerst ein Anmeldeverfahren und eine Runde auswaehlen.";
+    return;
+  }
+
+  try {
+    errorMessage.value = "";
+    successMessage.value = "";
+    summary.value = null;
+    loading.value = true;
+    resetPreview();
+    const response = await importService.importJg4ausSchild({
+      verfahren_id: props.verfahrenId,
+      runde_id: props.rundeId,
+    }, props.token);
+    summary.value = response?.total_summary || response;
+    successMessage.value = "Pooldaten aus Schild wurden importiert.";
+    await loadPoolSchueler();
+    await loadPoolStats();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Schild-Poolimport ist fehlgeschlagen.";
+  } finally {
+    loading.value = false;
+  }
+}
+
 watch(() => [props.verfahrenId, props.rundeId], () => {
   resetPreview();
   summary.value = null;
@@ -317,6 +344,9 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
         />
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openPicker">
           CSV hochladen
+        </button>
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="importJg4ausSchild">
+          Import Pooldaten aus Schild
         </button>
       </div>
     </div>
