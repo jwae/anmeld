@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
+import CsvImportOverlay from "./CsvImportOverlay.vue";
 
 type PoolSchuelerRow = {
   schueler_id: number;
@@ -49,15 +50,12 @@ const props = defineProps<{
   title?: string;
 }>();
 
-const fileInput = ref<HTMLInputElement | null>(null);
 const loading = ref(false);
-const previewToken = ref("");
-const fileName = ref("");
-const previewRows = ref<any[]>([]);
 const errorMessage = ref("");
 const successMessage = ref("");
 const summary = ref<any | null>(null);
 const isExpanded = ref(false);
+const showCsvImportOverlay = ref(false);
 const showSchildImportOverlay = ref(false);
 const showEditPoolOverlay = ref(false);
 const savingEditPool = ref(false);
@@ -107,10 +105,6 @@ const currentSchoolYearLabel = computed(() => (
 
 const currentSectionNo = computed(() => (
   currentSchoolYearSectionLabel.value.split(".")[1] || "-"
-));
-
-const selectedValidRows = computed(() => (
-  previewRows.value.filter((row) => !!row?.selected && !!row?.valid)
 ));
 
 const poolStatusOptions = computed(() => (
@@ -175,7 +169,8 @@ const duplicatePoolStudentIds = computed(() => {
 });
 
 const hasOpenOverlay = computed(() => (
-  showSchildImportOverlay.value
+  showCsvImportOverlay.value
+  || showSchildImportOverlay.value
   || showEditPoolOverlay.value
   || showDuplicateConflictsOverlay.value
 ));
@@ -203,25 +198,8 @@ const sortedPoolSchuelerRows = computed(() => {
   });
 });
 
-function openPicker() {
-  fileInput.value?.click();
-}
-
 function resetPreview() {
-  previewToken.value = "";
-  fileName.value = "";
-  previewRows.value = [];
-}
-
-function toggleAll() {
-  const shouldSelectAll = previewRows.value.some((row) => row?.valid && !row?.selected);
-  for (const row of previewRows.value) {
-    if (!row?.valid) {
-      row.selected = false;
-      continue;
-    }
-    row.selected = shouldSelectAll;
-  }
+  showCsvImportOverlay.value = false;
 }
 
 async function loadPoolStats() {
@@ -333,70 +311,25 @@ function poolSortMarker(key: PoolSortKey) {
   return poolSortDirection.value === "asc" ? " ▲" : " ▼";
 }
 
-async function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement | null;
-  const file = input?.files?.[0] || null;
-  if (!file) return;
-
-  try {
-    if (!props.verfahrenId || !props.rundeId) {
-      throw new Error("Bitte zuerst ein Anmeldeverfahren und eine Runde auswaehlen.");
-    }
-    if (!String(file.name || "").toLowerCase().endsWith(".csv")) {
-      throw new Error("Bitte eine CSV-Datei auswaehlen.");
-    }
-    errorMessage.value = "";
-    successMessage.value = "";
-    summary.value = null;
-    loading.value = true;
-    fileName.value = file.name;
-    const csvText = await file.text();
-    const response = await importService.previewPool({
-      csv_text: csvText,
-      verfahren_id: props.verfahrenId,
-      runde_id: props.rundeId,
-    }, props.token);
-    previewToken.value = String(response?.preview_token || "").trim();
-    previewRows.value = Array.isArray(response?.rows) ? response.rows : [];
-    if (!previewRows.value.length) {
-      throw new Error("Keine importierbaren Zeilen gefunden.");
-    }
-  } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Die CSV-Vorschau konnte nicht geladen werden.";
-    resetPreview();
-  } finally {
-    loading.value = false;
-    if (input) input.value = "";
-  }
+function openCsvImportOverlay() {
+  if (!props.verfahrenId || !props.rundeId || loading.value) return;
+  errorMessage.value = "";
+  successMessage.value = "";
+  showCsvImportOverlay.value = true;
 }
 
-async function startImport() {
-  if (!props.verfahrenId || !props.rundeId) {
-    errorMessage.value = "Bitte zuerst ein Anmeldeverfahren und eine Runde auswaehlen.";
-    return;
-  }
-
-  try {
-    errorMessage.value = "";
-    successMessage.value = "";
-    summary.value = null;
-    loading.value = true;
-    const response = await importService.importPool({
-      verfahren_id: props.verfahrenId,
-      runde_id: props.rundeId,
-      preview_token: previewToken.value,
-      selected_row_numbers: selectedValidRows.value.map((row) => Number(row?.row_number || 0)),
-    }, props.token);
-    summary.value = response;
-    successMessage.value = "Schuelerpool-Import erfolgreich abgeschlossen.";
-    resetPreview();
-    await loadPoolSchueler();
-    await loadPoolStats();
-  } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Der Schuelerpool-Import ist fehlgeschlagen.";
-  } finally {
-    loading.value = false;
-  }
+async function handleCsvImportSuccess(result: any) {
+  summary.value = {
+    rows_read: Number(result?.inserted || 0) + Number(result?.updated || 0) + Number(result?.skipped || 0),
+    imported_students: Number(result?.inserted || 0),
+    updated_students: Number(result?.updated || 0),
+    created_open_cases: 0,
+    skipped_rows: Number(result?.skipped || 0),
+    error_rows: Number(result?.errors || 0),
+  };
+  successMessage.value = "Schuelerpool-Import erfolgreich abgeschlossen.";
+  await loadPoolSchueler();
+  await loadPoolStats();
 }
 
 async function importJg4ausSchild() {
@@ -584,14 +517,7 @@ onUnmounted(() => {
         </p>
       </div>
       <div class="import-head-actions">
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".csv,text/csv"
-          class="hidden-input"
-          @change="handleFileChange"
-        />
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openPicker">
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
           CSV hochladen
         </button>
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
@@ -621,70 +547,6 @@ onUnmounted(() => {
       <div v-if="summary.le_count !== undefined"><strong>LE:</strong> {{ summary.le_count }}</div>
       <div v-if="summary.zd_count !== undefined"><strong>ZD:</strong> {{ summary.zd_count }}</div>
       <div v-if="summary.ef_count !== undefined"><strong>EF:</strong> {{ summary.ef_count }}</div>
-    </div>
-
-    <div v-if="previewRows.length" class="import-preview">
-      <div class="import-preview-head">
-        <div>
-          <strong>Vorschau</strong>
-          <span>{{ fileName }}</span>
-        </div>
-        <div class="import-head-actions">
-          <button class="btn-secondary" type="button" :disabled="loading" @click="toggleAll">Auswahl umschalten</button>
-          <button class="btn-primary" type="button" :disabled="loading || !selectedValidRows.length || !verfahrenId || !rundeId" @click="startImport">
-            {{ loading ? "Importiere..." : "Import starten" }}
-          </button>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table class="import-table">
-          <thead>
-            <tr>
-              <th>Import</th>
-              <th>Zeile</th>
-              <th>Status</th>
-              <th>Fehler</th>
-              <th>SNR</th>
-              <th>S-ID</th>
-              <th>Vorname</th>
-              <th>Nachname</th>
-              <th>Geburtsdatum</th>
-              <th>Strasse</th>
-              <th>PLZ</th>
-              <th>Ort</th>
-              <th>LE</th>
-              <th>ZD</th>
-              <th>Empf.</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in previewRows" :key="`pool-preview-${row.row_number}`" :class="{ 'is-invalid': !row.valid }">
-              <td><input v-model="row.selected" type="checkbox" :disabled="loading || !row.valid" /></td>
-              <td>{{ index + 1 }}</td>
-              <td>
-                <span v-if="!row.valid" class="badge badge-danger">Fehler</span>
-                <span v-else-if="row.import_status === 'NEU'" class="badge badge-success">Neu</span>
-                <span v-else-if="row.import_status === 'UPDATE'" class="badge badge-warning">Update</span>
-                <span v-else-if="row.import_status === 'VORHANDEN'" class="badge badge-info">Vorhanden</span>
-                <span v-else class="badge badge-success">Gueltig</span>
-              </td>
-              <td>{{ Array.isArray(row.errors) && row.errors.length ? row.errors.join(", ") : "-" }}</td>
-              <td>{{ row.data?.snr || "-" }}</td>
-              <td>{{ row.data?.schueler_id || "-" }}</td>
-              <td>{{ row.data?.vorname || "-" }}</td>
-              <td>{{ row.data?.nachname || "-" }}</td>
-              <td>{{ row.data?.geburtsdatum || "-" }}</td>
-              <td>{{ truncateText(row.data?.strasse) }}</td>
-              <td>{{ row.data?.plz || "-" }}</td>
-              <td>{{ truncateText(row.data?.ort) }}</td>
-              <td>{{ row.data?.foerderbedarf || "-" }}</td>
-              <td>{{ row.data?.zieldifferent || "-" }}</td>
-              <td>{{ row.data?.empfehlung || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
 
     <div class="import-preview">
@@ -834,6 +696,17 @@ onUnmounted(() => {
       </div>
     </div>
     </div>
+
+    <CsvImportOverlay
+      :open="showCsvImportOverlay"
+      :token="token"
+      :verfahren-id="verfahrenId"
+      :runde-id="rundeId"
+      :title="title || 'Schuelerpool importieren (CSV, EWO-Datei)'"
+      import-art="pool"
+      @close="showCsvImportOverlay = false"
+      @success="handleCsvImportSuccess"
+    />
 
     <div
       v-if="showSchildImportOverlay"

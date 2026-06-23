@@ -61,6 +61,42 @@ export const importService = {
     return response.data;
   },
 
+  async getAnmSchuelerImportSchema(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.get("/api/importe/anm-schueler/schema", {
+      params: payload,
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async validateAnmSchuelerImport(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anm-schueler/validate", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async executeAnmSchuelerImport(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anm-schueler/execute", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async getAnmSchuelerAnmeldungenSchema(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.get("/api/importe/anm-schueler/anmeldungen/schema", {
+      params: payload,
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async validateAnmSchuelerAnmeldungen(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anm-schueler/anmeldungen/validate", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async executeAnmSchuelerAnmeldungen(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anm-schueler/anmeldungen/execute", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
   async getAnmeldungsSchulen(verfahrenId: number, rundeId?: number | null, token?: string) {
     const response = await apiClient.get("/api/importe/anmeldungen/schulen", {
       params: {

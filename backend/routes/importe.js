@@ -13,6 +13,12 @@ function createImporteRouter({ authenticateToken, requireAdmin, getPool }) {
   router.post("/pool/vorschau", controller.poolPreview);
   router.post("/pool", controller.poolImport);
   router.post("/pool/schild/jg4", controller.importJg4ausSchild);
+  router.get("/anm-schueler/schema", controller.anmSchuelerImportSchema);
+  router.post("/anm-schueler/validate", controller.anmSchuelerImportValidate);
+  router.post("/anm-schueler/execute", controller.anmSchuelerImportExecute);
+  router.get("/anm-schueler/anmeldungen/schema", controller.anmSchuelerAnmeldungenSchema);
+  router.post("/anm-schueler/anmeldungen/validate", controller.anmSchuelerAnmeldungenValidate);
+  router.post("/anm-schueler/anmeldungen/execute", controller.anmSchuelerAnmeldungenExecute);
   router.delete("/schueler/alle", controller.clearSchuelerDaten);
 
   router.get("/anmeldungen/schulen", controller.anmeldungenSchulen);

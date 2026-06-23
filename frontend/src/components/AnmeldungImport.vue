@@ -1,6 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import importService from "../services/importService";
+import AnmeldungenImportOverlay from "./AnmeldungenImportOverlay.vue";
+
+type SchoolRow = {
+  snr: string;
+  name: string;
+  kapazitaet?: number;
+  neuaufnahme?: number;
+  warteliste?: number;
+  freie_plaetze?: number;
+};
 
 const props = defineProps<{
   token?: string;
@@ -8,42 +18,14 @@ const props = defineProps<{
   rundeId: number | null;
 }>();
 
-const fileInput = ref<HTMLInputElement | null>(null);
-const schools = ref<any[]>([]);
-const previewRows = ref<any[]>([]);
-const previewToken = ref("");
-const fileName = ref("");
+const schools = ref<SchoolRow[]>([]);
 const loadingSchools = ref(false);
-const loadingPreview = ref(false);
 const importing = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 const importSummary = ref<any | null>(null);
 const isExpanded = ref(false);
-
-const groupedPreviewCountBySchool = computed(() => {
-  const counts = new Map();
-  for (const row of previewRows.value) {
-    const snr = String(row?.data?.snr || "").trim();
-    if (!snr) continue;
-    counts.set(snr, Number(counts.get(snr) || 0) + 1);
-  }
-  return counts;
-});
-
-const groupedImportableCountBySchool = computed(() => {
-  const counts = new Map();
-  for (const row of previewRows.value) {
-    const snr = String(row?.data?.snr || "").trim();
-    if (!snr || !row?.valid || !row?.selected) continue;
-    counts.set(snr, Number(counts.get(snr) || 0) + 1);
-  }
-  return counts;
-});
-
-const selectedValidRows = computed(() => (
-  previewRows.value.filter((row) => !!row?.selected && !!row?.valid)
-));
+const showCsvImportOverlay = ref(false);
 
 async function loadSchools() {
   if (!props.verfahrenId) {
@@ -68,8 +50,11 @@ async function toggleExpanded() {
   await loadSchools();
 }
 
-function openPicker() {
-  fileInput.value?.click();
+function openCsvImportOverlay() {
+  if (!props.verfahrenId || !props.rundeId || importing.value) return;
+  errorMessage.value = "";
+  successMessage.value = "";
+  showCsvImportOverlay.value = true;
 }
 
 async function importiereAnmeldungenAusSchild3() {
@@ -83,7 +68,6 @@ async function importiereAnmeldungenAusSchild3() {
     errorMessage.value = "";
     successMessage.value = "";
     importSummary.value = null;
-    resetPreview();
     const response = await importService.importiereAnmeldungenAusSchild3({
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
@@ -98,133 +82,29 @@ async function importiereAnmeldungenAusSchild3() {
   }
 }
 
-function resetPreview() {
-  previewRows.value = [];
-  previewToken.value = "";
-  fileName.value = "";
+async function handleWizardSuccess(result: any) {
+  importSummary.value = {
+    total_summary: {
+      imported_rows: Number(result?.inserted || 0),
+      updated_rows: Number(result?.updated || 0),
+      skipped_rows: Number(result?.skipped || 0),
+      error_rows: Number(result?.errors || 0),
+      pool_anmeldung: Number(result?.pool_anmeldung || 0),
+      nur_anmeldung: Number(result?.nur_anmeldung || 0),
+      rows_read: Number(result?.inserted || 0) + Number(result?.updated || 0) + Number(result?.skipped || 0),
+    },
+  };
+  successMessage.value = "Anmeldungsimport erfolgreich abgeschlossen.";
+  await loadSchools();
 }
 
-function toggleAll() {
-  const shouldSelectAll = previewRows.value.some((row) => row?.valid && !row?.selected);
-  for (const row of previewRows.value) {
-    if (!row?.valid) {
-      row.selected = false;
-      continue;
-    }
-    row.selected = shouldSelectAll;
-  }
-}
-
-async function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement | null;
-  const file = input?.files?.[0] || null;
-  if (!file || !props.verfahrenId || !props.rundeId) return;
-
-  try {
-    if (!String(file.name || "").toLowerCase().endsWith(".csv")) {
-      throw new Error("Bitte eine CSV-Datei auswaehlen.");
-    }
-    errorMessage.value = "";
-    successMessage.value = "";
-    importSummary.value = null;
-    loadingPreview.value = true;
-    fileName.value = file.name;
-    const csvText = await file.text();
-    const response = await importService.previewAnmeldungen({
-      verfahren_id: props.verfahrenId,
-      runde_id: props.rundeId,
-      csv_text: csvText,
-    }, props.token);
-    previewToken.value = String(response?.preview_token || "").trim();
-    previewRows.value = Array.isArray(response?.rows) ? response.rows : [];
-    if (!previewRows.value.length) {
-      throw new Error("Keine importierbaren Zeilen gefunden.");
-    }
-  } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Die CSV-Vorschau konnte nicht geladen werden.";
-    resetPreview();
-  } finally {
-    loadingPreview.value = false;
-    if (input) input.value = "";
-  }
-}
-
-async function importSchool(snr: string) {
-  if (!props.verfahrenId || !props.rundeId) {
-    errorMessage.value = "Bitte zuerst Verfahren und Runde auswaehlen.";
-    return;
-  }
-
-  try {
-    importing.value = true;
-    errorMessage.value = "";
-    successMessage.value = "";
-    const selectedRows = previewRows.value
-      .filter((row) => !!row?.selected && !!row?.valid && String(row?.data?.snr || "").trim() === snr)
-      .map((row) => Number(row?.row_number || 0));
-    const response = await importService.importAnmeldungenSchool(snr, {
-      verfahren_id: props.verfahrenId,
-      runde_id: props.rundeId,
-      preview_token: previewToken.value,
-      selected_row_numbers: selectedRows,
-    }, props.token);
-    importSummary.value = { type: "school", rows: [response] };
-    successMessage.value = `Anmeldungen fuer Schule ${snr} wurden importiert.`;
-    await loadSchools();
-    previewRows.value = previewRows.value.filter((row) => String(row?.data?.snr || "").trim() !== snr);
-    if (!previewRows.value.length) {
-      previewToken.value = "";
-      fileName.value = "";
-    }
-  } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Der Import fuer die Schule ist fehlgeschlagen.";
-  } finally {
-    importing.value = false;
-  }
-}
-
-async function importAll() {
-  if (!props.verfahrenId || !props.rundeId) {
-    errorMessage.value = "Bitte zuerst Verfahren und Runde auswaehlen.";
-    return;
-  }
-
-  try {
-    importing.value = true;
-    errorMessage.value = "";
-    successMessage.value = "";
-    const response = await importService.importAnmeldungenAlle({
-      verfahren_id: props.verfahrenId,
-      runde_id: props.rundeId,
-      preview_token: previewToken.value,
-      selected_row_numbers: selectedValidRows.value.map((row) => Number(row?.row_number || 0)),
-    }, props.token);
-    importSummary.value = response;
-    successMessage.value = "Anmeldungsimport fuer alle Schulen abgeschlossen.";
-    resetPreview();
-    await loadSchools();
-  } catch (error: any) {
-    errorMessage.value = error?.response?.data?.error || error?.message || "Der Gesamtimport ist fehlgeschlagen.";
-  } finally {
-    importing.value = false;
-  }
-}
-
-watch(() => props.verfahrenId, () => {
-  resetPreview();
+watch(() => [props.verfahrenId, props.rundeId], () => {
   importSummary.value = null;
   successMessage.value = "";
   errorMessage.value = "";
+  showCsvImportOverlay.value = false;
   loadSchools();
 }, { immediate: true });
-
-watch(() => props.rundeId, () => {
-  resetPreview();
-  importSummary.value = null;
-  successMessage.value = "";
-  errorMessage.value = "";
-  loadSchools();
-});
 
 onMounted(() => {
   loadSchools();
@@ -246,186 +126,78 @@ onMounted(() => {
           </button>
           Schulanmeldungen importieren (CSV, Schild3)
         </h3>
-        <p>CSV-Datei fuer die aktuelle Runde pruefen, mit dem Pool abgleichen und pro Schule oder gesammelt importieren.</p>
+        <p>CSV-Datei fuer die aktuelle Runde pruefen, Statuswerte zuordnen und gueltige Anmeldungen in anm_schueler uebernehmen.</p>
       </div>
       <div class="import-head-actions">
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".csv,text/csv"
-          class="hidden-input"
-          @change="handleFileChange"
-        />
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loadingPreview || importing" @click="openPicker">
+        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
           CSV hochladen
         </button>
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3
         </button>
-        <button class="btn-primary" type="button" :disabled="!selectedValidRows.length || importing" @click="importAll">
-          {{ importing ? "Importiere..." : "Anmeldungen importieren" }}
-        </button>
       </div>
     </div>
 
     <div v-show="isExpanded" class="section-panel">
-    <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
-    </div>
-
-    <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-      <p class="feedback-title">Erfolg</p>
-      <p>{{ successMessage }}</p>
-    </div>
-
-    <div class="school-strip">
-      <div v-if="loadingSchools" class="anm-loading-state">Schulen werden geladen...</div>
-      <div v-else-if="!schools.length" class="anm-empty-state">Keine Schulen fuer das aktuelle Verfahren vorhanden.</div>
-      <div v-else class="table-wrap school-table-wrap">
-        <table class="import-table school-table">
-          <thead>
-            <tr>
-              <th>SNr</th>
-              <th>Schulname</th>
-              <th>Kapazitaet</th>
-              <th>Neuaufnahme</th>
-              <th>Warteliste</th>
-              <th>Freie Plaetze</th>
-              <th>Aktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="school in schools" :key="school.snr">
-              <td class="school-snr-cell">{{ school.snr }}</td>
-              <td>
-                <strong :title="String(school.name || '').trim()">{{ school.name }}</strong>
-              </td>
-              <td>{{ Number(school.kapazitaet || 0) }}</td>
-              <td>{{ Number(school.neuaufnahme || 0) }}</td>
-              <td>{{ Number(school.warteliste || 0) }}</td>
-              <td :class="{ 'is-negative': Number(school.freie_plaetze || 0) < 0 }">
-                {{ Number(school.freie_plaetze || 0) }}
-              </td>
-              <td>
-                <button
-                  class="btn-secondary"
-                  type="button"
-                  :disabled="importing || !(groupedImportableCountBySchool.get(school.snr) || 0)"
-                  @click="importSchool(school.snr)"
-                >
-                  Schule importieren
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
+        <p class="feedback-title">Fehler</p>
+        <p>{{ errorMessage }}</p>
       </div>
-    </div>
 
-    <div v-if="importSummary" class="import-summary">
-      <template v-if="Array.isArray(importSummary.schools)">
-        <div><strong>Gelesen:</strong> {{ importSummary.total_summary?.rows_read || previewRows.length || 0 }}</div>
+      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
+        <p class="feedback-title">Erfolg</p>
+        <p>{{ successMessage }}</p>
+      </div>
+
+      <div class="school-strip">
+        <div v-if="loadingSchools" class="anm-loading-state">Schulen werden geladen...</div>
+        <div v-else-if="!schools.length" class="anm-empty-state">Keine Schulen fuer das aktuelle Verfahren vorhanden.</div>
+        <div v-else class="table-wrap school-table-wrap">
+          <table class="import-table school-table">
+            <thead>
+              <tr>
+                <th>SNr</th>
+                <th>Schulname</th>
+                <th>Kapazitaet</th>
+                <th>Neuaufnahme</th>
+                <th>Warteliste</th>
+                <th>Freie Plaetze</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="school in schools" :key="school.snr">
+                <td class="school-snr-cell">{{ school.snr }}</td>
+                <td><strong :title="String(school.name || '').trim()">{{ school.name }}</strong></td>
+                <td>{{ Number(school.kapazitaet || 0) }}</td>
+                <td>{{ Number(school.neuaufnahme || 0) }}</td>
+                <td>{{ Number(school.warteliste || 0) }}</td>
+                <td :class="{ 'is-negative': Number(school.freie_plaetze || 0) < 0 }">{{ Number(school.freie_plaetze || 0) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div v-if="importSummary?.total_summary" class="import-summary">
+        <div><strong>Gelesen:</strong> {{ importSummary.total_summary?.rows_read || 0 }}</div>
         <div><strong>Importiert:</strong> {{ importSummary.total_summary?.imported_rows || 0 }}</div>
         <div><strong>Aktualisiert:</strong> {{ importSummary.total_summary?.updated_rows || 0 }}</div>
-        <div><strong>Neue Schueler:</strong> {{ importSummary.total_summary?.created_students || 0 }}</div>
-        <div><strong>Offene Faelle:</strong> {{ importSummary.total_summary?.created_open_cases || 0 }}</div>
         <div><strong>Uebersprungen:</strong> {{ importSummary.total_summary?.skipped_rows || 0 }}</div>
         <div><strong>Fehler:</strong> {{ importSummary.total_summary?.error_rows || 0 }}</div>
-      </template>
-      <template v-else-if="Array.isArray(importSummary.rows)">
-        <div><strong>Gelesen:</strong> {{ importSummary.rows[0]?.rows_read || 0 }}</div>
-        <div><strong>Importiert:</strong> {{ importSummary.rows[0]?.imported_rows || 0 }}</div>
-        <div><strong>Aktualisiert:</strong> {{ importSummary.rows[0]?.updated_rows || 0 }}</div>
-        <div><strong>Neue Schueler:</strong> {{ importSummary.rows[0]?.created_students || 0 }}</div>
-        <div><strong>Offene Faelle:</strong> {{ importSummary.rows[0]?.created_open_cases || 0 }}</div>
-        <div><strong>Uebersprungen:</strong> {{ importSummary.rows[0]?.skipped_rows || 0 }}</div>
-        <div><strong>Fehler:</strong> {{ importSummary.rows[0]?.error_rows || 0 }}</div>
-      </template>
-    </div>
-
-    <div v-if="Array.isArray(importSummary?.schools) && importSummary.schools.length" class="table-wrap">
-      <table class="import-table import-result-table">
-        <thead>
-          <tr>
-            <th>SNR</th>
-            <th>Gelesen</th>
-            <th>Importiert</th>
-            <th>Aktualisiert</th>
-            <th>Neue Schueler</th>
-            <th>Offene Faelle</th>
-            <th>Uebersprungen</th>
-            <th>Fehler</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in importSummary.schools" :key="`summary-${row.snr}`">
-            <td>{{ row.snr }}</td>
-            <td>{{ row.rows_read || 0 }}</td>
-            <td>{{ row.imported_rows || 0 }}</td>
-            <td>{{ row.updated_rows || 0 }}</td>
-            <td>{{ row.created_students || 0 }}</td>
-            <td>{{ row.created_open_cases || 0 }}</td>
-            <td>{{ row.skipped_rows || 0 }}</td>
-            <td>{{ row.error_rows || 0 }}</td>
-            <td>{{ row.message || (row.skipped ? "Uebersprungen" : "OK") }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="previewRows.length" class="import-preview">
-      <div class="import-preview-head">
-        <div>
-          <strong>Vorschau</strong>
-          <span>{{ fileName }}</span>
-        </div>
-        <button class="btn-secondary" type="button" :disabled="importing" @click="toggleAll">Auswahl umschalten</button>
-      </div>
-
-      <div class="table-wrap">
-        <table class="import-table">
-          <thead>
-            <tr>
-              <th>Import</th>
-              <th>Zeile</th>
-              <th>Status</th>
-              <th>Fehler</th>
-              <th>Schul-Nr</th>
-              <th>Schule</th>
-              <th>Schueler-ID</th>
-              <th>Vorname</th>
-              <th>Nachname</th>
-              <th>Geburtsdatum</th>
-              <th>Foerderbedarf</th>
-              <th>Zieldifferent</th>
-              <th>Anmeldestatus</th>
-              <th>Importaktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in previewRows" :key="`anmeldung-preview-${row.row_number}`" :class="{ 'is-invalid': !row.valid }">
-              <td><input v-model="row.selected" type="checkbox" :disabled="importing || !row.valid" /></td>
-              <td>{{ row.row_number }}</td>
-              <td>{{ row.valid ? "Gueltig" : "Fehler" }}</td>
-              <td>{{ Array.isArray(row.errors) && row.errors.length ? row.errors.join(", ") : "-" }}</td>
-              <td>{{ row.data?.snr || "-" }}</td>
-              <td>{{ row.school_name || "-" }}</td>
-              <td>{{ row.data?.schueler_schul_id || "-" }}</td>
-              <td>{{ row.data?.vorname || "-" }}</td>
-              <td>{{ row.data?.nachname || "-" }}</td>
-              <td>{{ row.data?.geburtsdatum || "-" }}</td>
-              <td>{{ row.data?.foerderbedarf || "-" }}</td>
-              <td>{{ row.data?.zieldifferent || "-" }}</td>
-              <td>{{ row.data?.anmeldestatus_code || "-" }}</td>
-              <td>{{ row.match?.match_hinweis || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div><strong>Pool + Anmeldung:</strong> {{ importSummary.total_summary?.pool_anmeldung || 0 }}</div>
+        <div><strong>Nur Anmeldung:</strong> {{ importSummary.total_summary?.nur_anmeldung || 0 }}</div>
       </div>
     </div>
-    </div>
+
+    <AnmeldungenImportOverlay
+      :open="showCsvImportOverlay"
+      :token="token"
+      :verfahren-id="verfahrenId"
+      :runde-id="rundeId"
+      :schools="schools.map((school) => ({ snr: school.snr, name: school.name }))"
+      @close="showCsvImportOverlay = false"
+      @success="handleWizardSuccess"
+    />
   </section>
 </template>
 
@@ -442,8 +214,7 @@ onMounted(() => {
   gap: 16px;
 }
 
-.import-card-head,
-.import-preview-head {
+.import-card-head {
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -503,30 +274,17 @@ onMounted(() => {
   line-height: 1.55;
 }
 
-.hidden-input {
-  display: none;
-}
-
 .import-head-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.btn-primary,
 .btn-secondary {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
   border: 0;
-}
-
-.btn-primary {
-  background: linear-gradient(180deg, #1f72d8 0%, #1459a8 100%);
-  color: #ffffff;
-}
-
-.btn-secondary {
   background: #eef4fd;
   color: #17385f;
 }
@@ -545,21 +303,6 @@ onMounted(() => {
   color: #19365b;
 }
 
-.import-preview {
-  display: grid;
-  gap: 12px;
-}
-
-.import-preview-head strong,
-.import-preview-head span {
-  display: block;
-}
-
-.import-preview-head span {
-  margin-top: 4px;
-  color: #5d7390;
-}
-
 .table-wrap {
   overflow-x: auto;
   max-height: 640px;
@@ -569,9 +312,13 @@ onMounted(() => {
   background: #ffffff;
 }
 
+.school-table-wrap {
+  max-height: none;
+}
+
 .import-table {
   width: 100%;
-  min-width: 1400px;
+  min-width: 860px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -581,24 +328,6 @@ onMounted(() => {
   top: 0;
   background: #f8fbff;
   z-index: 1;
-}
-
-.import-result-table {
-  min-width: 640px;
-}
-
-.school-table-wrap {
-  max-height: none;
-}
-
-.school-table {
-  min-width: 860px;
-}
-
-.school-table .school-snr-cell {
-  white-space: nowrap;
-  color: #5d7390;
-  font-size: 13px;
 }
 
 .import-table th,
@@ -620,18 +349,42 @@ onMounted(() => {
   line-height: 1.15;
 }
 
+.school-snr-cell {
+  white-space: nowrap;
+  color: #5d7390;
+  font-size: 13px;
+}
+
 .import-table td.is-negative {
   color: #b42318;
   font-weight: 700;
 }
 
-.import-table tr.is-invalid {
+.feedback-panel {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.feedback-panel-error {
+  border: 1px solid #fca5a5;
   background: #fff5f5;
+  color: #991b1b;
+}
+
+.feedback-panel-success {
+  border: 1px solid #a7f3d0;
+  background: #f0fdf4;
+  color: #065f46;
+}
+
+.feedback-title {
+  font-weight: 700;
+  margin: 0 0 4px;
 }
 
 @media (max-width: 900px) {
-  .import-card-head,
-  .import-preview-head {
+  .import-card-head {
     flex-direction: column;
   }
 }

@@ -5,6 +5,8 @@ const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
 const anmeldungsPreviewSessions = new Map();
+const anmSchuelerImportSessions = new Map();
+const anmSchuelerAnmeldungenImportSessions = new Map();
 const tableColumnCache = new Map();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
 let svwsConnectionModulePromise = null;
@@ -196,6 +198,722 @@ function getPreview(store, token) {
     return null;
   }
   return preview;
+}
+
+function getPoolImportFieldDefinitions(schuelerColumns) {
+  const fields = [
+    {
+      key: "source_school_snr",
+      label: "Quell-SNR / Schulnummer",
+      description: "Schule, aus der der Pooldatensatz stammt.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "schueler_id",
+      label: "Import-ID",
+      description: "Wird in schueler_id und quell_schueler_nr geschrieben.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "quell_schueler_nr",
+      label: "Quell-Schueler-Nr",
+      description: "Wird automatisch aus der Import-ID uebernommen.",
+      required: true,
+      warning: false,
+      readOnly: true,
+      systemValue: "Automatisch aus Import-ID",
+    },
+    {
+      key: "vorname",
+      label: "Vorname",
+      description: "Pflichtfeld aus der CSV.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "nachname",
+      label: "Nachname",
+      description: "Pflichtfeld aus der CSV.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "geburtsdatum",
+      label: "Geburtsdatum",
+      description: "Pflichtfeld aus der CSV.",
+      required: true,
+      warning: false,
+    },
+  ];
+
+  const optionalFields = [
+    ["strasse", "Strasse", "Adresse des Kindes."],
+    ["plz", "PLZ", "Postleitzahl."],
+    ["ort", "Ort", "Wohnort."],
+    ["foerderbedarf", "LE", "Foerderbedarf als 0/1, Ja/Nein."],
+    ["zieldifferent", "ZD", "Zieldifferent als 0/1, Ja/Nein."],
+    ["ef", "EF", "EF als 0/1, Ja/Nein."],
+    ["empfehlung", "Empfehlung", "Empfehlungscode aus dem Katalog."],
+    ["teilnahmestatus", "Teilnahmestatus", "Aktiv, Wegzug, Abgemeldet oder Verstorben."],
+    ["quell_jahrgang", "Quell-Jahrgang", "Jahrgang an der Herkunftsschule."],
+    ["bemerkung", "Bemerkung", "Freie Notiz zum Datensatz."],
+  ];
+
+  for (const [key, label, description] of optionalFields) {
+    if (!schuelerColumns.has(key)) continue;
+    fields.push({
+      key,
+      label,
+      description,
+      required: false,
+      warning: false,
+    });
+  }
+
+  return fields;
+}
+
+function getAnmeldungenImportFieldDefinitions(schuelerColumns) {
+  const fields = [
+    {
+      key: "schueler_id",
+      label: "Import-ID",
+      description: "Wird in schueler_id und quell_schueler_nr geschrieben.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "quell_schueler_nr",
+      label: "Quell-Schueler-Nr",
+      description: "Wird automatisch aus der Import-ID uebernommen.",
+      required: true,
+      warning: false,
+      readOnly: true,
+      systemValue: "Automatisch aus Import-ID",
+    },
+    {
+      key: "schul_nr",
+      label: "Aufnahmeschule",
+      description: "Aus CSV oder globaler Auswahl.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "anmeldestatus",
+      label: "Status aus CSV",
+      description: "Wird spaeter auf die Datenbankwerte gemappt.",
+      required: true,
+      warning: false,
+    },
+    {
+      key: "vorname",
+      label: "Vorname",
+      description: "Optionales Zusatzfeld.",
+      required: false,
+      warning: false,
+    },
+    {
+      key: "nachname",
+      label: "Nachname",
+      description: "Optionales Zusatzfeld.",
+      required: false,
+      warning: false,
+    },
+    {
+      key: "geburtsdatum",
+      label: "Geburtsdatum",
+      description: "Optionales Zusatzfeld.",
+      required: false,
+      warning: false,
+    },
+  ];
+
+  const optionalFields = [
+    ["empfehlung", "Empfehlung", "Empfehlungscode aus dem Katalog."],
+    ["foerderbedarf", "Foerderbedarf", "0/1, Ja/Nein."],
+    ["foerder_id", "Foerder-ID", "Kennung des Foerderbedarfs."],
+    ["zieldifferent", "Zieldifferent", "0/1, Ja/Nein."],
+    ["bemerkung", "Bemerkung", "Freie Notiz."],
+    ["strasse", "Strasse", "Adresse."],
+    ["plz", "PLZ", "Postleitzahl."],
+    ["ort", "Ort", "Wohnort."],
+  ];
+  for (const [key, label, description] of optionalFields) {
+    if (!schuelerColumns.has(key) && !["foerder_id"].includes(key)) continue;
+    fields.push({
+      key,
+      label,
+      description,
+      required: false,
+      warning: false,
+    });
+  }
+  return fields;
+}
+
+function getAnmeldestatusTargetValues() {
+  return ["Neuaufnahme", "Warteliste", "Zugeordnet", "Abgelehnt", "Ohne"];
+}
+
+function isEmptyImportValue(value) {
+  return normalizeText(value) === "";
+}
+
+function isValidImportBoolean(value) {
+  const text = normalizeTextLower(value);
+  return !text || ["1", "0", "true", "false", "ja", "nein", "yes", "no", "y", "n"].includes(text);
+}
+
+function isValidIsoDate(value) {
+  const text = normalizeText(value);
+  if (!text) return true;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return true;
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) return true;
+  return false;
+}
+
+function buildPoolImportSummary(rows) {
+  const totalRows = Number(rows.length || 0);
+  const selectedRows = rows.filter((row) => row.selected && row.status !== "fehler").length;
+  const skippedRows = rows.filter((row) => row.status !== "fehler" && !row.selected).length;
+  const errorRows = rows.filter((row) => row.status === "fehler").length;
+  const newRows = rows.filter((row) => row.selected && row.status !== "fehler" && row.import_action === "NEU").length;
+  const updateRows = rows.filter((row) => row.selected && row.status !== "fehler" && row.import_action === "UPDATE").length;
+  return {
+    Gesamtzeilen: totalRows,
+    Ausgewaehlt: selectedRows,
+    Uebersprungen: skippedRows,
+    Fehlerzeilen: errorRows,
+    Neue_Datensaetze: newRows,
+    Zu_aktualisieren: updateRows,
+  };
+}
+
+async function validatePoolImportRows(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const csvRows = Array.isArray(payload?.csv_rows) ? payload.csv_rows : [];
+  const mapping = payload?.mapping || {};
+  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+  const mappedFields = new Set(
+    Object.entries(mapping)
+      .filter(([, value]) => normalizeText(value))
+      .map(([key]) => key),
+  );
+  const verfahrenstyp = await loadProcedureType(pool, verfahrenId);
+  const schoolRole = verfahrenstyp === "SEK1" ? "Quellschulen" : "Zielschulen";
+  const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, schoolRole);
+  const empfehlungByCode = schuelerColumns.has("empfehlung")
+    ? await loadCatalogByCode(pool, "anm_kat_empfehlung")
+    : new Map();
+
+  const ids = csvRows
+    .map((row) => normalizeText(row?.record?.[mapping.schueler_id] || ""))
+    .filter(Boolean);
+  const [existingRows] = ids.length
+    ? await pool.query(
+      `
+      SELECT
+        id,
+        schueler_id,
+        COALESCE(vorname, '') AS vorname,
+        COALESCE(nachname, '') AS nachname,
+        DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+        COALESCE(NULLIF(TRIM(quell_snr), ''), NULLIF(TRIM(schul_nr), ''), '') AS source_school_snr,
+        COALESCE(quell_schueler_nr, '') AS quell_schueler_nr,
+        COALESCE(strasse, '') AS strasse,
+        COALESCE(plz, '') AS plz,
+        COALESCE(ort, '') AS ort,
+        COALESCE(foerderbedarf, '') AS foerderbedarf,
+        COALESCE(zieldifferent, 0) AS zieldifferent,
+        COALESCE(ef, 0) AS ef,
+        COALESCE(empfehlung, '') AS empfehlung,
+        COALESCE(teilnahmestatus, '') AS teilnahmestatus,
+        COALESCE(quell_jahrgang, '') AS quell_jahrgang,
+        COALESCE(bemerkung, '') AS bemerkung
+      FROM anm_schueler
+      WHERE verfahren_id = ?
+        AND runde_id = ?
+        AND schueler_id IN (?)
+      `,
+      [verfahrenId, rundeId, ids],
+    )
+    : [[]];
+  const existingById = new Map((existingRows || []).map((row) => [normalizeText(row?.schueler_id), row]));
+
+  const duplicateCountById = new Map();
+  for (const id of ids) {
+    duplicateCountById.set(id, Number(duplicateCountById.get(id) || 0) + 1);
+  }
+
+  const rows = csvRows.map((row) => {
+    const record = row?.record || {};
+    const rowNumber = Number(row?.row_number || 0);
+    const data = {
+      source_school_snr: normalizeText(record?.[mapping.source_school_snr] || ""),
+      schueler_id: normalizeText(record?.[mapping.schueler_id] || ""),
+      vorname: normalizeText(record?.[mapping.vorname] || ""),
+      nachname: normalizeText(record?.[mapping.nachname] || ""),
+      geburtsdatum: normalizeDate(record?.[mapping.geburtsdatum] || ""),
+      strasse: normalizeText(record?.[mapping.strasse] || ""),
+      plz: normalizeText(record?.[mapping.plz] || ""),
+      ort: normalizeText(record?.[mapping.ort] || ""),
+      foerderbedarf: normalizeText(record?.[mapping.foerderbedarf] || ""),
+      zieldifferent: normalizeText(record?.[mapping.zieldifferent] || ""),
+      ef: normalizeText(record?.[mapping.ef] || ""),
+      empfehlung: normalizeText(record?.[mapping.empfehlung] || ""),
+      teilnahmestatus: normalizeText(record?.[mapping.teilnahmestatus] || ""),
+      quell_jahrgang: normalizeText(record?.[mapping.quell_jahrgang] || ""),
+      bemerkung: normalizeText(record?.[mapping.bemerkung] || ""),
+      quell_schueler_nr: normalizeText(record?.[mapping.schueler_id] || ""),
+    };
+
+    const errors = [];
+    const warnings = [];
+
+    if (!data.source_school_snr) errors.push("Quell-SNR fehlt.");
+    if (data.source_school_snr && !schoolBySnr.has(data.source_school_snr)) {
+      errors.push("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
+    }
+    if (!data.schueler_id) errors.push("Import-ID fehlt.");
+    if (data.schueler_id && Number(duplicateCountById.get(data.schueler_id) || 0) > 1) {
+      errors.push("Import-ID ist in der CSV doppelt.");
+    }
+    if (!data.vorname) errors.push("Vorname fehlt.");
+    if (!data.nachname) errors.push("Nachname fehlt.");
+    if (!data.geburtsdatum) errors.push("Geburtsdatum fehlt.");
+    if (data.geburtsdatum && !isValidIsoDate(data.geburtsdatum)) {
+      errors.push("Geburtsdatum ist ungueltig.");
+    }
+    if (!isValidImportBoolean(data.foerderbedarf)) errors.push("LE ist ungueltig.");
+    if (!isValidImportBoolean(data.zieldifferent)) errors.push("ZD ist ungueltig.");
+    if (!isValidImportBoolean(data.ef)) errors.push("EF ist ungueltig.");
+    if (data.teilnahmestatus && !["Aktiv", "Wegzug", "Abgemeldet", "Verstorben"].includes(data.teilnahmestatus)) {
+      errors.push("Teilnahmestatus ist ungueltig.");
+    }
+    if (data.empfehlung && empfehlungByCode.size > 0 && !empfehlungByCode.has(normalizeTextLower(data.empfehlung))) {
+      errors.push("Empfehlung ist unbekannt.");
+    }
+    const existing = existingById.get(data.schueler_id);
+    let importAction = "NEU";
+    let changedFields = [];
+    if (existing) {
+      const comparisons = [
+        {
+          field: "source_school_snr",
+          matches: normalizeText(existing?.source_school_snr) === data.source_school_snr,
+        },
+        {
+          field: "schueler_id",
+          matches: normalizeText(existing?.schueler_id) === data.schueler_id,
+        },
+        {
+          field: "quell_schueler_nr",
+          matches: normalizeText(existing?.quell_schueler_nr) === data.quell_schueler_nr,
+        },
+        {
+          field: "vorname",
+          matches: normalizeText(existing?.vorname) === data.vorname,
+        },
+        {
+          field: "nachname",
+          matches: normalizeText(existing?.nachname) === data.nachname,
+        },
+        {
+          field: "geburtsdatum",
+          matches: normalizeDate(existing?.geburtsdatum) === normalizeDate(data.geburtsdatum),
+        },
+      ];
+
+      if (mappedFields.has("strasse")) comparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
+      if (mappedFields.has("plz")) comparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
+      if (mappedFields.has("ort")) comparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
+      if (mappedFields.has("foerderbedarf")) comparisons.push({ field: "foerderbedarf", matches: normalizeText(existing?.foerderbedarf) === data.foerderbedarf });
+      if (mappedFields.has("zieldifferent")) comparisons.push({ field: "zieldifferent", matches: Number(existing?.zieldifferent || 0) === normalizeBoolean(data.zieldifferent) });
+      if (mappedFields.has("ef")) comparisons.push({ field: "ef", matches: Number(existing?.ef || 0) === normalizeBoolean(data.ef) });
+      if (mappedFields.has("empfehlung")) comparisons.push({ field: "empfehlung", matches: normalizeText(existing?.empfehlung) === data.empfehlung });
+      if (mappedFields.has("teilnahmestatus")) comparisons.push({ field: "teilnahmestatus", matches: normalizeText(existing?.teilnahmestatus) === data.teilnahmestatus });
+      if (mappedFields.has("quell_jahrgang")) comparisons.push({ field: "quell_jahrgang", matches: normalizeText(existing?.quell_jahrgang) === data.quell_jahrgang });
+      if (mappedFields.has("bemerkung")) comparisons.push({ field: "bemerkung", matches: normalizeText(existing?.bemerkung) === data.bemerkung });
+
+      changedFields = comparisons.filter((entry) => !entry.matches).map((entry) => entry.field);
+      const unchanged = changedFields.length === 0;
+      importAction = unchanged ? "VORHANDEN" : "UPDATE";
+    }
+    const status = errors.length > 0 ? "fehler" : warnings.length > 0 ? "warnung" : "gueltig";
+
+    return {
+      row_number: rowNumber,
+      selected: errors.length === 0 && importAction !== "VORHANDEN",
+      import_action: importAction,
+      status,
+      errors,
+      warnings,
+      changed_fields: changedFields,
+      data,
+    };
+  });
+
+  return {
+    rows,
+    summary: buildPoolImportSummary(rows),
+  };
+}
+
+async function upsertAnmSchuelerCsvImport(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const importArt = normalizeTextLower(payload?.import_art) || "pool";
+  const row = payload?.row || {};
+  const mapping = payload?.mapping || {};
+  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+  const schuelerId = normalizeText(row?.schueler_id);
+  const sourceSchoolSnr = normalizeText(row?.source_school_snr);
+  const anmeldungsTreffer = await findApplicationBySchuelerNr(pool, verfahrenId, rundeId, schuelerId);
+  const hasAnmeldung = Boolean(anmeldungsTreffer);
+  const abgleichStatus = hasAnmeldung ? "Pool + Anm" : (importArt === "pool" ? "Nur Pool" : "Nur Anmeldung");
+  const [existingRows] = await pool.query(
+    `
+    SELECT id, herkunft
+    FROM anm_schueler
+    WHERE verfahren_id = ?
+      AND runde_id = ?
+      AND schueler_id = ?
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [verfahrenId, rundeId, schuelerId],
+  );
+  const existing = Array.isArray(existingRows) && existingRows.length ? existingRows[0] : null;
+
+  const mappedFields = new Set(
+    Object.entries(mapping)
+      .filter(([, value]) => normalizeText(value))
+      .map(([key]) => key),
+  );
+
+  const applyOptionalAssignment = (columnName, columnValue, assignments, values, options = {}) => {
+    const sourceField = options.sourceField || columnName;
+    if (!schuelerColumns.has(columnName) || !mappedFields.has(sourceField)) return;
+    assignments.push(`${columnName} = ?`);
+    values.push(columnValue);
+  };
+
+  if (existing) {
+    const assignments = [
+      "schueler_nr = ?",
+      "abgleich_status = ?",
+      "updated_at = NOW()",
+    ];
+    const values = [
+      schuelerId,
+      abgleichStatus,
+    ];
+    applyOptionalAssignment("vorname", normalizeText(row?.vorname) || null, assignments, values);
+    applyOptionalAssignment("nachname", normalizeText(row?.nachname) || null, assignments, values);
+    applyOptionalAssignment("geburtsdatum", normalizeDate(row?.geburtsdatum), assignments, values);
+    applyOptionalAssignment("strasse", normalizeText(row?.strasse) || null, assignments, values);
+    applyOptionalAssignment("plz", normalizeText(row?.plz) || null, assignments, values);
+    applyOptionalAssignment("ort", normalizeText(row?.ort) || null, assignments, values);
+    applyOptionalAssignment("foerderbedarf", normalizeBoolean(row?.foerderbedarf), assignments, values);
+    applyOptionalAssignment("zieldifferent", normalizeBoolean(row?.zieldifferent), assignments, values);
+    applyOptionalAssignment("ef", normalizeBoolean(row?.ef), assignments, values);
+    applyOptionalAssignment("empfehlung", normalizeText(row?.empfehlung) || null, assignments, values);
+    applyOptionalAssignment("teilnahmestatus", normalizeText(row?.teilnahmestatus) || null, assignments, values);
+    applyOptionalAssignment("quell_jahrgang", normalizeText(row?.quell_jahrgang) || null, assignments, values);
+    applyOptionalAssignment("bemerkung", normalizeText(row?.bemerkung) || null, assignments, values);
+    if (schuelerColumns.has("quell_schueler_nr")) {
+      assignments.push("quell_schueler_nr = ?");
+      values.push(schuelerId);
+    }
+    if (schuelerColumns.has("quell_snr")) {
+      assignments.push("quell_snr = ?");
+      values.push(sourceSchoolSnr || null);
+    }
+    if (schuelerColumns.has("schul_nr")) {
+      assignments.push("schul_nr = ?");
+      values.push(sourceSchoolSnr || null);
+    }
+    values.push(Number(existing.id));
+    await pool.query(
+      `
+      UPDATE anm_schueler
+      SET ${assignments.join(", ")}
+      WHERE id = ?
+      `,
+      values,
+    );
+    return { action: "UPDATE", id: Number(existing.id) };
+  }
+
+  const insertColumns = [
+    "verfahren_id",
+    "runde_id",
+    "schueler_id",
+    "schueler_nr",
+    "abgleich_status",
+    "anmeldestatus",
+  ];
+  const placeholders = ["?", "?", "?", "?", "?", "?"];
+  const values = [
+    verfahrenId,
+    rundeId,
+    schuelerId,
+    schuelerId,
+    abgleichStatus,
+    hasAnmeldung ? mapAnmeldestatusToSchuelerStatus(anmeldungsTreffer?.anmeldestatus_text) : "Ohne",
+  ];
+
+  const pushInsert = (columnName, columnValue, options = {}) => {
+    const sourceField = options.sourceField || columnName;
+    if (!schuelerColumns.has(columnName)) return;
+    if (!options.system && !mappedFields.has(sourceField)) return;
+    insertColumns.push(columnName);
+    placeholders.push("?");
+    values.push(columnValue);
+  };
+
+  pushInsert("herkunft", importArt === "pool" ? "Pool" : "Anmeldung", { system: true });
+  pushInsert("quell_schueler_nr", schuelerId, { system: true });
+  pushInsert("quell_snr", sourceSchoolSnr || null, { system: true, sourceField: "source_school_snr" });
+  pushInsert("schul_nr", sourceSchoolSnr || null, { system: true, sourceField: "source_school_snr" });
+  pushInsert("vorname", normalizeText(row?.vorname) || null);
+  pushInsert("nachname", normalizeText(row?.nachname) || null);
+  pushInsert("geburtsdatum", normalizeDate(row?.geburtsdatum));
+  pushInsert("strasse", normalizeText(row?.strasse) || null);
+  pushInsert("plz", normalizeText(row?.plz) || null);
+  pushInsert("ort", normalizeText(row?.ort) || null);
+  pushInsert("foerderbedarf", normalizeBoolean(row?.foerderbedarf));
+  pushInsert("zieldifferent", normalizeBoolean(row?.zieldifferent));
+  pushInsert("ef", normalizeBoolean(row?.ef));
+  pushInsert("empfehlung", normalizeText(row?.empfehlung) || null);
+  pushInsert("teilnahmestatus", normalizeText(row?.teilnahmestatus) || null);
+  pushInsert("quell_jahrgang", normalizeText(row?.quell_jahrgang) || null);
+  pushInsert("bemerkung", normalizeText(row?.bemerkung) || null);
+
+  const [result] = await pool.query(
+    `
+    INSERT INTO anm_schueler (${insertColumns.join(", ")})
+    VALUES (${placeholders.join(", ")})
+    `,
+    values,
+  );
+  return { action: "INSERT", id: Number(result?.insertId || 0) };
+}
+
+function buildAnmeldungenImportSummary(rows) {
+  const selectedRows = rows.filter((row) => row.selected && row.status !== "fehler");
+  return {
+    Gesamtzeilen: Number(rows.length || 0),
+    Ausgewaehlt: selectedRows.length,
+    Uebersprungen: rows.filter((row) => row.status !== "fehler" && !row.selected).length,
+    Fehlerzeilen: rows.filter((row) => row.status === "fehler").length,
+    Neue_Datensaetze: selectedRows.filter((row) => row.import_action === "NEU").length,
+    Updates: selectedRows.filter((row) => row.import_action === "UPDATE").length,
+    Pool_Treffer: selectedRows.filter((row) => row.pool_match).length,
+    Nur_Anmeldung_Faelle: selectedRows.filter((row) => !row.pool_match).length,
+  };
+}
+
+async function validateAnmeldungenImportRows(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const csvRows = Array.isArray(payload?.csv_rows) ? payload.csv_rows : [];
+  const mapping = payload?.mapping || {};
+  const statusMapping = payload?.status_mapping || {};
+  const globalSchulNr = normalizeText(payload?.global_schul_nr);
+  const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
+  const targetStatuses = new Set(getAnmeldestatusTargetValues().map((value) => normalizeTextLower(value)));
+
+  const ids = csvRows
+    .map((row) => normalizeText(row?.record?.[mapping.schueler_id] || ""))
+    .filter(Boolean);
+  const duplicateCountById = new Map();
+  for (const id of ids) {
+    duplicateCountById.set(id, Number(duplicateCountById.get(id) || 0) + 1);
+  }
+
+  const rows = [];
+  for (const row of csvRows) {
+    const record = row?.record || {};
+    const rowNumber = Number(row?.row_number || 0);
+    const rawStatus = normalizeText(record?.[mapping.anmeldestatus] || "");
+    const mappedStatus = normalizeText(statusMapping[rawStatus] || "");
+    const schulNr = normalizeText(record?.[mapping.schul_nr] || "") || globalSchulNr;
+    const data = {
+      schueler_id: normalizeText(record?.[mapping.schueler_id] || ""),
+      quell_schueler_nr: normalizeText(record?.[mapping.schueler_id] || ""),
+      schul_nr: schulNr,
+      anmeldestatus: mappedStatus,
+      anmeldestatus_raw: rawStatus,
+      vorname: normalizeText(record?.[mapping.vorname] || ""),
+      nachname: normalizeText(record?.[mapping.nachname] || ""),
+      geburtsdatum: normalizeDate(record?.[mapping.geburtsdatum] || ""),
+      empfehlung: normalizeText(record?.[mapping.empfehlung] || ""),
+      foerderbedarf: normalizeText(record?.[mapping.foerderbedarf] || ""),
+      foerder_id: normalizeText(record?.[mapping.foerder_id] || ""),
+      zieldifferent: normalizeText(record?.[mapping.zieldifferent] || ""),
+      bemerkung: normalizeText(record?.[mapping.bemerkung] || ""),
+      strasse: normalizeText(record?.[mapping.strasse] || ""),
+      plz: normalizeText(record?.[mapping.plz] || ""),
+      ort: normalizeText(record?.[mapping.ort] || ""),
+    };
+
+    const errors = [];
+    const warnings = [];
+    if (!data.schueler_id) errors.push("Import-ID fehlt.");
+    if (data.schueler_id && Number(duplicateCountById.get(data.schueler_id) || 0) > 1) errors.push("Import-ID ist in der CSV doppelt.");
+    if (!data.schul_nr) errors.push("schul_nr fehlt.");
+    if (data.schul_nr && !schoolBySnr.has(data.schul_nr)) errors.push("schul_nr existiert nicht im Verfahren.");
+    if (!data.anmeldestatus_raw) errors.push("Status aus CSV fehlt.");
+    if (data.anmeldestatus_raw && !mappedStatus) errors.push("Statuswert ist noch nicht zugeordnet.");
+    if (mappedStatus && !targetStatuses.has(normalizeTextLower(mappedStatus))) errors.push("Zielstatus ist ungueltig.");
+    if (data.geburtsdatum && !isValidIsoDate(data.geburtsdatum)) errors.push("Geburtsdatum ist ungueltig.");
+    if (!isValidImportBoolean(data.foerderbedarf)) errors.push("Foerderbedarf ist ungueltig.");
+    if (!isValidImportBoolean(data.zieldifferent)) errors.push("Zieldifferent ist ungueltig.");
+
+    const existing = data.schueler_id
+      ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.schueler_id)
+      : null;
+    const poolMatch = hasPoolAbgleich(existing);
+    const importAction = existing ? "UPDATE" : "NEU";
+    const abgleichStatus = poolMatch ? "Pool + Anm" : "Nur Anmeldung";
+    if (!data.vorname) warnings.push("Vorname fehlt.");
+    if (!data.nachname) warnings.push("Nachname fehlt.");
+    const status = errors.length > 0 ? "fehler" : warnings.length > 0 ? "warnung" : "gueltig";
+    rows.push({
+      row_number: rowNumber,
+      selected: errors.length === 0,
+      import_action: importAction,
+      pool_match: poolMatch,
+      abgleich_status: abgleichStatus,
+      status,
+      errors,
+      warnings,
+      data,
+    });
+  }
+
+  return {
+    rows,
+    summary: buildAnmeldungenImportSummary(rows),
+  };
+}
+
+async function upsertAnmeldungenWizardImport(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const row = payload?.row || {};
+  const existing = await findExistingSchuelerRecord(pool, verfahrenId, rundeId, row.schueler_id);
+  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+  const poolMatch = hasPoolAbgleich(existing);
+  const abgleichStatus = poolMatch ? "Pool + Anm" : "Nur Anmeldung";
+
+  if (existing) {
+    const assignments = [
+      "schueler_id = ?",
+      "schueler_nr = ?",
+      "quell_schueler_nr = ?",
+      "schul_nr = ?",
+      "abgleich_status = ?",
+      "anmeldestatus = ?",
+      "vorname = ?",
+      "nachname = ?",
+      "geburtsdatum = ?",
+    ];
+    const values = [
+      row.schueler_id,
+      row.schueler_id,
+      row.schueler_id,
+      row.schul_nr || null,
+      abgleichStatus,
+      row.anmeldestatus,
+      row.vorname || null,
+      row.nachname || null,
+      normalizeDate(row.geburtsdatum),
+    ];
+    const optionalAssignments = [
+      ["empfehlung", row.empfehlung || null],
+      ["foerderbedarf", normalizeText(row.foerderbedarf) || null],
+      ["foerder_id", normalizeText(row.foerder_id) || null],
+      ["zieldifferent", normalizeBoolean(row.zieldifferent)],
+      ["bemerkung", row.bemerkung || null],
+      ["strasse", row.strasse || null],
+      ["plz", row.plz || null],
+      ["ort", row.ort || null],
+    ];
+    for (const [columnName, columnValue] of optionalAssignments) {
+      if (!schuelerColumns.has(columnName)) continue;
+      assignments.push(`${columnName} = ?`);
+      values.push(columnValue);
+    }
+    values.push(Number(existing.id));
+    await pool.query(
+      `
+      UPDATE anm_schueler
+      SET ${assignments.join(", ")}, updated_at = NOW()
+      WHERE id = ?
+      `,
+      values,
+    );
+    return { action: "UPDATE", pool_match: poolMatch };
+  }
+
+  const insertColumns = [
+    "verfahren_id",
+    "runde_id",
+    "schueler_id",
+    "schueler_nr",
+    "quell_schueler_nr",
+    "schul_nr",
+    "abgleich_status",
+    "anmeldestatus",
+    "vorname",
+    "nachname",
+    "geburtsdatum",
+    "herkunft",
+  ];
+  const placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"];
+  const values = [
+    verfahrenId,
+    rundeId,
+    row.schueler_id,
+    row.schueler_id,
+    row.schueler_id,
+    row.schul_nr || null,
+    abgleichStatus,
+    row.anmeldestatus,
+    row.vorname || null,
+    row.nachname || null,
+    normalizeDate(row.geburtsdatum),
+    "Anmeldung",
+  ];
+  const optionalInserts = [
+    ["empfehlung", row.empfehlung || null],
+    ["foerderbedarf", normalizeText(row.foerderbedarf) || null],
+    ["foerder_id", normalizeText(row.foerder_id) || null],
+    ["zieldifferent", normalizeBoolean(row.zieldifferent)],
+    ["bemerkung", row.bemerkung || null],
+    ["strasse", row.strasse || null],
+    ["plz", row.plz || null],
+    ["ort", row.ort || null],
+  ];
+  for (const [columnName, columnValue] of optionalInserts) {
+    if (!schuelerColumns.has(columnName)) continue;
+    insertColumns.push(columnName);
+    placeholders.push("?");
+    values.push(columnValue);
+  }
+  await pool.query(
+    `
+    INSERT INTO anm_schueler (${insertColumns.join(", ")})
+    VALUES (${placeholders.join(", ")})
+    `,
+    values,
+  );
+  return { action: "INSERT", pool_match: poolMatch };
 }
 
 async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
@@ -2159,6 +2877,246 @@ async function importAnmeldungenForSchool(connection, payload) {
 
 function createImporteController({ getPool }) {
   return {
+    anmSchuelerImportSchema: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.query?.verfahren_id || 0);
+        const rundeId = Number(req.query?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        const pool = getPool();
+        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+        return res.json({
+          fields: getPoolImportFieldDefinitions(schuelerColumns),
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Das Importschema konnte nicht geladen werden.");
+      }
+    },
+
+    anmSchuelerImportValidate: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        const pool = getPool();
+        const validation = await validatePoolImportRows(pool, req.body || {});
+        const session = storePreview(anmSchuelerImportSessions, {
+          verfahren_id: verfahrenId,
+          runde_id: rundeId,
+          import_art: req.body?.import_art || "pool",
+          mapping: req.body?.mapping || {},
+          rows: validation.rows,
+        });
+        return res.json({
+          validation_token: session.token,
+          expires_at: new Date(session.expires_at).toISOString(),
+          rows: validation.rows,
+          summary: validation.summary,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die Validierung des CSV-Imports ist fehlgeschlagen.");
+      }
+    },
+
+    anmSchuelerImportExecute: async (req, res) => {
+      const connection = await getPool().getConnection();
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        const validation = getPreview(anmSchuelerImportSessions, req.body?.validation_token);
+        if (!validation) return sendError(res, 409, "Die Validierung ist abgelaufen oder nicht mehr vorhanden.");
+        if (Number(validation?.verfahren_id || 0) !== verfahrenId || Number(validation?.runde_id || 0) !== rundeId) {
+          return sendError(res, 409, "Die Validierung passt nicht mehr zur aktuellen Runde.");
+        }
+
+        const selectedRowNumbers = Array.isArray(req.body?.selected_row_numbers)
+          ? req.body.selected_row_numbers.map((value) => Number(value || 0)).filter((value) => value > 0)
+          : [];
+        if (!selectedRowNumbers.length) {
+          return sendError(res, 400, "Bitte mindestens eine gueltige Zeile fuer den Import auswaehlen.");
+        }
+
+        const selectedSet = new Set(selectedRowNumbers);
+        const rows = (validation.rows || []).filter((row) => selectedSet.has(Number(row?.row_number || 0)) && row?.status !== "fehler");
+        if (!rows.length) {
+          return sendError(res, 400, "Es wurden keine importierbaren Zeilen ausgewaehlt.");
+        }
+
+        await connection.beginTransaction();
+        let inserted = 0;
+        let updated = 0;
+        let skipped = 0;
+        let errors = 0;
+        const rowResults = [];
+
+        for (const row of rows) {
+          try {
+            const result = await upsertAnmSchuelerCsvImport(connection, {
+              verfahren_id: verfahrenId,
+              runde_id: rundeId,
+              import_art: validation.import_art || "pool",
+              row: row.data,
+              mapping: validation.mapping || {},
+            });
+            if (result.action === "INSERT") inserted += 1;
+            else updated += 1;
+            rowResults.push({
+              row_number: Number(row.row_number || 0),
+              action: result.action,
+              message: result.action === "INSERT" ? "Datensatz neu angelegt." : "Datensatz aktualisiert.",
+            });
+          } catch (error) {
+            errors += 1;
+            rowResults.push({
+              row_number: Number(row.row_number || 0),
+              action: "FEHLER",
+              message: error?.message || "Unbekannter Fehler",
+            });
+          }
+        }
+
+        skipped = (validation.rows || []).filter((row) => !selectedSet.has(Number(row?.row_number || 0)) || row?.status === "fehler").length;
+        await connection.commit();
+        anmSchuelerImportSessions.delete(normalizeText(req.body?.validation_token));
+
+        return res.status(201).json({
+          inserted,
+          updated,
+          skipped,
+          errors,
+          row_results: rowResults,
+        });
+      } catch (error) {
+        await connection.rollback().catch(() => {});
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der CSV-Import konnte nicht abgeschlossen werden.");
+      } finally {
+        connection.release();
+      }
+    },
+
+    anmSchuelerAnmeldungenSchema: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.query?.verfahren_id || 0);
+        const rundeId = Number(req.query?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        const pool = getPool();
+        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+        return res.json({
+          fields: getAnmeldungenImportFieldDefinitions(schuelerColumns),
+          status_target_values: getAnmeldestatusTargetValues(),
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Das Schema fuer den Anmeldungsimport konnte nicht geladen werden.");
+      }
+    },
+
+    anmSchuelerAnmeldungenValidate: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        const pool = getPool();
+        const validation = await validateAnmeldungenImportRows(pool, req.body || {});
+        const session = storePreview(anmSchuelerAnmeldungenImportSessions, {
+          verfahren_id: verfahrenId,
+          runde_id: rundeId,
+          rows: validation.rows,
+        });
+        return res.json({
+          validation_token: session.token,
+          expires_at: new Date(session.expires_at).toISOString(),
+          rows: validation.rows,
+          summary: validation.summary,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die Validierung des Anmeldungsimports ist fehlgeschlagen.");
+      }
+    },
+
+    anmSchuelerAnmeldungenExecute: async (req, res) => {
+      const connection = await getPool().getConnection();
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        const validation = getPreview(anmSchuelerAnmeldungenImportSessions, req.body?.validation_token);
+        if (!validation) return sendError(res, 409, "Die Validierung ist abgelaufen oder nicht mehr vorhanden.");
+        const selectedRowNumbers = Array.isArray(req.body?.selected_row_numbers)
+          ? req.body.selected_row_numbers.map((value) => Number(value || 0)).filter((value) => value > 0)
+          : [];
+        if (!selectedRowNumbers.length) return sendError(res, 400, "Bitte mindestens eine gueltige Zeile auswaehlen.");
+
+        const selectedSet = new Set(selectedRowNumbers);
+        const rows = (validation.rows || []).filter((row) => selectedSet.has(Number(row?.row_number || 0)) && row?.status !== "fehler");
+        if (!rows.length) return sendError(res, 400, "Es wurden keine importierbaren Zeilen ausgewaehlt.");
+
+        await connection.beginTransaction();
+        let inserted = 0;
+        let updated = 0;
+        let skipped = 0;
+        let errors = 0;
+        let poolAnmeldung = 0;
+        let nurAnmeldung = 0;
+        const row_results = [];
+        for (const row of rows) {
+          try {
+            const result = await upsertAnmeldungenWizardImport(connection, {
+              verfahren_id: verfahrenId,
+              runde_id: rundeId,
+              row: row.data,
+            });
+            if (result.action === "INSERT") inserted += 1;
+            else updated += 1;
+            if (result.pool_match) poolAnmeldung += 1;
+            else nurAnmeldung += 1;
+            row_results.push({
+              row_number: Number(row.row_number || 0),
+              action: result.action,
+              message: result.action === "INSERT" ? "Datensatz neu angelegt." : "Datensatz aktualisiert.",
+            });
+          } catch (error) {
+            errors += 1;
+            row_results.push({
+              row_number: Number(row.row_number || 0),
+              action: "FEHLER",
+              message: error?.message || "Unbekannter Fehler",
+            });
+          }
+        }
+        skipped = (validation.rows || []).filter((row) => !selectedSet.has(Number(row?.row_number || 0)) || row?.status === "fehler").length;
+        await connection.commit();
+        anmSchuelerAnmeldungenImportSessions.delete(normalizeText(req.body?.validation_token));
+        return res.status(201).json({
+          inserted,
+          updated,
+          skipped,
+          errors,
+          pool_anmeldung: poolAnmeldung,
+          nur_anmeldung: nurAnmeldung,
+          row_results,
+        });
+      } catch (error) {
+        await connection.rollback().catch(() => {});
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Anmeldungsimport konnte nicht abgeschlossen werden.");
+      } finally {
+        connection.release();
+      }
+    },
+
     poolStats: async (req, res) => {
       try {
         const verfahrenId = Number(req.query?.verfahren_id || 0);
@@ -3075,6 +4033,7 @@ function createImporteController({ getPool }) {
         await connection.commit();
         poolPreviewSessions.clear();
         anmeldungsPreviewSessions.clear();
+        anmSchuelerImportSessions.clear();
         return res.json({
           success: true,
           message: `Alle Schuelerdaten (${deletedRows} Datensaetze) wurden erfolgreich geloescht.`,
