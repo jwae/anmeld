@@ -9,6 +9,8 @@ function createAbgleichRouter({ authenticateToken, requireAdmin, getPool }) {
   router.get("/verfahren-uebersicht", controller.verfahrenUebersicht);
   router.get("/schueler-uebersicht", controller.schuelerUebersicht);
   router.post("/schueler-uebersicht/geocoding", controller.schuelerGeocoding);
+  router.patch("/schueler/:id", controller.updateSchueler);
+  router.post("/offene-faelle", controller.createOffenerFall);
 
   return router;
 }

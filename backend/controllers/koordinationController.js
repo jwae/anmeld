@@ -181,6 +181,104 @@ async function loadSchoolMapBySnr(pool) {
   );
 }
 
+async function loadFallstatusOptions(pool) {
+  const [rows] = await pool.query(
+    `
+    SELECT id, code, bezeichnung
+    FROM anm_kat_fallstatus
+    WHERE COALESCE(aktiv, 1) = 1
+    ORDER BY COALESCE(sortierung, 0) ASC, COALESCE(bezeichnung, code) ASC
+    `,
+  );
+
+  return (rows || []).map((row) => ({
+    id: Number(row?.id || 0),
+    code: normalizeText(row?.code),
+    bezeichnung: normalizeText(row?.bezeichnung) || normalizeText(row?.code),
+  })).filter((row) => row.id > 0);
+}
+
+async function loadOffeneFaelleRows(pool, verfahrenId) {
+  const offeneFallColumns = await loadTableColumns(pool, "anm_offener_fall");
+  if (!offeneFallColumns.size) return [];
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      COALESCE(f.id, 0) AS fall_id,
+      COALESCE(f.verfahren_id, 0) AS verfahren_id,
+      COALESCE(f.fallstatus_id, 0) AS fallstatus_id,
+      ${offeneFallColumns.has("schueler_id") ? "COALESCE(f.schueler_id, 0)" : "0"} AS schueler_row_id,
+      COALESCE(f.schueler_pool_id, 0) AS schueler_pool_id,
+      COALESCE(f.schueler_anmeldung_id, 0) AS schueler_anmeldung_id,
+      COALESCE(sa.runde_id, s.runde_id, 0) AS runde_id,
+      COALESCE(NULLIF(TRIM(s.vorname), ''), NULLIF(TRIM(sp.vorname), ''), NULLIF(TRIM(sa.vorname), ''), '') AS vorname,
+      COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') AS nachname,
+      DATE_FORMAT(COALESCE(s.geburtsdatum, sp.geburtsdatum, sa.geburtsdatum), '%Y-%m-%d') AS geburtsdatum,
+      COALESCE(NULLIF(TRIM(s.schueler_id), ''), NULLIF(TRIM(sa.schueler_schul_id), ''), NULLIF(TRIM(sp.id), ''), '') AS schueler_ident,
+      COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''), '') AS aktuelle_snr,
+      COALESCE(NULLIF(TRIM(curr.name), ''), '') AS aktuelle_schule,
+      COALESCE(NULLIF(TRIM(f.zugewiesene_snr), ''), '') AS zugewiesene_snr,
+      COALESCE(NULLIF(TRIM(assign.name), ''), '') AS zugewiesene_schule,
+      COALESCE(NULLIF(TRIM(fg.code), ''), '') AS fallgrund_code,
+      COALESCE(NULLIF(TRIM(fg.bezeichnung), ''), NULLIF(TRIM(fg.code), ''), '') AS fallgrund,
+      COALESCE(NULLIF(TRIM(fs.bezeichnung), ''), NULLIF(TRIM(fs.code), ''), '') AS fallstatus,
+      COALESCE(NULLIF(TRIM(f.bemerkung), ''), '') AS bemerkung,
+      DATE_FORMAT(f.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+      DATE_FORMAT(f.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at,
+      CASE
+        ${offeneFallColumns.has("schueler_id") ? "WHEN f.schueler_id IS NOT NULL THEN 'anm_schueler'" : ""}
+        ${offeneFallColumns.has("schueler_id") ? " " : ""}WHEN f.schueler_pool_id IS NOT NULL THEN 'anm_schueler_pool'
+        WHEN f.schueler_anmeldung_id IS NOT NULL THEN 'anm_schueler_anmeldung'
+        ELSE 'unbekannt'
+      END AS quelle
+    FROM anm_offener_fall f
+    LEFT JOIN anm_schueler s
+      ON ${offeneFallColumns.has("schueler_id") ? "s.id = f.schueler_id" : "1 = 0"}
+    LEFT JOIN anm_schueler_pool sp
+      ON sp.id = f.schueler_pool_id
+    LEFT JOIN anm_schueler_anmeldung sa
+      ON sa.id = f.schueler_anmeldung_id
+    LEFT JOIN anm_kat_fallgrund fg
+      ON fg.id = f.fallgrund_id
+    LEFT JOIN anm_kat_fallstatus fs
+      ON fs.id = f.fallstatus_id
+    LEFT JOIN anm_schulen curr
+      ON curr.snr = COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''))
+    LEFT JOIN anm_schulen assign
+      ON assign.snr = f.zugewiesene_snr
+    WHERE f.verfahren_id = ?
+    ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') ASC
+    `,
+    [verfahrenId],
+  );
+
+  return (rows || []).map((row) => ({
+    fall_id: Number(row?.fall_id || 0),
+    verfahren_id: Number(row?.verfahren_id || 0),
+    fallstatus_id: Number(row?.fallstatus_id || 0),
+    schueler_row_id: Number(row?.schueler_row_id || 0),
+    schueler_pool_id: Number(row?.schueler_pool_id || 0),
+    schueler_anmeldung_id: Number(row?.schueler_anmeldung_id || 0),
+    runde_id: Number(row?.runde_id || 0),
+    vorname: normalizeText(row?.vorname),
+    nachname: normalizeText(row?.nachname),
+    geburtsdatum: normalizeText(row?.geburtsdatum),
+    schueler_ident: normalizeText(row?.schueler_ident),
+    aktuelle_snr: normalizeText(row?.aktuelle_snr),
+    aktuelle_schule: normalizeText(row?.aktuelle_schule),
+    zugewiesene_snr: normalizeText(row?.zugewiesene_snr),
+    zugewiesene_schule: normalizeText(row?.zugewiesene_schule),
+    fallgrund_code: normalizeText(row?.fallgrund_code),
+    fallgrund: normalizeText(row?.fallgrund),
+    fallstatus: normalizeText(row?.fallstatus),
+    bemerkung: normalizeText(row?.bemerkung),
+    created_at: normalizeText(row?.created_at),
+    updated_at: normalizeText(row?.updated_at),
+    quelle: normalizeText(row?.quelle),
+  }));
+}
+
 async function loadSchoolRows(pool, verfahrenId, rundeId) {
   const schoolColumns = await loadTableColumns(pool, "anm_schulen");
   const capacityColumns = await loadTableColumns(pool, "anm_kapazitaet");
@@ -646,6 +744,81 @@ function createKoordinationController({ getPool }) {
         return sendError(res, error?.statusCode || 500, error?.message || "Die Koordinationsansicht konnte nicht geladen werden.");
       } finally {
         connection.release();
+      }
+    },
+
+    offeneFaelle: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.query.verfahren_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+
+        const pool = getPool();
+        const rows = await loadOffeneFaelleRows(pool, verfahrenId);
+        const fallstatusOptions = await loadFallstatusOptions(pool);
+        return res.json({ rows, fallstatusOptions });
+      } catch (error) {
+        console.error("offene faelle overview failed:", error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die offenen Faelle konnten nicht geladen werden.");
+      }
+    },
+
+    updateOffenerFall: async (req, res) => {
+      try {
+        const fallId = Number(req.params.id || 0);
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const fallstatusId = Number(req.body?.fallstatus_id || 0);
+        const bemerkung = normalizeText(req.body?.bemerkung);
+
+        if (!fallId) return sendError(res, 400, "id ist erforderlich.");
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!fallstatusId) return sendError(res, 400, "fallstatus_id ist erforderlich.");
+
+        const pool = getPool();
+        const [statusRows] = await pool.query(
+          `
+          SELECT id, COALESCE(bezeichnung, code) AS bezeichnung
+          FROM anm_kat_fallstatus
+          WHERE id = ?
+          LIMIT 1
+          `,
+          [fallstatusId],
+        );
+        if (!Array.isArray(statusRows) || !statusRows.length) {
+          return sendError(res, 404, "Der ausgewaehlte Fallstatus wurde nicht gefunden.");
+        }
+
+        const [existingRows] = await pool.query(
+          `
+          SELECT id
+          FROM anm_offener_fall
+          WHERE id = ?
+            AND verfahren_id = ?
+          LIMIT 1
+          `,
+          [fallId, verfahrenId],
+        );
+        if (!Array.isArray(existingRows) || !existingRows.length) {
+          return sendError(res, 404, "Der offene Fall wurde nicht gefunden.");
+        }
+
+        await pool.query(
+          `
+          UPDATE anm_offener_fall
+          SET fallstatus_id = ?,
+              bemerkung = ?,
+              updated_at = NOW()
+          WHERE id = ?
+          `,
+          [fallstatusId, bemerkung || null, fallId],
+        );
+
+        return res.json({
+          success: true,
+          message: `Der offene Fall wurde auf ${normalizeText(statusRows[0]?.bezeichnung)} gesetzt.`,
+        });
+      } catch (error) {
+        console.error("offener fall update failed:", error);
+        return sendError(res, 500, "Der offene Fall konnte nicht gespeichert werden.");
       }
     },
 

@@ -17,6 +17,17 @@ type SchuelerRow = {
   schueler_schul_id: string;
   abgleich_status: string;
   anmeldestatus: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
+  bemerkung?: string;
+  offene_faelle_anzahl?: number;
+};
+
+type FallgrundOption = {
+  id: number;
+  code: string;
+  bezeichnung: string;
 };
 
 type SummaryStats = {
@@ -59,6 +70,17 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const schuelerRows = ref<SchuelerRow[]>([]);
 const schoolOverviewRows = ref<SchoolOverviewRow[]>([]);
+const anmeldestatusOptions = ref<string[]>([]);
+const fallgrundOptions = ref<FallgrundOption[]>([]);
+const caseDialogOpen = ref(false);
+const caseDialogSaving = ref(false);
+const selectedCaseRow = ref<SchuelerRow | null>(null);
+const caseFallgrundId = ref<number>(0);
+const caseBemerkung = ref("");
+const editDialogOpen = ref(false);
+const editDialogSaving = ref(false);
+const selectedEditRow = ref<SchuelerRow | null>(null);
+const editForm = ref<Record<string, string>>({});
 
 const search = ref("");
 const schuleFilter = ref("alle");
@@ -83,7 +105,6 @@ function createEmptySummary(): SummaryStats {
 }
 
 const summary = ref<SummaryStats>(createEmptySummary());
-const anmeldestatusOptions = ["Neuaufnahme", "Warteliste", "Zugewiesen", "Abgelehnt", "Ohne", "Zugeordnet"];
 
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
@@ -91,6 +112,10 @@ function normalizeText(value: unknown) {
 
 function normalizeStatus(value: unknown) {
   return normalizeText(value) || "Ohne";
+}
+
+function normalizeStatusFilterValue(value: unknown) {
+  return normalizeStatus(value).toLowerCase();
 }
 
 function displayHerkunft(row: SchuelerRow) {
@@ -152,6 +177,82 @@ function formatDate(value: string | null | undefined) {
   return text;
 }
 
+function offeneFaelleAnzahl(row: SchuelerRow) {
+  return Number(row.offene_faelle_anzahl || 0);
+}
+
+function hasOpenCase(row: SchuelerRow) {
+  return offeneFaelleAnzahl(row) > 0;
+}
+
+function caseIconButtonClass(row: SchuelerRow) {
+  return hasOpenCase(row)
+    ? "case-icon-btn case-icon-btn-active"
+    : "case-icon-btn case-icon-btn-idle";
+}
+
+function caseIconTitle(row: SchuelerRow) {
+  return hasOpenCase(row)
+    ? `${offeneFaelleAnzahl(row)} offener Fall/Faelle vorhanden`
+    : "Manuellen offenen Fall anlegen";
+}
+
+function openEditDialog(row: SchuelerRow) {
+  selectedEditRow.value = row;
+  editForm.value = {
+    schueler_schul_id: normalizeText(row.schueler_schul_id),
+    vorname: normalizeText(row.vorname),
+    nachname: normalizeText(row.nachname),
+    geburtsdatum: normalizeText(row.geburtsdatum),
+    foerderbedarf: normalizeText(row.foerderbedarf) === "1" ? "1" : "0",
+    zieldifferent: isZieldifferent(row.zieldifferent) ? "1" : "0",
+    herkunft: normalizeText(row.herkunft),
+    abgleich_status: normalizeText(row.abgleich_status),
+    anmeldestatus: normalizeText(row.anmeldestatus),
+    schulnummer: normalizeText(row.schulnummer),
+    strasse: normalizeText(row.strasse),
+    plz: normalizeText(row.plz),
+    ort: normalizeText(row.ort),
+    bemerkung: normalizeText(row.bemerkung),
+  };
+  errorMessage.value = "";
+  successMessage.value = "";
+  editDialogOpen.value = true;
+}
+
+function closeEditDialog() {
+  if (editDialogSaving.value) return;
+  editDialogOpen.value = false;
+  selectedEditRow.value = null;
+  editForm.value = {};
+}
+
+async function saveEditDialog() {
+  if (!props.verfahrenId || !props.rundeId || !selectedEditRow.value) return;
+
+  try {
+    editDialogSaving.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    const response = await abgleichService.updateSchueler(
+      Number(selectedEditRow.value.schueler_id || 0),
+      {
+        verfahren_id: props.verfahrenId,
+        runde_id: props.rundeId,
+        ...editForm.value,
+      },
+      props.token,
+    );
+    successMessage.value = response?.message || "Der Schuelerdatensatz wurde gespeichert.";
+    await loadData();
+    closeEditDialog();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Schuelerdatensatz konnte nicht gespeichert werden.";
+  } finally {
+    editDialogSaving.value = false;
+  }
+}
+
 function uniqueOptions(selector: (row: SchuelerRow) => string) {
   return Array.from(
     new Set(
@@ -169,6 +270,12 @@ const foerderbedarfOptions = [
   { value: "0", label: "Nein" },
 ];
 const herkunftOptions = computed(() => uniqueOptions((row) => displayHerkunft(row)));
+const herkunftEditOptions = computed(() => Array.from(new Set([
+  "Pool",
+  "Anmeldung",
+  "Manuell",
+  ...uniqueOptions((row) => displayHerkunft(row)).filter((option) => option !== "-"),
+])).sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" })));
 
 const filteredRows = computed(() => {
   const searchText = normalizeText(search.value).toLowerCase();
@@ -184,7 +291,10 @@ const filteredRows = computed(() => {
         if (rowSchule !== schuleFilter.value) return false;
       }
     }
-    if (anmeldestatusFilter.value !== "alle" && normalizeStatus(row.anmeldestatus) !== anmeldestatusFilter.value) return false;
+    if (
+      anmeldestatusFilter.value !== "alle"
+      && normalizeStatusFilterValue(row.anmeldestatus) !== normalizeStatusFilterValue(anmeldestatusFilter.value)
+    ) return false;
     if (foerderbedarfFilter.value !== "alle" && foerderbedarfDropdownValue(row) !== foerderbedarfFilter.value) return false;
     if (herkunftFilter.value !== "alle" && displayHerkunft(row) !== herkunftFilter.value) return false;
     if (zieldifferentFilter.value === "ja" && !isZieldifferent(row.zieldifferent)) return false;
@@ -257,6 +367,8 @@ async function loadData() {
   if (!props.verfahrenId || !props.rundeId) {
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    anmeldestatusOptions.value = [];
+    fallgrundOptions.value = [];
     summary.value = createEmptySummary();
     return;
   }
@@ -267,6 +379,8 @@ async function loadData() {
     const response = await abgleichService.getSchuelerUebersicht(props.verfahrenId, props.rundeId, props.token);
     schuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
     schoolOverviewRows.value = Array.isArray(response?.schoolOverview) ? response.schoolOverview : [];
+    anmeldestatusOptions.value = Array.isArray(response?.anmeldestatusOptions) ? response.anmeldestatusOptions : [];
+    fallgrundOptions.value = Array.isArray(response?.fallgrundOptions) ? response.fallgrundOptions : [];
     summary.value = {
       ...createEmptySummary(),
       ...(response?.summary || {}),
@@ -275,9 +389,56 @@ async function loadData() {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Abgleichsansicht konnte nicht geladen werden.";
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    anmeldestatusOptions.value = [];
+    fallgrundOptions.value = [];
     summary.value = createEmptySummary();
   } finally {
     loading.value = false;
+  }
+}
+
+function resetCaseDialog() {
+  caseDialogOpen.value = false;
+  caseDialogSaving.value = false;
+  selectedCaseRow.value = null;
+  caseFallgrundId.value = 0;
+  caseBemerkung.value = "";
+}
+
+function openCaseDialog(row: SchuelerRow) {
+  selectedCaseRow.value = row;
+  caseFallgrundId.value = Number(fallgrundOptions.value[0]?.id || 0);
+  caseBemerkung.value = "";
+  errorMessage.value = "";
+  successMessage.value = "";
+  caseDialogOpen.value = true;
+}
+
+async function submitOpenCase() {
+  if (!props.verfahrenId || !props.rundeId || !selectedCaseRow.value) return;
+  if (!Number(caseFallgrundId.value || 0)) {
+    errorMessage.value = "Bitte einen Fallgrund auswaehlen.";
+    return;
+  }
+
+  try {
+    caseDialogSaving.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    const response = await abgleichService.createOffenerFall({
+      verfahren_id: props.verfahrenId,
+      runde_id: props.rundeId,
+      schueler_id: Number(selectedCaseRow.value.schueler_id || 0),
+      fallgrund_id: Number(caseFallgrundId.value || 0),
+      bemerkung: caseBemerkung.value || "",
+    }, props.token);
+    successMessage.value = response?.message || "Der offene Fall wurde angelegt.";
+    await loadData();
+    resetCaseDialog();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der offene Fall konnte nicht angelegt werden.";
+  } finally {
+    caseDialogSaving.value = false;
   }
 }
 
@@ -510,6 +671,8 @@ function toggleSchuleFilter(schuleName: string) {
               <tr>
                 <th>Nr.</th>
                 <th><button type="button" @click="setSort('schueler_schul_id')">Schueler-ID{{ sortMarker('schueler_schul_id') }}</button></th>
+                <th>Bearb.</th>
+                <th>Fall</th>
                 <th><button type="button" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
                 <th><button type="button" @click="setSort('geburtsdatum')">Geburtsdatum{{ sortMarker('geburtsdatum') }}</button></th>
                 <th><button type="button" @click="setSort('foerderbedarf')">LE{{ sortMarker('foerderbedarf') }}</button></th>
@@ -523,14 +686,37 @@ function toggleSchuleFilter(schuleName: string) {
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="12" class="table-empty">Daten werden geladen...</td>
+                <td colspan="13" class="table-empty">Daten werden geladen...</td>
               </tr>
               <tr v-else-if="!sortedRows.length">
-                <td colspan="12" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
+                <td colspan="13" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
               </tr>
               <tr v-for="(row, index) in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}-${index}`">
                 <td>{{ index + 1 }}</td>
                 <td>{{ row.schueler_schul_id || "-" }}</td>
+                <td class="case-action-cell">
+                  <button
+                    type="button"
+                    class="case-icon-btn case-icon-btn-edit"
+                    title="Schuelerdatensatz bearbeiten"
+                    aria-label="Schuelerdatensatz bearbeiten"
+                    @click="openEditDialog(row)"
+                  >
+                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                  </button>
+                </td>
+                <td class="case-action-cell">
+                  <button
+                    type="button"
+                    :class="caseIconButtonClass(row)"
+                    :title="caseIconTitle(row)"
+                    :aria-label="caseIconTitle(row)"
+                    @click="openCaseDialog(row)"
+                  >
+                    <i class="bi bi-chat-square-text" aria-hidden="true"></i>
+                    <span v-if="hasOpenCase(row)" class="case-count-badge">{{ offeneFaelleAnzahl(row) }}</span>
+                  </button>
+                </td>
                 <td
                   :class="{ 'cell-duplicate-name': hasDuplicateNameBirth(row) }"
                   :title="hasDuplicateNameBirth(row) ? 'Name und Geburtsdatum kommen mehrfach vor' : ''"
@@ -569,6 +755,147 @@ function toggleSchuleFilter(schuleName: string) {
           </table>
         </div>
       </section>
+
+      <div v-if="caseDialogOpen" class="dialog-backdrop" @click.self="resetCaseDialog">
+        <section class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="offener-fall-dialog-title">
+          <div class="case-dialog-head">
+            <div>
+              <p class="section-eyebrow">Manueller Offener Fall</p>
+              <h3 id="offener-fall-dialog-title">Fall in Abgleich anlegen</h3>
+              <p class="case-dialog-student">
+                {{ selectedCaseRow ? ([selectedCaseRow.nachname, selectedCaseRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
+              </p>
+            </div>
+            <button type="button" class="case-dialog-close" aria-label="Dialog schliessen" @click="resetCaseDialog">×</button>
+          </div>
+
+          <div class="case-dialog-body">
+            <label class="filter-field">
+              <span>Fallgrund</span>
+              <select v-model="caseFallgrundId">
+                <option :value="0">Bitte waehlen</option>
+                <option v-for="option in fallgrundOptions" :key="option.id" :value="option.id">{{ option.code }}</option>
+              </select>
+            </label>
+
+            <label class="filter-field case-dialog-note">
+              <span>Bemerkung</span>
+              <textarea
+                v-model="caseBemerkung"
+                rows="5"
+                placeholder="Optional eine Bearbeitungsnotiz zum Fall erfassen"
+              />
+            </label>
+          </div>
+
+          <div class="case-dialog-actions">
+            <button type="button" class="btn-secondary" @click="resetCaseDialog">Abbrechen</button>
+            <button type="button" class="btn-primary" :disabled="caseDialogSaving" @click="submitOpenCase">
+              {{ caseDialogSaving ? "Speichere..." : "Fall anlegen" }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="editDialogOpen" class="dialog-backdrop" @click.self="closeEditDialog">
+        <section class="case-dialog case-dialog-edit" role="dialog" aria-modal="true" aria-labelledby="schueler-edit-dialog-title">
+          <div class="case-dialog-head">
+            <div>
+              <p class="section-eyebrow">Schuelerdatensatz</p>
+              <h3 id="schueler-edit-dialog-title">Schuelerdatensatz bearbeiten</h3>
+              <p class="case-dialog-student">
+                {{ selectedEditRow ? ([selectedEditRow.nachname, selectedEditRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
+              </p>
+            </div>
+            <button type="button" class="case-dialog-close" aria-label="Dialog schliessen" @click="closeEditDialog">×</button>
+          </div>
+
+          <div class="case-dialog-body case-dialog-body-edit">
+            <div class="edit-form-grid">
+              <label>
+                <span>Schueler-ID</span>
+                <input v-model="editForm.schueler_schul_id" type="text" />
+              </label>
+              <label>
+                <span>Schul-Nr</span>
+                <input v-model="editForm.schulnummer" type="text" />
+              </label>
+              <label>
+                <span>Vorname</span>
+                <input v-model="editForm.vorname" type="text" />
+              </label>
+              <label>
+                <span>Nachname</span>
+                <input v-model="editForm.nachname" type="text" />
+              </label>
+              <label>
+                <span>Geburtsdatum</span>
+                <input v-model="editForm.geburtsdatum" type="date" />
+              </label>
+              <label>
+                <span>Herkunft</span>
+                <select v-model="editForm.herkunft">
+                  <option value="">Bitte waehlen</option>
+                  <option v-for="option in herkunftEditOptions" :key="option" :value="option">{{ option }}</option>
+                </select>
+              </label>
+              <label>
+                <span>Abgleichstatus</span>
+                <select v-model="editForm.abgleich_status">
+                  <option value="">Bitte waehlen</option>
+                  <option value="Nur Pool">Nur Pool</option>
+                  <option value="Nur Anmeldung">Nur Anmeldung</option>
+                  <option value="Pool + Anm">Pool + Anm</option>
+                </select>
+              </label>
+              <label>
+                <span>Anmeldestatus</span>
+                <select v-model="editForm.anmeldestatus">
+                  <option value="">Bitte waehlen</option>
+                  <option v-for="option in anmeldestatusOptions" :key="option" :value="option">{{ option }}</option>
+                </select>
+              </label>
+              <label>
+                <span>LE</span>
+                <select v-model="editForm.foerderbedarf">
+                  <option value="0">Nein</option>
+                  <option value="1">Ja</option>
+                </select>
+              </label>
+              <label>
+                <span>ZD</span>
+                <select v-model="editForm.zieldifferent">
+                  <option value="0">Nein</option>
+                  <option value="1">Ja</option>
+                </select>
+              </label>
+              <label>
+                <span>Strasse</span>
+                <input v-model="editForm.strasse" type="text" />
+              </label>
+              <label>
+                <span>PLZ</span>
+                <input v-model="editForm.plz" type="text" />
+              </label>
+              <label class="edit-form-full">
+                <span>Ort</span>
+                <input v-model="editForm.ort" type="text" />
+              </label>
+              <label class="edit-form-full">
+                <span>Bemerkung</span>
+                <textarea v-model="editForm.bemerkung" rows="4"></textarea>
+              </label>
+            </div>
+          </div>
+
+          <div class="case-dialog-actions">
+            <button type="button" class="btn-secondary" :disabled="editDialogSaving" @click="closeEditDialog">Abbrechen</button>
+            <button type="button" class="btn-primary" :disabled="editDialogSaving" @click="saveEditDialog">
+              {{ editDialogSaving ? "Speichere..." : "Speichern" }}
+            </button>
+          </div>
+        </section>
+      </div>
     </template>
   </section>
 </template>
@@ -794,6 +1121,60 @@ function toggleSchuleFilter(schuleName: string) {
   cursor: pointer;
 }
 
+.case-action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.case-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #d7e2ef;
+  background: #eef4fd;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.case-icon-btn i {
+  font-size: 14px;
+}
+
+.case-icon-btn-idle {
+  color: #a5b4c8;
+  background: #eef4fd;
+}
+
+.case-icon-btn-active {
+  color: #b42318;
+  border-color: #f2c2c2;
+  background: #fff1f1;
+}
+
+.case-icon-btn-edit {
+  color: #1459a8;
+  background: #eef4fd;
+}
+
+.case-count-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #b42318;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
 .cell-duplicate-name {
   background: #fee2e2;
 }
@@ -815,6 +1196,15 @@ function toggleSchuleFilter(schuleName: string) {
   border: 0;
   background: #eef4fd;
   color: #17385f;
+}
+
+.btn-primary {
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  border: 0;
+  background: #17385f;
+  color: #fff;
 }
 
 .status-badge {
@@ -893,6 +1283,133 @@ function toggleSchuleFilter(schuleName: string) {
   color: #21653a;
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.case-dialog {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #dbe4f0;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 24px 60px rgba(19, 54, 102, 0.2);
+}
+
+.case-dialog-edit {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 40px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.case-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.case-dialog-head h3 {
+  margin: 0;
+  color: #17385f;
+}
+
+.case-dialog-student {
+  margin: 8px 0 0;
+  color: #4a607e;
+  font-weight: 600;
+}
+
+.case-dialog-close {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: #eef4fd;
+  color: #17385f;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.case-dialog-body {
+  display: grid;
+  gap: 14px;
+}
+
+.case-dialog-body-edit {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.edit-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.edit-form-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.edit-form-grid span {
+  color: #5a7393;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.edit-form-grid input,
+.edit-form-grid select,
+.edit-form-grid textarea {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #d7e2ef;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #17385f;
+  font-size: 13px;
+  font: inherit;
+}
+
+.edit-form-grid textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.edit-form-full {
+  grid-column: 1 / -1;
+}
+
+.case-dialog-note textarea {
+  min-height: 130px;
+  padding: 10px 12px;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #17385f;
+  font: inherit;
+  resize: vertical;
+}
+
+.case-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 900px) {
   .abgleich-toolbar,
   .section-head {
@@ -912,6 +1429,10 @@ function toggleSchuleFilter(schuleName: string) {
   .filter-field-compact {
     min-width: 0;
     flex-basis: auto;
+  }
+
+  .edit-form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

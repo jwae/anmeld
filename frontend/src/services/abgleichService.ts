@@ -40,4 +40,31 @@ export default {
     }, buildAuthConfig(token));
     return response.data;
   },
+
+  async createOffenerFall(
+    payload: {
+      verfahren_id: number;
+      runde_id: number;
+      schueler_id: number;
+      fallgrund_id: number;
+      bemerkung: string;
+    },
+    token?: string,
+  ) {
+    const response = await apiClient.post("/api/abgleich/offene-faelle", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async updateSchueler(
+    id: number,
+    payload: Record<string, unknown>,
+    token?: string,
+  ) {
+    const response = await apiClient.patch(
+      `/api/abgleich/schueler/${encodeURIComponent(String(id))}`,
+      payload,
+      buildAuthConfig(token),
+    );
+    return response.data;
+  },
 };

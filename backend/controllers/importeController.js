@@ -864,6 +864,8 @@ async function upsertAnmeldungenWizardImport(pool, payload) {
   const abgleichStatus = poolMatch ? "Pool + Anm" : "Nur Anmeldung";
 
   if (existing) {
+    const alteSchulnummer = normalizeText(existing?.schul_nr);
+    const neueSchulnummer = normalizeText(row?.schul_nr);
     const assignments = [
       "schueler_id = ?",
       "schueler_nr = ?",
@@ -914,6 +916,18 @@ async function upsertAnmeldungenWizardImport(pool, payload) {
       `,
       values,
     );
+    if (
+      alteSchulnummer
+      && neueSchulnummer
+      && normalizeTextLower(alteSchulnummer) !== normalizeTextLower(neueSchulnummer)
+    ) {
+      await ensureOpenCaseForSchoolChange(pool, {
+        verfahren_id: verfahrenId,
+        schueler_id: Number(existing.id),
+        alte_schulnummer: alteSchulnummer,
+        neue_schulnummer: neueSchulnummer,
+      });
+    }
     return { action: "UPDATE", pool_match: poolMatch };
   }
 
@@ -2072,6 +2086,64 @@ async function ensureOpenCaseForStatus(pool, payload) {
   });
 }
 
+async function resolvePoolStudentIdForSchoolChange(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const schuelerId = normalizeText(payload?.schueler_id);
+  const alteSchulnummer = normalizeText(payload?.alte_schulnummer);
+  const neueSchulnummer = normalizeText(payload?.neue_schulnummer);
+  if (!verfahrenId || !schuelerId) return null;
+
+  if (rundeId) {
+    const schoolNumbers = [neueSchulnummer, alteSchulnummer].filter(Boolean);
+    for (const schulnummer of schoolNumbers) {
+      const existingApplication = await findExistingApplication(pool, verfahrenId, rundeId, schulnummer, schuelerId);
+      const existingPoolId = Number(existingApplication?.schueler_pool_id || 0);
+      if (existingPoolId) return existingPoolId;
+    }
+
+    const [applicationRows] = await pool.query(
+      `
+      SELECT schueler_pool_id
+      FROM anm_anmeldung
+      WHERE verfahren_id = ?
+        AND runde_id = ?
+        AND TRIM(schueler_schul_id) = ?
+        AND schueler_pool_id IS NOT NULL
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [verfahrenId, rundeId, schuelerId],
+    );
+    if (Array.isArray(applicationRows) && applicationRows.length) {
+      const applicationPoolId = Number(applicationRows[0]?.schueler_pool_id || 0);
+      if (applicationPoolId) return applicationPoolId;
+    }
+  }
+
+  const schoolNumbers = [alteSchulnummer, neueSchulnummer].filter(Boolean);
+  for (const schulnummer of schoolNumbers) {
+    const poolId = await findExistingStudentByCsvId(pool, schuelerId, { verfahrenId, snr: schulnummer });
+    if (poolId) return Number(poolId);
+  }
+
+  const matchResult = await matchStudent(pool, {
+    vorname: payload?.vorname,
+    nachname: payload?.nachname,
+    geburtsdatum: payload?.geburtsdatum,
+    adresse: [
+      normalizeText(payload?.strasse),
+      [normalizeText(payload?.plz), normalizeText(payload?.ort)].filter(Boolean).join(" "),
+    ].filter(Boolean).join(", "),
+    erzieher: "",
+  });
+  if (Number(matchResult?.schueler_pool_id || 0)) {
+    return Number(matchResult.schueler_pool_id);
+  }
+
+  return null;
+}
+
 async function upsertStudent(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
@@ -2314,6 +2386,62 @@ async function ensureOpenCase(pool, payload) {
     ],
   );
   return { created: true };
+}
+
+async function ensureOpenCaseForSchoolChange(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const schuelerId = Number(payload?.schueler_id || 0);
+  const alteSchulnummer = normalizeText(payload?.alte_schulnummer);
+  const neueSchulnummer = normalizeText(payload?.neue_schulnummer);
+  if (!verfahrenId || !schuelerId || !alteSchulnummer || !neueSchulnummer) {
+    return { created: false, updated: false };
+  }
+
+  const bemerkung = `Das Kind wurde im vorherigen Verfahren der Schule '${alteSchulnummer}' zur Anmeldung zugeordnet. Laut der Importdatei wurde es aber an der Schule mit der schulnummer '${neueSchulnummer}' angemeldet! Bitte pruefen.`;
+  const fallgrundId = 17;
+  const fallstatusByCode = await loadCatalogByCode(pool, "anm_kat_fallstatus");
+  const fallstatusOffen = fallstatusByCode.get("offen");
+  const fallstatusId = Number(fallstatusOffen?.id || 0);
+  if (!fallstatusId) {
+    return { created: false, updated: false };
+  }
+
+  const [existingRows] = await pool.query(
+    `
+    SELECT id
+    FROM anm_offener_fall
+    WHERE verfahren_id = ?
+      AND schueler_id = ?
+      AND fallgrund_id = ?
+    LIMIT 1
+    `,
+    [verfahrenId, schuelerId, fallgrundId],
+  );
+
+  if (Array.isArray(existingRows) && existingRows.length) {
+    await pool.query(
+      `
+      UPDATE anm_offener_fall
+      SET fallstatus_id = ?,
+          zugewiesene_snr = ?,
+          bemerkung = ?,
+          updated_at = NOW()
+      WHERE id = ?
+      `,
+      [fallstatusId, alteSchulnummer || null, bemerkung, Number(existingRows[0].id)],
+    );
+    return { created: false, updated: true };
+  }
+
+  await pool.query(
+    `
+    INSERT INTO anm_offener_fall (
+      verfahren_id, schueler_pool_id, schueler_id, schueler_anmeldung_id, fallgrund_id, fallstatus_id, zugewiesene_snr, bemerkung
+    ) VALUES (?, NULL, ?, NULL, ?, ?, ?, ?)
+    `,
+    [verfahrenId, schuelerId, fallgrundId, fallstatusId, alteSchulnummer || null, bemerkung],
+  );
+  return { created: true, updated: false };
 }
 
 function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {

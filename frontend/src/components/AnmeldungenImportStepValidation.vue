@@ -31,6 +31,9 @@ function statusInlineClass(value: string) {
   if (normalized === "warteliste") return "status-inline-new-amber";
   return "status-inline-new-blue";
 }
+function schulNrInlineClass() {
+  return "status-inline-new-red";
+}
 function fieldTitle(row: Row, field: string) {
   if (!hasFieldChanged(row, field)) return "";
   const previousValue = previousFieldValue(row, field);
@@ -49,7 +52,13 @@ function fieldTitle(row: Row, field: string) {
             <td><input :checked="row.selected" type="checkbox" :disabled="busy || row.status === 'fehler'" @change="$emit('toggle-row', row.row_number, ($event.target as HTMLInputElement).checked)" /></td>
             <td>{{ row.row_number }}</td>
             <td>{{ fieldValue(row, 'schueler_id') }}</td>
-            <td :class="{ 'cell-changed cell-changed-blue': hasFieldChanged(row, 'schul_nr') }" :title="fieldTitle(row, 'schul_nr')">{{ row.data.schul_nr || "-" }}</td>
+            <td :title="fieldTitle(row, 'schul_nr')">
+              <template v-if="hasFieldChanged(row, 'schul_nr')">
+                <span>{{ previousFieldValue(row, 'schul_nr') }} -> </span>
+                <span class="status-inline-new" :class="schulNrInlineClass()">{{ fieldValue(row, 'schul_nr') }}</span>
+              </template>
+              <template v-else>{{ fieldValue(row, 'schul_nr') }}</template>
+            </td>
             <td :title="fieldTitle(row, 'anmeldestatus')">
               <template v-if="hasFieldChanged(row, 'anmeldestatus')">
                 <span>{{ previousFieldValue(row, 'anmeldestatus') }} -> </span>
@@ -77,7 +86,8 @@ function fieldTitle(row: Row, field: string) {
 .cell-changed-green{background:#dcfce7;color:#166534}
 .cell-changed-violet{background:#f3e8ff;color:#6b21a8}
 .status-inline-new{display:inline-block;padding:1px 6px;border-radius:999px}
-.status-inline-new-blue{background:#dbeafe;color:#1d4ed8}
-.status-inline-new-green{background:#dcfce7;color:#166534}
-.status-inline-new-amber{background:#fef3c7;color:#92400e}
-</style>
+  .status-inline-new-blue{background:#dbeafe;color:#1d4ed8}
+  .status-inline-new-green{background:#dcfce7;color:#166534}
+  .status-inline-new-amber{background:#fef3c7;color:#92400e}
+  .status-inline-new-red{background:#fee2e2;color:#b91c1c}
+  </style>

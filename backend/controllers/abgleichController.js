@@ -39,6 +39,122 @@ async function loadTableColumns(pool, tableName) {
   return columns;
 }
 
+async function loadAnmeldestatusCodes(pool) {
+  const [rows] = await pool.query(`
+    SELECT code
+    FROM anm_kat_anmeldestatus
+    WHERE COALESCE(TRIM(code), '') <> ''
+    ORDER BY code
+  `);
+
+  return (rows || [])
+    .map((row) => normalizeText(row?.code))
+    .filter(Boolean);
+}
+
+async function loadFallgrundOptions(pool) {
+  const [rows] = await pool.query(
+    `
+    SELECT id, code, bezeichnung
+    FROM anm_kat_fallgrund
+    WHERE COALESCE(aktiv, 1) = 1
+    ORDER BY COALESCE(sortierung, 0) ASC, COALESCE(code, bezeichnung) ASC
+    `,
+  );
+
+  return (rows || []).map((row) => ({
+    id: Number(row?.id || 0),
+    code: normalizeText(row?.code),
+    bezeichnung: normalizeText(row?.bezeichnung) || normalizeText(row?.code),
+  })).filter((row) => row.id > 0);
+}
+
+async function loadOpenCaseCountsByStudent(pool, verfahrenId) {
+  if (!(await tableExists(pool, "anm_offener_fall"))) return new Map();
+  const columns = await loadTableColumns(pool, "anm_offener_fall");
+  if (!columns.has("schueler_id")) return new Map();
+
+  const [rows] = await pool.query(
+    `
+    SELECT f.schueler_id, COUNT(*) AS total
+    FROM anm_offener_fall f
+    LEFT JOIN anm_kat_fallstatus fs
+      ON fs.id = f.fallstatus_id
+    WHERE verfahren_id = ?
+      AND f.schueler_id IS NOT NULL
+      AND LOWER(TRIM(COALESCE(fs.code, fs.bezeichnung, ''))) <> 'erledigt'
+    GROUP BY f.schueler_id
+    `,
+    [verfahrenId],
+  );
+
+  return new Map(
+    (rows || []).map((row) => [Number(row?.schueler_id || 0), Number(row?.total || 0)]),
+  );
+}
+
+async function loadFallstatusOpenId(pool) {
+  const [rows] = await pool.query(
+    `
+    SELECT id
+    FROM anm_kat_fallstatus
+    WHERE LOWER(TRIM(COALESCE(code, ''))) = 'offen'
+    LIMIT 1
+    `,
+  );
+
+  const fallstatusId = Number(rows?.[0]?.id || 0);
+  return fallstatusId > 0 ? fallstatusId : 0;
+}
+
+async function updateAbgleichSchuelerRow(pool, rowId, payload) {
+  const columns = await loadTableColumns(pool, "anm_schueler");
+  const assignments = [];
+  const values = [];
+  const add = (column, value) => {
+    if (!columns.has(column)) return;
+    assignments.push(`${column} = ?`);
+    values.push(value);
+  };
+
+  const normalizeBooleanValue = (value) => {
+    const text = normalizeText(value).toLowerCase();
+    if (["1", "true", "ja", "yes"].includes(text)) return 1;
+    return 0;
+  };
+
+  add("schueler_id", normalizeText(payload?.schueler_schul_id || payload?.schueler_id) || null);
+  add("vorname", normalizeText(payload?.vorname) || null);
+  add("nachname", normalizeText(payload?.nachname) || null);
+  add("geburtsdatum", normalizeText(payload?.geburtsdatum) || null);
+  add("foerderbedarf", normalizeBooleanValue(payload?.foerderbedarf));
+  add("zieldifferent", normalizeBooleanValue(payload?.zieldifferent));
+  add("herkunft", normalizeText(payload?.herkunft) || null);
+  add("abgleich_status", normalizeText(payload?.abgleich_status) || null);
+  add("anmeldestatus", normalizeText(payload?.anmeldestatus) || null);
+  add("schul_nr", normalizeText(payload?.schulnummer || payload?.schul_nr) || null);
+  add("strasse", normalizeText(payload?.strasse) || null);
+  add("plz", normalizeText(payload?.plz) || null);
+  add("ort", normalizeText(payload?.ort) || null);
+  add("bemerkung", normalizeText(payload?.bemerkung) || null);
+
+  if (!assignments.length) {
+    const error = new Error("Es wurden keine aktualisierbaren Felder uebergeben.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  values.push(Number(rowId));
+  await pool.query(
+    `
+    UPDATE anm_schueler
+    SET ${assignments.join(", ")}, updated_at = NOW()
+    WHERE id = ?
+    `,
+    values,
+  );
+}
+
 function createAddressLabel(row) {
   return [
     normalizeText(row?.strasse),
@@ -313,21 +429,26 @@ async function loadSummary(pool, verfahrenId, rundeId, schoolRows) {
   let ohneAnmeldung = 0;
 
   if (await tableExists(pool, "anm_offener_fall")) {
+    const offenerFallColumns = await loadTableColumns(pool, "anm_offener_fall");
+    const openCaseEntityExpr = offenerFallColumns.has("schueler_id")
+      ? "CASE WHEN schueler_pool_id IS NOT NULL THEN CONCAT('pool:', schueler_pool_id) WHEN schueler_id IS NOT NULL THEN CONCAT('schueler:', schueler_id) ELSE NULL END"
+      : "CASE WHEN schueler_pool_id IS NOT NULL THEN CONCAT('pool:', schueler_pool_id) ELSE NULL END";
     const [countRows] = await pool.query(
       `
       SELECT COUNT(*) AS total
       FROM (
-        SELECT DISTINCT schueler_pool_id
+        SELECT DISTINCT ${openCaseEntityExpr} AS entity_key
         FROM anm_offener_fall
         WHERE verfahren_id = ?
-          AND schueler_pool_id IS NOT NULL
+          AND (${openCaseEntityExpr}) IS NOT NULL
         UNION
-        SELECT DISTINCT schueler_pool_id
+        SELECT DISTINCT CONCAT('pool:', schueler_pool_id) AS entity_key
         FROM anm_anmeldung
         WHERE verfahren_id = ?
           AND runde_id = ?
           AND schueler_pool_id IS NOT NULL
       ) considered
+      WHERE entity_key IS NOT NULL
       `,
       [verfahrenId, verfahrenId, rundeId],
     );
@@ -387,6 +508,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     params.push(rundeId);
   }
 
+  const openCaseCounts = await loadOpenCaseCountsByStudent(pool, verfahrenId);
+
   const [rows] = await pool.query(
     `
     SELECT
@@ -404,7 +527,10 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
       NULLIF(TRIM(${studentIdColumn}), '') AS schueler_schul_id,
       COALESCE(s.abgleich_status, '') AS abgleich_status,
-      COALESCE(s.anmeldestatus, '') AS anmeldestatus
+      COALESCE(s.anmeldestatus, '') AS anmeldestatus,
+      ${columns.has("strasse") ? "COALESCE(s.strasse, '')" : "''"} AS strasse,
+      ${columns.has("plz") ? "COALESCE(s.plz, '')" : "''"} AS plz,
+      ${columns.has("bemerkung") ? "COALESCE(s.bemerkung, '')" : "''"} AS bemerkung
     FROM anm_schueler s
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
@@ -433,6 +559,10 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     schueler_schul_id: normalizeText(row?.schueler_schul_id),
     abgleich_status: normalizeText(row?.abgleich_status),
     anmeldestatus: normalizeText(row?.anmeldestatus),
+    strasse: normalizeText(row?.strasse),
+    plz: normalizeText(row?.plz),
+    bemerkung: normalizeText(row?.bemerkung),
+    offene_faelle_anzahl: Number(openCaseCounts.get(Number(row?.schueler_id || 0)) || 0),
   }));
 }
 
@@ -781,10 +911,140 @@ function createAbgleichController({ getPool }) {
         const rows = await loadSchuelerRows(pool, verfahrenId, rundeId);
         const summary = await loadSchuelerCardSummary(pool, verfahrenId, rundeId);
         const schoolOverview = await loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId);
-        return res.json({ rows, summary, schoolOverview });
+        const anmeldestatusOptions = await loadAnmeldestatusCodes(pool);
+        const fallgrundOptions = await loadFallgrundOptions(pool);
+        return res.json({ rows, summary, schoolOverview, anmeldestatusOptions, fallgrundOptions });
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");
+      }
+    },
+
+    createOffenerFall: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        const schuelerId = Number(req.body?.schueler_id || 0);
+        const fallgrundId = Number(req.body?.fallgrund_id || 0);
+        const bemerkung = normalizeText(req.body?.bemerkung);
+
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        if (!schuelerId) return sendError(res, 400, "schueler_id ist erforderlich.");
+        if (!fallgrundId) return sendError(res, 400, "fallgrund_id ist erforderlich.");
+
+        const pool = getPool();
+        const offenerFallColumns = await loadTableColumns(pool, "anm_offener_fall");
+        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+        if (!offenerFallColumns.has("schueler_id")) {
+          return sendError(res, 500, "Die Tabelle anm_offener_fall unterstuetzt noch keinen direkten Schuelerbezug.");
+        }
+
+        const fallstatusId = await loadFallstatusOpenId(pool);
+        if (!fallstatusId) {
+          return sendError(res, 500, "Kein Fallstatus mit dem Code 'offen' gefunden.");
+        }
+
+        const [studentRows] = await pool.query(
+          `
+          SELECT id, COALESCE(vorname, '') AS vorname, COALESCE(nachname, '') AS nachname
+          FROM anm_schueler
+          WHERE id = ?
+            ${schuelerColumns.has("verfahren_id") ? "AND verfahren_id = ?" : ""}
+            ${schuelerColumns.has("runde_id") ? "AND runde_id = ?" : ""}
+          LIMIT 1
+          `,
+          [
+            schuelerId,
+            ...(schuelerColumns.has("verfahren_id") ? [verfahrenId] : []),
+            ...(schuelerColumns.has("runde_id") ? [rundeId] : []),
+          ],
+        );
+        if (!Array.isArray(studentRows) || !studentRows.length) {
+          return sendError(res, 404, "Der ausgewaehlte Schueler wurde nicht gefunden.");
+        }
+
+        const [fallgrundRows] = await pool.query(
+          `
+          SELECT id, COALESCE(bezeichnung, code) AS label
+          FROM anm_kat_fallgrund
+          WHERE id = ?
+          LIMIT 1
+          `,
+          [fallgrundId],
+        );
+        if (!Array.isArray(fallgrundRows) || !fallgrundRows.length) {
+          return sendError(res, 404, "Der ausgewaehlte Fallgrund wurde nicht gefunden.");
+        }
+
+        const [result] = await pool.query(
+          `
+          INSERT INTO anm_offener_fall (
+            verfahren_id,
+            schueler_pool_id,
+            schueler_id,
+            schueler_anmeldung_id,
+            fallgrund_id,
+            fallstatus_id,
+            zugewiesene_snr,
+            bemerkung,
+            created_at,
+            updated_at
+          ) VALUES (?, NULL, ?, NULL, ?, ?, NULL, ?, NOW(), NOW())
+          `,
+          [verfahrenId, schuelerId, fallgrundId, fallstatusId, bemerkung || null],
+        );
+
+        const student = studentRows[0] || {};
+        return res.status(201).json({
+          success: true,
+          fall_id: Number(result?.insertId || 0),
+          message: `Offener Fall fuer ${normalizeText(student.nachname)}, ${normalizeText(student.vorname)} wurde angelegt.`,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, 500, "Der offene Fall konnte nicht angelegt werden.");
+      }
+    },
+
+    updateSchueler: async (req, res) => {
+      try {
+        const rowId = Number(req.params.id || 0);
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!rowId) return sendError(res, 400, "id ist erforderlich.");
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+
+        const pool = getPool();
+        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
+        const [rows] = await pool.query(
+          `
+          SELECT id
+          FROM anm_schueler
+          WHERE id = ?
+            ${schuelerColumns.has("verfahren_id") ? "AND verfahren_id = ?" : ""}
+            ${schuelerColumns.has("runde_id") ? "AND runde_id = ?" : ""}
+          LIMIT 1
+          `,
+          [
+            rowId,
+            ...(schuelerColumns.has("verfahren_id") ? [verfahrenId] : []),
+            ...(schuelerColumns.has("runde_id") ? [rundeId] : []),
+          ],
+        );
+        if (!Array.isArray(rows) || !rows.length) {
+          return sendError(res, 404, "Der ausgewaehlte Schuelerdatensatz wurde nicht gefunden.");
+        }
+
+        await updateAbgleichSchuelerRow(pool, rowId, req.body || {});
+        return res.json({
+          success: true,
+          message: "Der Schuelerdatensatz wurde gespeichert.",
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Schuelerdatensatz konnte nicht gespeichert werden.");
       }
     },
 
