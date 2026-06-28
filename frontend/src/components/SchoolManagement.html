@@ -133,6 +133,13 @@
             Fehlende Koordinaten berechnen
           </button>
           <button
+            class="btn-secondary school-management-import-info-button"
+            type="button"
+            @click="openGeocodeInfoOverlay"
+          >
+            ? Info Geocodes
+          </button>
+          <button
             class="btn-secondary school-management-delete-all"
             type="button"
             @click="deleteAllManagementSchools"
@@ -589,6 +596,49 @@
     </div>
 
     <div
+      v-if="geocodeInfoOverlayOpen"
+      class="school-management-modal-overlay"
+      @click.self="closeGeocodeInfoOverlay"
+    >
+      <section class="school-management-modal school-management-import-info-modal" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
+        <div class="school-management-modal-head">
+          <div>
+            <h3>Info zur Geocodes-Berechnung</h3>
+            <p>So werden fehlende Koordinaten fuer Schulen ermittelt.</p>
+          </div>
+          <button class="btn-secondary" type="button" @click="closeGeocodeInfoOverlay">
+            Schliessen
+          </button>
+        </div>
+
+        <div class="school-management-import-info-grid">
+          <section class="school-management-import-info-card">
+            <h4>Berechnung</h4>
+            <div class="school-management-import-info-list">
+              <p>Verwendet werden die Felder <code>strasse</code>, <code>plz</code> und <code>ort</code> aus <code>anm_schulen</code>.</p>
+              <p>Aus diesen Adressdaten wird eine Suchanfrage gebaut und an den Geocoding-Dienst von OpenRouteService gesendet.</p>
+              <p>Wenn ein Treffer gefunden wird, werden die Werte als <code>latitude</code> und <code>longitude</code> gespeichert.</p>
+              <p>Wenn Adresse oder Treffer fehlen, bleiben die Koordinaten leer.</p>
+            </div>
+          </section>
+
+          <section class="school-management-import-info-card">
+            <h4>Dienst</h4>
+            <div class="school-management-import-info-list">
+              <p>Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
+              <p>
+                Dokumentation:
+                <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
+                  OpenRouteService Geocoding
+                </a>
+              </p>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div
       v-if="deleteAllSchoolsConfirmOpen"
       class="school-management-modal-overlay"
       @click.self="closeDeleteAllSchoolsConfirm"
@@ -657,6 +707,16 @@
         <span class="school-management-loading-spinner" aria-hidden="true"></span>
         <strong>Bitte warten...</strong>
         <p>{{ currentActionLabel || "Vorgang laeuft..." }}</p>
+        <p v-if="currentActionInfo" class="school-management-loading-info">{{ currentActionInfo }}</p>
+        <a
+          v-if="currentActionLink"
+          class="school-management-loading-link"
+          :href="currentActionLink"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ currentActionLinkLabel || currentActionLink }}
+        </a>
       </section>
     </div>
   </template>

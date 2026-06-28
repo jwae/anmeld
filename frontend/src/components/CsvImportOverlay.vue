@@ -114,6 +114,10 @@ const delimiterLabel = computed(() => {
   return "Tab";
 });
 
+const showSourceSchoolColumn = computed(() => (
+  schemaFields.value.some((field) => field.key === "source_school_snr" && field.required)
+));
+
 const stepTitle = computed(() => {
   if (currentStep.value === 1) return "Datei auswaehlen";
   if (currentStep.value === 2) return `Vorschau der Importdatei (erste ${CSV_PREVIEW_ROW_LIMIT} Zeilen)`;
@@ -383,6 +387,7 @@ function handleClose() {
           v-else-if="currentStep === 4"
           :rows="validationRows"
           :busy="busy"
+          :show-source-school-column="showSourceSchoolColumn"
           @toggle-all="toggleAllRows"
           @toggle-row="toggleRow"
         />

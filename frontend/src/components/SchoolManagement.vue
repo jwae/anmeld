@@ -25,6 +25,9 @@ const emit = defineEmits<{
 const managementSaving = ref<boolean>(false);
 const loadingOverlayOpen = ref<boolean>(false);
 const currentActionLabel = ref<string>("");
+const currentActionInfo = ref<string>("");
+const currentActionLink = ref<string>("");
+const currentActionLinkLabel = ref<string>("");
 const schoolImportInput = ref<HTMLInputElement | null>(null);
 const schoolTableImportInput = ref<HTMLInputElement | null>(null);
 const selectedManagementSchoolSourceId = ref<string>("");
@@ -57,6 +60,7 @@ const schoolTableImportSummary = ref({
 });
 const deleteAllSchoolsConfirmOpen = ref<boolean>(false);
 const importInfoOverlayOpen = ref<boolean>(false);
+const geocodeInfoOverlayOpen = ref<boolean>(false);
 const schoolSourceForm = reactive({
   snr: "",
   name: "",
@@ -366,6 +370,14 @@ function closeImportInfoOverlay() {
   importInfoOverlayOpen.value = false;
 }
 
+function openGeocodeInfoOverlay() {
+  geocodeInfoOverlayOpen.value = true;
+}
+
+function closeGeocodeInfoOverlay() {
+  geocodeInfoOverlayOpen.value = false;
+}
+
 function openImportResultDialog(title: string, body: string) {
   importResultDialogTitle.value = String(title || "Import-Ergebnis").trim() || "Import-Ergebnis";
   importResultDialogBody.value = String(body || "").trim();
@@ -567,9 +579,9 @@ watch([localFeedbackError, localFeedbackNotice], ([error, notice]) => {
   }, 3200);
 });
 
-watch([schoolSelectionModalOpen, schoolImportPreviewModalOpen, schoolTableImportPreviewModalOpen, importResultDialogOpen, deleteAllSchoolsConfirmOpen, importInfoOverlayOpen], ([isSelectionOpen, isSourceImportOpen, isSchoolImportOpen, isResultOpen, isDeleteConfirmOpen, isImportInfoOpen]) => {
+watch([schoolSelectionModalOpen, schoolImportPreviewModalOpen, schoolTableImportPreviewModalOpen, importResultDialogOpen, deleteAllSchoolsConfirmOpen, importInfoOverlayOpen, geocodeInfoOverlayOpen], ([isSelectionOpen, isSourceImportOpen, isSchoolImportOpen, isResultOpen, isDeleteConfirmOpen, isImportInfoOpen, isGeocodeInfoOpen]) => {
   if (typeof document === "undefined") return;
-  document.body.style.overflow = isSelectionOpen || isSourceImportOpen || isSchoolImportOpen || isResultOpen || isDeleteConfirmOpen || isImportInfoOpen ? "hidden" : "";
+  document.body.style.overflow = isSelectionOpen || isSourceImportOpen || isSchoolImportOpen || isResultOpen || isDeleteConfirmOpen || isImportInfoOpen || isGeocodeInfoOpen ? "hidden" : "";
 });
 
 watch(
@@ -784,6 +796,9 @@ async function testAllManagementSchoolSources() {
   managementSaving.value = true;
   loadingOverlayOpen.value = true;
   currentActionLabel.value = "Ich teste, ob der SVWS-Server und die DB der aktivierten Schulen erreichbar ist.";
+  currentActionInfo.value = "";
+  currentActionLink.value = "";
+  currentActionLinkLabel.value = "";
   emitFeedback("", "");
 
   try {
@@ -867,6 +882,9 @@ async function geocodeMissingManagementSchoolSources() {
   managementSaving.value = true;
   loadingOverlayOpen.value = true;
   currentActionLabel.value = "Ich berechne fehlende Koordinaten fuer Schulen ohne Latitude/Longitude.";
+  currentActionInfo.value = "Die Adressen werden dabei ueber OpenRouteService geocodiert und in Latitude/Longitude fuer die Schulstandorte umgewandelt.";
+  currentActionLink.value = "https://openrouteservice.org/dev/#/api-docs/geocode/search/get";
+  currentActionLinkLabel.value = "OpenRouteService Geocoding";
   emitFeedback("", "");
 
   try {
@@ -891,6 +909,9 @@ async function geocodeMissingManagementSchoolSources() {
     managementSaving.value = false;
     loadingOverlayOpen.value = false;
     currentActionLabel.value = "";
+    currentActionInfo.value = "";
+    currentActionLink.value = "";
+    currentActionLinkLabel.value = "";
   }
 }
 

@@ -50,6 +50,7 @@ const students = ref<StudentRow[]>([]);
 const selectedSchoolSnr = ref("");
 const selectedStudentRowIds = ref<number[]>([]);
 const distanceMode = ref("");
+const geocodeInfoOverlayOpen = ref(false);
 
 const selectedSchool = computed(
   () => schools.value.find((school) => school.snr === selectedSchoolSnr.value) || null,
@@ -112,6 +113,14 @@ function statusClass(value: string) {
   if (normalized === "warteliste") return "status-chip status-chip-warteliste";
   if (normalized === "abgelehnt" || normalized === "ablehnung") return "status-chip status-chip-abgelehnt";
   return "status-chip";
+}
+
+function openGeocodeInfoOverlay() {
+  geocodeInfoOverlayOpen.value = true;
+}
+
+function closeGeocodeInfoOverlay() {
+  geocodeInfoOverlayOpen.value = false;
 }
 
 async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
@@ -238,9 +247,14 @@ watch(
           Waehle eine Schule aus. Die Schueler werden nach Entfernung zur ausgewaehlten Schule sortiert angezeigt.
         </p>
       </div>
-      <button class="btn-secondary" type="button" @click="loadData(selectedSchoolSnr)" :disabled="loading">
-        {{ loading ? "Aktualisiere..." : "Aktualisieren" }}
-      </button>
+      <div class="toolbar-actions">
+        <button class="btn-secondary" type="button" @click="openGeocodeInfoOverlay">
+          ? Info Geocodes
+        </button>
+        <button class="btn-secondary" type="button" @click="loadData(selectedSchoolSnr)" :disabled="loading">
+          {{ loading ? "Aktualisiere..." : "Aktualisieren" }}
+        </button>
+      </div>
     </div>
 
     <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning">
@@ -414,6 +428,41 @@ watch(
         </article>
       </section>
     </template>
+
+    <div
+      v-if="geocodeInfoOverlayOpen"
+      class="koordination-modal-overlay"
+      @click.self="closeGeocodeInfoOverlay"
+    >
+      <section class="koordination-modal" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
+        <div class="section-head">
+          <div>
+            <p class="section-eyebrow">Info</p>
+            <h4>Info zur Geocodes-Berechnung</h4>
+          </div>
+          <button class="btn-secondary" type="button" @click="closeGeocodeInfoOverlay">
+            Schliessen
+          </button>
+        </div>
+        <div class="koordination-info-grid">
+          <section class="koordination-info-card">
+            <h5>Berechnung</h5>
+            <p>Fehlende Adressen werden ueber <code>strasse</code>, <code>plz</code> und <code>ort</code> geocodiert.</p>
+            <p>Aus dem Treffer werden <code>Latitude</code> und <code>Longitude</code> fuer die Distanzberechnung zur gewaehlten Schule gespeichert.</p>
+            <p>Wenn eine Adresse unvollstaendig ist oder kein Treffer gefunden wird, bleibt die Entfernung fuer diesen Datensatz leer.</p>
+          </section>
+          <section class="koordination-info-card">
+            <h5>Dienst</h5>
+            <p>Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
+            <p>
+              <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
+                OpenRouteService Geocoding
+              </a>
+            </p>
+          </section>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -481,6 +530,13 @@ watch(
   justify-content: space-between;
   gap: 16px;
   align-items: end;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
@@ -754,6 +810,66 @@ watch(
   font-weight: 700;
 }
 
+.koordination-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(22, 34, 52, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.koordination-modal {
+  width: min(760px, 100%);
+  padding: 22px;
+  border: 1px solid #dbe4f0;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fe 100%);
+  box-shadow: 0 28px 70px rgba(18, 45, 88, 0.24);
+}
+
+.koordination-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.koordination-info-card {
+  padding: 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.koordination-info-card h5 {
+  margin: 0 0 8px;
+  color: #17385f;
+  font-size: 15px;
+}
+
+.koordination-info-card p {
+  margin: 0 0 8px;
+  color: #4a607e;
+  line-height: 1.5;
+}
+
+.koordination-info-card p:last-child {
+  margin-bottom: 0;
+}
+
+.koordination-info-card a {
+  color: #1459a8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.koordination-info-card a:hover {
+  text-decoration: underline;
+}
+
 .table-empty {
   text-align: center;
   color: #6b7f99;
@@ -774,6 +890,12 @@ watch(
   }
 
   .selection-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions,
+  .koordination-info-grid {
+    width: 100%;
     grid-template-columns: 1fr;
   }
 }

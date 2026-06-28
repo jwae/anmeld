@@ -41,7 +41,7 @@ function handleDragOver(event: DragEvent) {
     </div>
 
     <div class="upload-options">
-      <label>
+      <label class="upload-option upload-option-compact">
         <span>Trennzeichen</span>
         <select :value="options.delimiter" @change="$emit('update:delimiter', ($event.target as HTMLSelectElement).value as 'auto' | ';' | ',' | '\t')">
           <option value="auto">Automatisch</option>
@@ -50,11 +50,14 @@ function handleDragOver(event: DragEvent) {
           <option :value="'\t'">Tab</option>
         </select>
       </label>
-      <label class="checkbox-row">
-        <input :checked="options.hasHeaders" type="checkbox" @change="$emit('update:hasHeaders', ($event.target as HTMLInputElement).checked)" />
+      <label class="upload-option upload-option-binary">
         <span>Erste Zeile enthält Spaltennamen</span>
+        <select :value="options.hasHeaders ? 'ja' : 'nein'" @change="$emit('update:hasHeaders', ($event.target as HTMLSelectElement).value === 'ja')">
+          <option value="ja">Ja</option>
+          <option value="nein">Nein</option>
+        </select>
       </label>
-      <label>
+      <label class="upload-option upload-option-compact">
         <span>Zeichensatz</span>
         <input type="text" value="UTF-8 (mit Fallback)" disabled />
       </label>
@@ -101,14 +104,32 @@ function handleDragOver(event: DragEvent) {
 }
 
 .upload-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 14px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .upload-options label {
   display: grid;
   gap: 6px;
+}
+
+.upload-option {
+  align-content: start;
+}
+
+.upload-option-compact {
+  width: 25%;
+  min-width: 110px;
+}
+
+.upload-option-binary {
+  width: max-content;
+  min-width: 210px;
 }
 
 .upload-options span {
@@ -125,17 +146,17 @@ function handleDragOver(event: DragEvent) {
   padding: 0 12px;
 }
 
-.checkbox-row {
-  align-content: center;
-}
-
-.checkbox-row input {
-  margin-right: 10px;
-}
-
 @media (max-width: 760px) {
   .upload-options {
+    display: grid;
     grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .upload-option-compact,
+  .upload-option-binary {
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

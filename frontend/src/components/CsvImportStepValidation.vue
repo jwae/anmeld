@@ -13,6 +13,7 @@ type ValidationRow = {
 defineProps<{
   rows: ValidationRow[];
   busy: boolean;
+  showSourceSchoolColumn?: boolean;
 }>();
 
 defineEmits<{
@@ -72,7 +73,7 @@ function isChanged(row: ValidationRow, field: string) {
           <tr>
             <th>Import</th>
             <th>Zeile</th>
-            <th>Schulnummer</th>
+            <th v-if="showSourceSchoolColumn">Schulnummer</th>
             <th>ID</th>
             <th>Vorname</th>
             <th>Nachname</th>
@@ -92,7 +93,7 @@ function isChanged(row: ValidationRow, field: string) {
               />
             </td>
             <td>{{ row.row_number }}</td>
-            <td :class="{ 'cell-changed': isChanged(row, 'source_school_snr') }">{{ row.data?.source_school_snr || "-" }}</td>
+            <td v-if="showSourceSchoolColumn" :class="{ 'cell-changed': isChanged(row, 'source_school_snr') }">{{ row.data?.source_school_snr || "-" }}</td>
             <td :class="{ 'cell-changed': isChanged(row, 'schueler_id') }">{{ row.data?.schueler_id || "-" }}</td>
             <td :class="{ 'cell-changed': isChanged(row, 'vorname') }">{{ row.data?.vorname || "-" }}</td>
             <td :class="{ 'cell-changed': isChanged(row, 'nachname') }">{{ row.data?.nachname || "-" }}</td>

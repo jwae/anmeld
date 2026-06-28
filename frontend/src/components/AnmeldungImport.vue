@@ -83,15 +83,19 @@ async function importiereAnmeldungenAusSchild3() {
 }
 
 async function handleWizardSuccess(result: any) {
+  const inserted = Number(result?.inserted || 0);
+  const updated = Number(result?.updated || 0);
+  const skipped = Number(result?.skipped || 0);
+  const errors = Number(result?.errors || 0);
   importSummary.value = {
     total_summary: {
-      imported_rows: Number(result?.inserted || 0),
-      updated_rows: Number(result?.updated || 0),
-      skipped_rows: Number(result?.skipped || 0),
-      error_rows: Number(result?.errors || 0),
+      imported_rows: inserted,
+      updated_rows: updated,
+      skipped_rows: skipped,
+      error_rows: errors,
       pool_anmeldung: Number(result?.pool_anmeldung || 0),
       nur_anmeldung: Number(result?.nur_anmeldung || 0),
-      rows_read: Number(result?.inserted || 0) + Number(result?.updated || 0) + Number(result?.skipped || 0),
+      rows_read: inserted + updated + skipped + errors,
     },
   };
   successMessage.value = "Anmeldungsimport erfolgreich abgeschlossen.";
@@ -130,7 +134,7 @@ onMounted(() => {
       </div>
       <div class="import-head-actions">
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
-          CSV hochladen
+          Import (CSV)
         </button>
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3

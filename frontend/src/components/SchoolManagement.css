@@ -492,6 +492,20 @@ button:disabled {
   line-height: 1.45;
 }
 
+.school-management-loading-info {
+  max-width: 32ch;
+}
+
+.school-management-loading-link {
+  color: #1459a8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.school-management-loading-link:hover {
+  text-decoration: underline;
+}
+
 .school-management-loading-spinner {
   width: 30px;
   height: 30px;

@@ -518,7 +518,7 @@ onUnmounted(() => {
       </div>
       <div class="import-head-actions">
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
-          CSV hochladen
+          Import (CSV, EWO)
         </button>
         <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
           Import Pooldaten aus Schild
