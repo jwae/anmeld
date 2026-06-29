@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AnmeldeverfahrenListe from "../AnmeldeverfahrenListe.vue";
 import AnmeldeverfahrenForm from "../AnmeldeverfahrenForm.vue";
 import AnmelderundenListe from "../AnmelderundenListe.vue";
@@ -58,6 +58,7 @@ const successMessage = ref<string>("");
 const showHiddenVerfahren = ref<boolean>(false);
 const showProcedureOverlay = ref<boolean>(false);
 const showRoundOverlay = ref<boolean>(false);
+let successMessageTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
 const rundenForm = ref<RundenFormState>(createEmptyRundenForm());
@@ -154,6 +155,10 @@ function getErrorMessage(error: any, fallbackMessage: string) {
 }
 
 function showError(error: any, fallbackMessage: string) {
+  if (successMessageTimeoutId) {
+    clearTimeout(successMessageTimeoutId);
+    successMessageTimeoutId = null;
+  }
   errorMessage.value = getErrorMessage(error, fallbackMessage);
   successMessage.value = "";
 }
@@ -161,6 +166,11 @@ function showError(error: any, fallbackMessage: string) {
 function showSuccess(message: string) {
   successMessage.value = message;
   errorMessage.value = "";
+  if (successMessageTimeoutId) clearTimeout(successMessageTimeoutId);
+  successMessageTimeoutId = setTimeout(() => {
+    successMessage.value = "";
+    successMessageTimeoutId = null;
+  }, 4000);
 }
 
 function applyLocalWorkingRound(rundenId: number | null) {
@@ -492,6 +502,13 @@ async function startRound(item: Anmelderunde) {
 onMounted(async () => {
   await loadVerfahren(props.initialVerfahrenId);
 });
+
+onBeforeUnmount(() => {
+  if (successMessageTimeoutId) {
+    clearTimeout(successMessageTimeoutId);
+    successMessageTimeoutId = null;
+  }
+});
 </script>
 
 <template>
@@ -504,35 +521,6 @@ onMounted(async () => {
         </label>
       </div>
 
-      <div class="anm-toolbar">
-        <button class="btn-secondary anm-toolbar-btn" type="button" @click="openCreateProcedureOverlay">
-          Neues Verfahren
-        </button>
-        <button
-          class="btn-secondary anm-toolbar-btn"
-          type="button"
-          :disabled="!selectedVerfahrenId || selectedProcedureLocked"
-          @click="openCreateRoundOverlay"
-        >
-          Weitere Runde anlegen
-        </button>
-        <button
-          class="btn-secondary anm-toolbar-btn"
-          type="button"
-          :disabled="selectedVerfahren?.status !== 'Vorbereitet'"
-          @click="startProcedure"
-        >
-          Verfahren starten
-        </button>
-        <button
-          class="btn-secondary anm-toolbar-btn anm-toolbar-btn-danger"
-          type="button"
-          :disabled="!selectedVerfahrenId || selectedProcedureLocked"
-          @click="finishProcedure"
-        >
-          Verfahren beenden
-        </button>
-      </div>
     </section>
 
     <transition name="feedback-fade" mode="out-in">
@@ -552,9 +540,15 @@ onMounted(async () => {
         :selected-id="selectedVerfahrenId"
         :loading="loadingVerfahren"
         :deleting-id="deletingVerfahrenId"
+        :can-create="true"
+        :can-start="selectedVerfahren?.status === 'Vorbereitet'"
+        :can-finish="!!selectedVerfahrenId && !selectedProcedureLocked"
         @select="selectVerfahren"
         @edit="openEditProcedureOverlay"
         @delete="deleteVerfahren"
+        @create="openCreateProcedureOverlay"
+        @start="startProcedure"
+        @finish="finishProcedure"
       />
 
       <AnmelderundenListe
@@ -565,11 +559,13 @@ onMounted(async () => {
         :deleting-id="deletingRundenId"
         :next-round-id="nextStartableRound?.id ?? null"
         :procedure-locked="selectedProcedureLocked"
+        :can-create-round="!!selectedVerfahrenId && !selectedProcedureLocked"
         @select="selectRunde"
         @edit="openEditRoundOverlay"
         @delete="deleteRunde"
         @set-working="setWorkingRound"
         @start-round="startRound"
+        @create-round="openCreateRoundOverlay"
       />
     </div>
 

@@ -6,12 +6,18 @@ defineProps<{
   selectedId: number | null;
   loading?: boolean;
   deletingId?: number | null;
+  canCreate?: boolean;
+  canStart?: boolean;
+  canFinish?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "select", id: number): void;
   (e: "edit", item: Anmeldeverfahren): void;
   (e: "delete", item: Anmeldeverfahren): void;
+  (e: "create"): void;
+  (e: "start"): void;
+  (e: "finish"): void;
 }>();
 
 function formatTimestamp(value: string) {
@@ -27,7 +33,18 @@ function formatTimestamp(value: string) {
         <h3>Anmeldeverfahren</h3>
         <p>Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
       </div>
-      <span class="anm-badge">{{ items.length }}</span>
+      <div class="anm-card-head-actions">
+        <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreate === false" @click="emit('create')">
+          Neues Verfahren
+        </button>
+        <button class="btn-secondary anm-head-btn anm-head-btn-success" type="button" :disabled="canStart === false" @click="emit('start')">
+          Verfahren starten
+        </button>
+        <button class="btn-secondary anm-head-btn anm-head-btn-danger" type="button" :disabled="canFinish === false" @click="emit('finish')">
+          Verfahren beenden
+        </button>
+        <span class="anm-badge">{{ items.length }}</span>
+      </div>
     </div>
 
     <div v-if="loading" class="anm-loading-state">Verfahren werden geladen...</div>
@@ -113,6 +130,18 @@ function formatTimestamp(value: string) {
   gap: 12px;
 }
 
+.anm-card-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #dbe6f2;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f9fbfe 0%, #f1f6fb 100%);
+}
+
 .anm-card-head h3 {
   margin: 0;
   color: #19385e;
@@ -135,6 +164,58 @@ function formatTimestamp(value: string) {
   font-weight: 800;
   text-align: center;
   font-size: 12px;
+}
+
+.anm-head-btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f466f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.anm-head-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
+}
+
+.anm-head-btn:disabled {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.anm-head-btn-primary {
+  border-color: #c8dbef;
+  background: #ffffff;
+}
+
+.anm-head-btn-success {
+  border-color: #cde7d4;
+  background: #f4fbf6;
+  color: #2d6a39;
+}
+
+.anm-head-btn-danger {
+  border-color: #f0d0d0;
+  background: #fff7f7;
+  color: #9a3a3a;
+}
+
+.anm-head-btn-danger:hover:not(:disabled) {
+  background: #faeeee;
 }
 
 .anm-loading-state,

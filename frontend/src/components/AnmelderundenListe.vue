@@ -9,6 +9,7 @@ defineProps<{
   deletingId?: number | null;
   nextRoundId?: number | null;
   procedureLocked?: boolean;
+  canCreateRound?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   (e: "delete", item: Anmelderunde): void;
   (e: "set-working", item: Anmelderunde): void;
   (e: "start-round", item: Anmelderunde): void;
+  (e: "create-round"): void;
 }>();
 
 function formatDate(value: string | null) {
@@ -32,7 +34,12 @@ function formatDate(value: string | null) {
         <p v-if="verfahren">Runden fuer {{ verfahren.bezeichnung }}.</p>
         <p v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
       </div>
-      <span v-if="verfahren" class="anm-badge">{{ items.length }}</span>
+      <div v-if="verfahren" class="anm-card-head-actions">
+        <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreateRound === false" @click="emit('create-round')">
+          Weitere Runde anlegen
+        </button>
+        <span class="anm-badge">{{ items.length }}</span>
+      </div>
     </div>
 
     <div v-if="!verfahren" class="anm-empty-state">
@@ -142,6 +149,18 @@ function formatDate(value: string | null) {
   gap: 12px;
 }
 
+.anm-card-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #dbe6f2;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f9fbfe 0%, #f1f6fb 100%);
+}
+
 .anm-card-head h3 {
   margin: 0;
   color: #19385e;
@@ -164,6 +183,42 @@ function formatDate(value: string | null) {
   font-weight: 800;
   text-align: center;
   font-size: 12px;
+}
+
+.anm-head-btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f466f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.anm-head-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
+}
+
+.anm-head-btn:disabled {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.anm-head-btn-primary {
+  border-color: #c8dbef;
+  background: #ffffff;
 }
 
 .anm-empty-state,

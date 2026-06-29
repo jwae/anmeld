@@ -205,7 +205,7 @@ async function create(pool, payload) {
     const schema = await loadSchemaConfig(connection);
     await connection.beginTransaction();
 
-    const initialProcedureStatus = "In Bearbeitung";
+    const initialProcedureStatus = "Vorbereitet";
 
     const fields = ["schuljahr", "bezeichnung", "verfahrenstyp", "status"];
     const values = [payload.schuljahr, payload.bezeichnung, payload.verfahrenstyp, initialProcedureStatus];
@@ -229,24 +229,20 @@ async function create(pool, payload) {
     if (schema.roundWorkingFlagColumn) roundFields.push(schema.roundWorkingFlagColumn);
 
     for (let roundNumber = 1; roundNumber <= 3; roundNumber += 1) {
-      const isFirstRound = roundNumber === 1;
       const roundValues = [
         result.insertId,
         roundNumber,
         `Runde ${roundNumber}`,
         null,
         null,
-        isFirstRound ? "In Bearbeitung" : "Vorbereitet",
+        "Vorbereitet",
       ];
-      if (schema.roundWorkingFlagColumn) roundValues.push(isFirstRound ? 1 : 0);
+      if (schema.roundWorkingFlagColumn) roundValues.push(0);
       const roundPlaceholders = roundFields.map(() => "?").join(", ");
-      const [roundResult] = await connection.query(
+      await connection.query(
         `INSERT INTO anm_runde (${roundFields.join(", ")}) VALUES (${roundPlaceholders})`,
         roundValues,
       );
-      if (isFirstRound) {
-        await setWorkingRound(connection, result.insertId, roundResult.insertId, schema);
-      }
     }
 
     await connection.commit();

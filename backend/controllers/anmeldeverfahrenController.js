@@ -104,7 +104,7 @@ function createAnmeldeverfahrenController({ getPool }) {
 
         const row = await model.create(getPool(), payload);
         res.status(201).json({
-          message: "Anmeldeverfahren erfolgreich angelegt. Runde 1 ist direkt in Bearbeitung und als Arbeitsrunde gesetzt.",
+          message: "Anmeldeverfahren erfolgreich angelegt. Drei Runden wurden im Status 'Vorbereitet' angelegt.",
           row,
         });
       } catch (error) {
