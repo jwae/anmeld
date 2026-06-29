@@ -13,7 +13,11 @@ type ValidationRow = {
 defineProps<{
   rows: ValidationRow[];
   busy: boolean;
-  showSourceSchoolColumn?: boolean;
+  fields: Array<{
+    key: string;
+    label: string;
+    readOnly?: boolean;
+  }>;
 }>();
 
 defineEmits<{
@@ -57,6 +61,12 @@ function statusChipClass(row: ValidationRow) {
 function isChanged(row: ValidationRow, field: string) {
   return row.import_action === "UPDATE" && Array.isArray(row.changed_fields) && row.changed_fields.includes(field);
 }
+
+function formatCellValue(field: { key: string; label: string }, value: string | null | undefined) {
+  if (field.key === "geburtsdatum") return formatGermanDate(value);
+  const text = String(value || "").trim();
+  return text || "-";
+}
 </script>
 
 <template>
@@ -73,11 +83,7 @@ function isChanged(row: ValidationRow, field: string) {
           <tr>
             <th>Import</th>
             <th>Zeile</th>
-            <th v-if="showSourceSchoolColumn">Schulnummer</th>
-            <th>ID</th>
-            <th>Vorname</th>
-            <th>Nachname</th>
-            <th>Geburtsdatum</th>
+            <th v-for="field in fields" :key="`validation-head-${field.key}`">{{ field.label }}</th>
             <th>Status</th>
             <th>Hinweise</th>
           </tr>
@@ -93,11 +99,13 @@ function isChanged(row: ValidationRow, field: string) {
               />
             </td>
             <td>{{ row.row_number }}</td>
-            <td v-if="showSourceSchoolColumn" :class="{ 'cell-changed': isChanged(row, 'source_school_snr') }">{{ row.data?.source_school_snr || "-" }}</td>
-            <td :class="{ 'cell-changed': isChanged(row, 'schueler_id') }">{{ row.data?.schueler_id || "-" }}</td>
-            <td :class="{ 'cell-changed': isChanged(row, 'vorname') }">{{ row.data?.vorname || "-" }}</td>
-            <td :class="{ 'cell-changed': isChanged(row, 'nachname') }">{{ row.data?.nachname || "-" }}</td>
-            <td :class="{ 'cell-changed': isChanged(row, 'geburtsdatum') }">{{ formatGermanDate(row.data?.geburtsdatum) }}</td>
+            <td
+              v-for="field in fields"
+              :key="`validation-cell-${row.row_number}-${field.key}`"
+              :class="{ 'cell-changed': isChanged(row, field.key) }"
+            >
+              {{ formatCellValue(field, row.data?.[field.key]) }}
+            </td>
             <td>
               <span class="status-chip" :class="statusChipClass(row)">
                 <template v-if="row.status === 'fehler'">{{ statusLabel(row.status) }}</template>

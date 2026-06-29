@@ -5,7 +5,6 @@ import CsvImportStepUpload from "./CsvImportStepUpload.vue";
 import CsvImportStepPreview from "./CsvImportStepPreview.vue";
 import CsvImportStepMapping from "./CsvImportStepMapping.vue";
 import CsvImportStepValidation from "./CsvImportStepValidation.vue";
-import CsvImportStepConfirm from "./CsvImportStepConfirm.vue";
 import CsvImportStepResult from "./CsvImportStepResult.vue";
 import { CSV_PREVIEW_ROW_LIMIT, normalizeMappingKey, parseCsvText, readCsvFileText, type ParsedCsvRow } from "../utils/csv";
 
@@ -77,7 +76,6 @@ const canProceed = computed(() => {
   if (currentStep.value === 2) return csvRows.value.length > 0;
   if (currentStep.value === 3) return hasRequiredMappings.value;
   if (currentStep.value === 4) return selectedImportRows.value.length > 0;
-  if (currentStep.value === 5) return true;
   return false;
 });
 
@@ -114,17 +112,19 @@ const delimiterLabel = computed(() => {
   return "Tab";
 });
 
-const showSourceSchoolColumn = computed(() => (
-  schemaFields.value.some((field) => field.key === "source_school_snr" && field.required)
+const validationDisplayFields = computed(() => (
+  schemaFields.value.filter((field) => (
+    field.key !== "quell_schueler_nr"
+    && (field.readOnly || !!String(mapping.value[field.key] || "").trim())
+  ))
 ));
 
 const stepTitle = computed(() => {
   if (currentStep.value === 1) return "Datei auswaehlen";
   if (currentStep.value === 2) return `Vorschau der Importdatei (erste ${CSV_PREVIEW_ROW_LIMIT} Zeilen)`;
   if (currentStep.value === 3) return "Import-Felder zuordnen";
-  if (currentStep.value === 4) return "Zeilen pruefen / auswaehlen";
-  if (currentStep.value === 5) return "Import bestaetigen";
-  return "Ergebnis anzeigen";
+  if (currentStep.value === 4) return "Zeilen pruefen / auswaehlen / Aenderungen sind hervorgehoben";
+  return "Zusammenfassung";
 });
 
 watch(() => props.open, async (isOpen) => {
@@ -295,7 +295,7 @@ async function executeImport() {
       selected_row_numbers: selectedImportRows.value.map((row) => row.row_number),
     }, props.token);
     importResult.value = response;
-    currentStep.value = 6;
+    currentStep.value = 5;
     emit("success", response || {});
   } catch (executeError: any) {
     error.value = executeError?.response?.data?.error || executeError?.message || "Der Import ist fehlgeschlagen.";
@@ -309,7 +309,7 @@ async function handleNext() {
     await runValidation();
     return;
   }
-  if (currentStep.value === 5) {
+  if (currentStep.value === 4) {
     await executeImport();
     return;
   }
@@ -334,7 +334,7 @@ function handleClose() {
         <div>
           <p class="csv-import-eyebrow">CSV-Import Wizard</p>
           <h3 id="csv-import-title">{{ title }}</h3>
-          <p>Schritt {{ currentStep }} von 6 | {{ stepTitle }}</p>
+          <p>Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
         </div>
         <button class="wizard-header-close-button" type="button" :disabled="busy" @click="handleClose">
           Schliessen
@@ -387,14 +387,9 @@ function handleClose() {
           v-else-if="currentStep === 4"
           :rows="validationRows"
           :busy="busy"
-          :show-source-school-column="showSourceSchoolColumn"
+          :fields="validationDisplayFields"
           @toggle-all="toggleAllRows"
           @toggle-row="toggleRow"
-        />
-
-        <CsvImportStepConfirm
-          v-else-if="currentStep === 5"
-          :summary="liveValidationSummary"
         />
 
         <CsvImportStepResult
@@ -405,13 +400,13 @@ function handleClose() {
 
       <div class="csv-import-footer">
         <button class="wizard-close-button" type="button" :disabled="busy" @click="handleClose">
-          {{ currentStep === 6 ? "Schliessen" : "Abbrechen" }}
+          {{ currentStep === 5 ? "Schliessen" : "Abbrechen" }}
         </button>
         <div class="csv-import-nav">
           <button
             class="wizard-nav-icon-button"
             type="button"
-            :disabled="busy || currentStep === 1 || currentStep === 6"
+            :disabled="busy || currentStep === 1 || currentStep === 5"
             aria-label="Vorheriger Schritt"
             title="Vorheriger Schritt"
             @click="handleBack"
@@ -419,15 +414,15 @@ function handleClose() {
             <span class="wizard-nav-chevron wizard-nav-chevron-left" aria-hidden="true"></span>
           </button>
           <button
-            v-if="currentStep < 6"
-            :class="currentStep === 5 ? 'wizard-submit-button' : 'wizard-nav-icon-button wizard-nav-icon-button-primary'"
+            v-if="currentStep < 5"
+            :class="currentStep === 4 ? 'wizard-submit-button' : 'wizard-nav-icon-button wizard-nav-icon-button-primary'"
             type="button"
             :disabled="busy || !canProceed"
-            :aria-label="currentStep === 5 ? 'Import starten' : 'Naechster Schritt'"
-            :title="currentStep === 5 ? 'Import starten' : 'Naechster Schritt'"
+            :aria-label="currentStep === 4 ? 'Import starten' : 'Naechster Schritt'"
+            :title="currentStep === 4 ? 'Import starten' : 'Naechster Schritt'"
             @click="handleNext"
           >
-            <template v-if="currentStep === 5">Import starten</template>
+            <template v-if="currentStep === 4">Import starten</template>
             <template v-else><span class="wizard-nav-chevron wizard-nav-chevron-right" aria-hidden="true"></span></template>
           </button>
         </div>

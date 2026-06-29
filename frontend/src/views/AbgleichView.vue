@@ -35,6 +35,7 @@ type SummaryStats = {
   schulen: number;
   neuaufnahme: number;
   warteliste: number;
+  zugeordnet: number;
   abgelehnt: number;
   ohne: number;
   foerderbedarf: number;
@@ -97,6 +98,7 @@ function createEmptySummary(): SummaryStats {
     schulen: 0,
     neuaufnahme: 0,
     warteliste: 0,
+    zugeordnet: 0,
     abgelehnt: 0,
     ohne: 0,
     foerderbedarf: 0,
@@ -381,9 +383,11 @@ async function loadData() {
     schoolOverviewRows.value = Array.isArray(response?.schoolOverview) ? response.schoolOverview : [];
     anmeldestatusOptions.value = Array.isArray(response?.anmeldestatusOptions) ? response.anmeldestatusOptions : [];
     fallgrundOptions.value = Array.isArray(response?.fallgrundOptions) ? response.fallgrundOptions : [];
+    const normalizedRows = Array.isArray(response?.rows) ? response.rows : [];
     summary.value = {
       ...createEmptySummary(),
       ...(response?.summary || {}),
+      zugeordnet: Number(response?.summary?.zugeordnet || normalizedRows.filter((row: SchuelerRow) => normalizeStatus(row.anmeldestatus) === "Zugeordnet").length || 0),
     };
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Abgleichsansicht konnte nicht geladen werden.";
@@ -528,6 +532,7 @@ function toggleSchuleFilter(schuleName: string) {
           <div class="metric-card"><span>Schulen</span><strong>{{ summary.schulen }}</strong></div>
           <div class="metric-card"><span>Neuaufnahme</span><strong>{{ summary.neuaufnahme }}</strong></div>
           <div class="metric-card"><span>Warteliste</span><strong>{{ summary.warteliste }}</strong></div>
+          <div class="metric-card"><span>Zuordnungen</span><strong>{{ summary.zugeordnet }}</strong></div>
           <div class="metric-card metric-card-alert"><span>Ohne Anmeldung</span><strong>{{ summary.ohne }}</strong></div>
           <div class="metric-card"><span>Foerderbedarf</span><strong>{{ summary.foerderbedarf }}</strong></div>
           <div class="metric-card"><span>Zieldifferent</span><strong>{{ summary.zieldifferent }}</strong></div>

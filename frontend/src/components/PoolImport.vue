@@ -58,8 +58,11 @@ const isExpanded = ref(false);
 const showCsvImportOverlay = ref(false);
 const showSchildImportOverlay = ref(false);
 const showEditPoolOverlay = ref(false);
+const showDeletePoolOverlay = ref(false);
 const savingEditPool = ref(false);
+const deletingPoolRow = ref(false);
 const editPoolForm = ref<Record<string, string | number | null>>({});
+const pendingDeletePoolRow = ref<PoolSchuelerRow | null>(null);
 const showDuplicateConflictsOverlay = ref(false);
 const duplicateConflicts = ref<Array<{
   schueler_id: string;
@@ -172,6 +175,7 @@ const hasOpenOverlay = computed(() => (
   showCsvImportOverlay.value
   || showSchildImportOverlay.value
   || showEditPoolOverlay.value
+  || showDeletePoolOverlay.value
   || showDuplicateConflictsOverlay.value
 ));
 
@@ -435,8 +439,49 @@ function openAdjacentPoolRow(direction: -1 | 1) {
 }
 
 function handleDeletePoolRow(row: PoolSchuelerRow) {
-  successMessage.value = "";
-  errorMessage.value = `Loeschen fuer ${[row.nachname, row.vorname].filter(Boolean).join(", ") || row.schueler_schul_id || "den Datensatz"} ist noch nicht implementiert.`;
+  pendingDeletePoolRow.value = row;
+  showDeletePoolOverlay.value = true;
+}
+
+function closeDeletePoolOverlay() {
+  if (deletingPoolRow.value) return;
+  showDeletePoolOverlay.value = false;
+  pendingDeletePoolRow.value = null;
+}
+
+function hideDeletePoolOverlay() {
+  showDeletePoolOverlay.value = false;
+  pendingDeletePoolRow.value = null;
+}
+
+async function confirmDeletePoolRow() {
+  const row = pendingDeletePoolRow.value;
+  if (!row) return;
+  const rowId = Number(row.schueler_id || 0);
+  if (!rowId) {
+    errorMessage.value = "Der Datensatz konnte nicht geloescht werden: ID fehlt.";
+    return;
+  }
+
+  try {
+    deletingPoolRow.value = true;
+    loading.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    await importService.deletePoolSchueler(rowId, props.token);
+    if (showEditPoolOverlay.value && Number(editPoolForm.value.id || 0) === rowId) {
+      showEditPoolOverlay.value = false;
+    }
+    hideDeletePoolOverlay();
+    successMessage.value = "Datensatz wurde geloescht.";
+    await loadPoolSchueler();
+    await loadPoolStats();
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Datensatz konnte nicht geloescht werden.";
+  } finally {
+    deletingPoolRow.value = false;
+    loading.value = false;
+  }
 }
 
 function closeEditPoolOverlay() {
@@ -478,6 +523,8 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   errorMessage.value = "";
   showSchildImportOverlay.value = false;
   showEditPoolOverlay.value = false;
+  showDeletePoolOverlay.value = false;
+  pendingDeletePoolRow.value = null;
   showDuplicateConflictsOverlay.value = false;
   duplicateConflicts.value = [];
   loadPoolStats();
@@ -881,6 +928,42 @@ onUnmounted(() => {
           </button>
           <button class="btn-primary" type="button" :disabled="savingEditPool" @click="saveEditPoolRow">
             {{ savingEditPool ? "Speichere..." : "Speichern" }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="showDeletePoolOverlay"
+      class="pool-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pool-delete-overlay-title"
+      @click.self="closeDeletePoolOverlay"
+    >
+      <section class="pool-import-overlay-card pool-delete-overlay-card">
+        <div class="pool-delete-hero">
+          <div class="pool-delete-badge" aria-hidden="true">!</div>
+          <div>
+            <h3 id="pool-delete-overlay-title">Datensatz wirklich loeschen?</h3>
+            <p>Diese Aktion entfernt das Kind aus dem Schuelerpool der aktuellen Runde.</p>
+          </div>
+        </div>
+
+        <div class="pool-delete-summary">
+          <strong>{{ [pendingDeletePoolRow?.nachname, pendingDeletePoolRow?.vorname].filter(Boolean).join(", ") || "-" }}</strong>
+          <span>
+            ID {{ pendingDeletePoolRow?.schueler_schul_id || "-" }}
+            <template v-if="pendingDeletePoolRow?.quell_snr"> | Quell-SNR {{ pendingDeletePoolRow?.quell_snr }}</template>
+          </span>
+        </div>
+
+        <div class="pool-import-overlay-actions">
+          <button class="btn-secondary" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
+            Abbrechen
+          </button>
+          <button class="btn-primary pool-delete-confirm-button" type="button" :disabled="deletingPoolRow" @click="confirmDeletePoolRow">
+            {{ deletingPoolRow ? "Loesche..." : "Loeschen" }}
           </button>
         </div>
       </section>
@@ -1420,6 +1503,10 @@ onUnmounted(() => {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.pool-delete-overlay-card {
+  width: min(520px, 100%);
+}
+
 .pool-import-overlay-head {
   display: flex;
   align-items: center;
@@ -1464,6 +1551,82 @@ onUnmounted(() => {
   margin: 0;
   color: #4a607e;
   line-height: 1.6;
+}
+
+.pool-delete-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.pool-delete-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 800;
+  box-shadow: 0 14px 28px rgba(220, 38, 38, 0.22);
+}
+
+.pool-delete-hero h3 {
+  margin: 0 0 4px;
+  color: #7f1d1d;
+}
+
+.pool-delete-hero p {
+  margin: 0;
+  color: #7b4150;
+  line-height: 1.55;
+}
+
+.pool-delete-summary {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(252, 165, 165, 0.18), transparent 34%),
+    linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+}
+
+.pool-delete-summary strong {
+  color: #7f1d1d;
+  font-size: 16px;
+}
+
+.pool-delete-summary span {
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.pool-delete-note {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.pool-delete-note p {
+  margin: 0;
+  color: #475569;
+}
+
+.pool-delete-confirm-button {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border-color: #dc2626;
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.2);
+}
+
+.pool-delete-confirm-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+  border-color: #b91c1c;
 }
 
 .pool-edit-form-grid {

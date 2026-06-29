@@ -394,18 +394,31 @@ function buildPoolImportSummary(rows) {
   };
 }
 
+function getPoolImportComparisonFieldKeys(fieldDefinitions, mapping) {
+  const mappedFields = new Set(
+    Object.entries(mapping || {})
+      .filter(([, value]) => normalizeText(value))
+      .map(([key]) => key),
+  );
+
+  return fieldDefinitions
+    .filter((field) => {
+      if (!field?.key) return false;
+      if (field.readOnly) return true;
+      return mappedFields.has(field.key);
+    })
+    .map((field) => field.key);
+}
+
 async function validatePoolImportRows(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
   const csvRows = Array.isArray(payload?.csv_rows) ? payload.csv_rows : [];
   const mapping = payload?.mapping || {};
   const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
-  const mappedFields = new Set(
-    Object.entries(mapping)
-      .filter(([, value]) => normalizeText(value))
-      .map(([key]) => key),
-  );
   const verfahrenstyp = await loadProcedureType(pool, verfahrenId);
+  const fieldDefinitions = getPoolImportFieldDefinitions(schuelerColumns, verfahrenstyp);
+  const comparisonFieldKeys = new Set(getPoolImportComparisonFieldKeys(fieldDefinitions, mapping));
   const schoolRole = verfahrenstyp === "SEK1" ? "Quellschulen" : "Zielschulen";
   const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, schoolRole);
   const empfehlungByCode = schuelerColumns.has("empfehlung")
@@ -531,18 +544,19 @@ async function validatePoolImportRows(pool, payload) {
         },
       ];
 
-      if (mappedFields.has("strasse")) comparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
-      if (mappedFields.has("plz")) comparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
-      if (mappedFields.has("ort")) comparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
-      if (mappedFields.has("foerderbedarf")) comparisons.push({ field: "foerderbedarf", matches: normalizeText(existing?.foerderbedarf) === data.foerderbedarf });
-      if (mappedFields.has("zieldifferent")) comparisons.push({ field: "zieldifferent", matches: Number(existing?.zieldifferent || 0) === normalizeBoolean(data.zieldifferent) });
-      if (mappedFields.has("ef")) comparisons.push({ field: "ef", matches: Number(existing?.ef || 0) === normalizeBoolean(data.ef) });
-      if (mappedFields.has("empfehlung")) comparisons.push({ field: "empfehlung", matches: normalizeText(existing?.empfehlung) === data.empfehlung });
-      if (mappedFields.has("teilnahmestatus")) comparisons.push({ field: "teilnahmestatus", matches: normalizeText(existing?.teilnahmestatus) === data.teilnahmestatus });
-      if (mappedFields.has("quell_jahrgang")) comparisons.push({ field: "quell_jahrgang", matches: normalizeText(existing?.quell_jahrgang) === data.quell_jahrgang });
-      if (mappedFields.has("bemerkung")) comparisons.push({ field: "bemerkung", matches: normalizeText(existing?.bemerkung) === data.bemerkung });
+      const filteredComparisons = comparisons.filter((entry) => comparisonFieldKeys.has(entry.field));
+      if (comparisonFieldKeys.has("strasse")) filteredComparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
+      if (comparisonFieldKeys.has("plz")) filteredComparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
+      if (comparisonFieldKeys.has("ort")) filteredComparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
+      if (comparisonFieldKeys.has("foerderbedarf")) filteredComparisons.push({ field: "foerderbedarf", matches: normalizeText(existing?.foerderbedarf) === data.foerderbedarf });
+      if (comparisonFieldKeys.has("zieldifferent")) filteredComparisons.push({ field: "zieldifferent", matches: Number(existing?.zieldifferent || 0) === normalizeBoolean(data.zieldifferent) });
+      if (comparisonFieldKeys.has("ef")) filteredComparisons.push({ field: "ef", matches: Number(existing?.ef || 0) === normalizeBoolean(data.ef) });
+      if (comparisonFieldKeys.has("empfehlung")) filteredComparisons.push({ field: "empfehlung", matches: normalizeText(existing?.empfehlung) === data.empfehlung });
+      if (comparisonFieldKeys.has("teilnahmestatus")) filteredComparisons.push({ field: "teilnahmestatus", matches: normalizeText(existing?.teilnahmestatus) === data.teilnahmestatus });
+      if (comparisonFieldKeys.has("quell_jahrgang")) filteredComparisons.push({ field: "quell_jahrgang", matches: normalizeText(existing?.quell_jahrgang) === data.quell_jahrgang });
+      if (comparisonFieldKeys.has("bemerkung")) filteredComparisons.push({ field: "bemerkung", matches: normalizeText(existing?.bemerkung) === data.bemerkung });
 
-      changedFields = comparisons.filter((entry) => !entry.matches).map((entry) => entry.field);
+      changedFields = filteredComparisons.filter((entry) => !entry.matches).map((entry) => entry.field);
       const unchanged = changedFields.length === 0;
       importAction = unchanged ? "VORHANDEN" : "UPDATE";
     }
@@ -1116,6 +1130,21 @@ async function updatePoolSchuelerRow(pool, rowId, payload) {
     `,
     values,
   );
+}
+
+async function deletePoolSchuelerRow(pool, rowId) {
+  const [result] = await pool.query(
+    `
+    DELETE FROM anm_schueler
+    WHERE id = ?
+    `,
+    [Number(rowId)],
+  );
+  if (!Number(result?.affectedRows || 0)) {
+    const error = new Error("Der Datensatz wurde nicht gefunden.");
+    error.statusCode = 404;
+    throw error;
+  }
 }
 
 async function loadCatalogByCode(pool, tableName) {
@@ -3545,6 +3574,18 @@ function createImporteController({ getPool }) {
       } catch (error) {
         console.error(error);
         return sendError(res, error?.statusCode || 500, error?.message || "Der Datensatz konnte nicht gespeichert werden.");
+      }
+    },
+
+    deletePoolSchueler: async (req, res) => {
+      try {
+        const rowId = Number(req.params?.id || 0);
+        if (!rowId) return sendError(res, 400, "id ist erforderlich.");
+        await deletePoolSchuelerRow(getPool(), rowId);
+        return res.json({ message: "Datensatz wurde geloescht." });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Datensatz konnte nicht geloescht werden.");
       }
     },
 

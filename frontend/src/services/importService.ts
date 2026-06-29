@@ -42,6 +42,14 @@ export const importService = {
     return response.data;
   },
 
+  async deletePoolSchueler(id: number, token?: string) {
+    const response = await apiClient.delete(
+      `/api/importe/pool/schueler/${encodeURIComponent(String(id))}`,
+      buildAuthConfig(token),
+    );
+    return response.data;
+  },
+
   async previewPool(payload: Record<string, unknown>, token?: string) {
     const response = await apiClient.post(
       "/api/importe/pool/vorschau",
