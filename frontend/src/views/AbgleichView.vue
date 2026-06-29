@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import abgleichService from "../services/abgleichService";
+import type { Anmeldeverfahrenstyp } from "../types";
 
 type SchuelerRow = {
   schueler_id: number | string;
@@ -12,6 +13,8 @@ type SchuelerRow = {
   foerder_label?: string | null;
   zieldifferent: number | string;
   herkunft?: string;
+  quell_snr?: string;
+  quell_schule?: string;
   schule: string;
   schulnummer: string;
   schueler_schul_id: string;
@@ -59,6 +62,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  verfahrenstyp?: Anmeldeverfahrenstyp | null;
   context: {
     verfahren: string;
     runde: string;
@@ -71,6 +75,7 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const schuelerRows = ref<SchuelerRow[]>([]);
 const schoolOverviewRows = ref<SchoolOverviewRow[]>([]);
+const schoolNumbersInProcedure = ref<string[]>([]);
 const anmeldestatusOptions = ref<string[]>([]);
 const fallgrundOptions = ref<FallgrundOption[]>([]);
 const caseDialogOpen = ref(false);
@@ -89,8 +94,9 @@ const anmeldestatusFilter = ref("alle");
 const foerderbedarfFilter = ref("alle");
 const zieldifferentFilter = ref("alle");
 const herkunftFilter = ref("alle");
-const sortKey = ref<keyof SchuelerRow>("nachname");
+const sortKey = ref<keyof SchuelerRow | "von">("nachname");
 const sortDirection = ref<"asc" | "desc">("asc");
+const isSek1Procedure = computed(() => props.verfahrenstyp === "SEK1");
 
 function createEmptySummary(): SummaryStats {
   return {
@@ -116,12 +122,44 @@ function normalizeStatus(value: unknown) {
   return normalizeText(value) || "Ohne";
 }
 
+function normalizeStatusKey(value: unknown) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss");
+}
+
+function mapAnmeldestatusEditValue(rawStatus: unknown, availableTargets: string[]) {
+  const targetLookup = new Map(
+    availableTargets.map((target) => [normalizeStatusKey(target), target]),
+  );
+  const normalized = normalizeStatusKey(rawStatus);
+  if (!normalized) return targetLookup.get("ohne") || "Ohne";
+  if (targetLookup.has(normalized)) return targetLookup.get(normalized) || "Ohne";
+  if (["warteliste", "wl", "warte liste"].includes(normalized)) return targetLookup.get("warteliste") || "Warteliste";
+  if (["ablehnung", "abgelehnt", "abgelehnt."].includes(normalized)) return targetLookup.get("abgelehnt") || "Abgelehnt";
+  if (["neuaufnahme", "aufnahme", "neu aufnahme"].includes(normalized)) return targetLookup.get("neuaufnahme") || "Neuaufnahme";
+  if (["zugeordnet", "zugewiesen"].includes(normalized)) return targetLookup.get("zugeordnet") || "Zugeordnet";
+  return normalizeText(rawStatus) || targetLookup.get("ohne") || "Ohne";
+}
+
 function normalizeStatusFilterValue(value: unknown) {
   return normalizeStatus(value).toLowerCase();
 }
 
 function displayHerkunft(row: SchuelerRow) {
   return normalizeText(row.herkunft) || "-";
+}
+
+function isUnknownSchoolNumber(value: unknown) {
+  const schulnummer = normalizeText(value);
+  return Boolean(
+    schulnummer
+    && schoolNumbersInProcedure.value.length
+    && !schoolNumbersInProcedure.value.includes(schulnummer),
+  );
 }
 
 function abgleichStatusHoverText(value: unknown) {
@@ -142,6 +180,7 @@ function abgleichStatusBadgeClass(value: unknown) {
 function anmeldestatusBadgeClass(value: unknown) {
   const status = normalizeStatus(value);
   if (status === "Ohne") return "status-chip status-chip-negative";
+  if (status === "Neuaufnahme") return "status-chip status-chip-positive";
   if (status === "Zugeordnet") return "status-chip status-chip-info";
   if (status === "Warteliste") return "status-chip status-chip-waiting";
   return "status-chip status-chip-muted";
@@ -179,6 +218,25 @@ function formatDate(value: string | null | undefined) {
   return text;
 }
 
+function truncateText(value: string, maxLength = 15) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function sourceDisplayText(row: SchuelerRow, maxSchoolLength = 15) {
+  const sourceNo = normalizeText(row.quell_snr);
+  const schoolName = normalizeText(row.quell_schule);
+  if (sourceNo && schoolName) return `${sourceNo} / ${truncateText(schoolName, maxSchoolLength)}`;
+  return sourceNo || truncateText(schoolName, maxSchoolLength) || "-";
+}
+
+function sourceDisplayTitle(row: SchuelerRow) {
+  const sourceNo = normalizeText(row.quell_snr);
+  const schoolName = normalizeText(row.quell_schule);
+  if (sourceNo && schoolName) return `${sourceNo} / ${schoolName}`;
+  return sourceNo || schoolName || "-";
+}
+
 function offeneFaelleAnzahl(row: SchuelerRow) {
   return Number(row.offene_faelle_anzahl || 0);
 }
@@ -210,7 +268,7 @@ function openEditDialog(row: SchuelerRow) {
     zieldifferent: isZieldifferent(row.zieldifferent) ? "1" : "0",
     herkunft: normalizeText(row.herkunft),
     abgleich_status: normalizeText(row.abgleich_status),
-    anmeldestatus: normalizeText(row.anmeldestatus),
+    anmeldestatus: mapAnmeldestatusEditValue(row.anmeldestatus, anmeldestatusEditOptions),
     schulnummer: normalizeText(row.schulnummer),
     strasse: normalizeText(row.strasse),
     plz: normalizeText(row.plz),
@@ -222,8 +280,8 @@ function openEditDialog(row: SchuelerRow) {
   editDialogOpen.value = true;
 }
 
-function closeEditDialog() {
-  if (editDialogSaving.value) return;
+function closeEditDialog(force = false) {
+  if (editDialogSaving.value && !force) return;
   editDialogOpen.value = false;
   selectedEditRow.value = null;
   editForm.value = {};
@@ -247,7 +305,7 @@ async function saveEditDialog() {
     );
     successMessage.value = response?.message || "Der Schuelerdatensatz wurde gespeichert.";
     await loadData();
-    closeEditDialog();
+    closeEditDialog(true);
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Der Schuelerdatensatz konnte nicht gespeichert werden.";
   } finally {
@@ -271,6 +329,7 @@ const foerderbedarfOptions = [
   { value: "1", label: "Ja" },
   { value: "0", label: "Nein" },
 ];
+const anmeldestatusEditOptions = ["Neuaufnahme", "Warteliste", "Zugeordnet", "Abgelehnt", "Ohne"];
 const herkunftOptions = computed(() => uniqueOptions((row) => displayHerkunft(row)));
 const herkunftEditOptions = computed(() => Array.from(new Set([
   "Pool",
@@ -318,8 +377,8 @@ const schoolOverview = computed(() => {
 const sortedRows = computed(() => {
   const factor = sortDirection.value === "asc" ? 1 : -1;
   return [...filteredRows.value].sort((left, right) => {
-    const a = left[sortKey.value];
-    const b = right[sortKey.value];
+    const a = sortKey.value === "von" ? sourceDisplayTitle(left) : left[sortKey.value];
+    const b = sortKey.value === "von" ? sourceDisplayTitle(right) : right[sortKey.value];
     return String(a ?? "").localeCompare(String(b ?? ""), "de", { numeric: true, sensitivity: "base" }) * factor;
   });
 });
@@ -338,7 +397,7 @@ const duplicateNameBirthKeys = computed(() => {
   );
 });
 
-function setSort(nextKey: keyof SchuelerRow) {
+function setSort(nextKey: keyof SchuelerRow | "von") {
   if (sortKey.value === nextKey) {
     sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
     return;
@@ -347,7 +406,7 @@ function setSort(nextKey: keyof SchuelerRow) {
   sortDirection.value = "asc";
 }
 
-function sortMarker(key: keyof SchuelerRow) {
+function sortMarker(key: keyof SchuelerRow | "von") {
   if (sortKey.value !== key) return "";
   return sortDirection.value === "asc" ? " ▲" : " ▼";
 }
@@ -369,6 +428,7 @@ async function loadData() {
   if (!props.verfahrenId || !props.rundeId) {
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
     summary.value = createEmptySummary();
@@ -381,6 +441,7 @@ async function loadData() {
     const response = await abgleichService.getSchuelerUebersicht(props.verfahrenId, props.rundeId, props.token);
     schuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
     schoolOverviewRows.value = Array.isArray(response?.schoolOverview) ? response.schoolOverview : [];
+    schoolNumbersInProcedure.value = Array.isArray(response?.schoolNumbersInProcedure) ? response.schoolNumbersInProcedure.map((value: unknown) => normalizeText(value)).filter(Boolean) : [];
     anmeldestatusOptions.value = Array.isArray(response?.anmeldestatusOptions) ? response.anmeldestatusOptions : [];
     fallgrundOptions.value = Array.isArray(response?.fallgrundOptions) ? response.fallgrundOptions : [];
     const normalizedRows = Array.isArray(response?.rows) ? response.rows : [];
@@ -393,6 +454,7 @@ async function loadData() {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Abgleichsansicht konnte nicht geladen werden.";
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
     summary.value = createEmptySummary();
@@ -679,6 +741,7 @@ function toggleSchuleFilter(schuleName: string) {
                 <th>Bearb.</th>
                 <th>Fall</th>
                 <th><button type="button" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
+                <th v-if="isSek1Procedure"><button type="button" @click="setSort('von')">Von{{ sortMarker('von') }}</button></th>
                 <th><button type="button" @click="setSort('geburtsdatum')">Geburtsdatum{{ sortMarker('geburtsdatum') }}</button></th>
                 <th><button type="button" @click="setSort('foerderbedarf')">LE{{ sortMarker('foerderbedarf') }}</button></th>
                 <th>ZD</th>
@@ -691,10 +754,10 @@ function toggleSchuleFilter(schuleName: string) {
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="13" class="table-empty">Daten werden geladen...</td>
+                <td :colspan="isSek1Procedure ? 14 : 13" class="table-empty">Daten werden geladen...</td>
               </tr>
               <tr v-else-if="!sortedRows.length">
-                <td colspan="13" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
+                <td :colspan="isSek1Procedure ? 14 : 13" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
               </tr>
               <tr v-for="(row, index) in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}-${index}`">
                 <td>{{ index + 1 }}</td>
@@ -726,6 +789,7 @@ function toggleSchuleFilter(schuleName: string) {
                   :class="{ 'cell-duplicate-name': hasDuplicateNameBirth(row) }"
                   :title="hasDuplicateNameBirth(row) ? 'Name und Geburtsdatum kommen mehrfach vor' : ''"
                 >{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
+                <td v-if="isSek1Procedure" :title="sourceDisplayTitle(row)">{{ sourceDisplayText(row) }}</td>
                 <td>{{ formatDate(row.geburtsdatum) }}</td>
                 <td>
                   <span
@@ -753,7 +817,14 @@ function toggleSchuleFilter(schuleName: string) {
                     {{ normalizeStatus(row.anmeldestatus) }}
                   </span>
                 </td>
-                <td>{{ row.schulnummer || "---" }}</td>
+                <td>
+                  <span
+                    :class="isUnknownSchoolNumber(row.schulnummer) ? 'status-chip status-chip-negative status-chip-nowrap' : ''"
+                    :title="isUnknownSchoolNumber(row.schulnummer) ? 'Schule ist nicht im Verfahren!' : ''"
+                  >
+                    {{ isUnknownSchoolNumber(row.schulnummer) ? `${row.schulnummer || "---"}` : (row.schulnummer || "---") }}
+                  </span>
+                </td>
                 <td>{{ row.schule }}</td>
               </tr>
             </tbody>
@@ -856,8 +927,7 @@ function toggleSchuleFilter(schuleName: string) {
               <label>
                 <span>Anmeldestatus</span>
                 <select v-model="editForm.anmeldestatus">
-                  <option value="">Bitte waehlen</option>
-                  <option v-for="option in anmeldestatusOptions" :key="option" :value="option">{{ option }}</option>
+                  <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
                 </select>
               </label>
               <label>
@@ -1275,6 +1345,10 @@ function toggleSchuleFilter(schuleName: string) {
 .status-chip-muted {
   background: #eef2f7;
   color: #6b7f99;
+}
+
+.status-chip-nowrap {
+  white-space: nowrap;
 }
 
 .feedback-panel-warning {

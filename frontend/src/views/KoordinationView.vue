@@ -27,6 +27,8 @@ type StudentRow = {
   geocoding_fehler: string;
   koordinierte_snr: string;
   koordinierte_schule: string;
+  latitude: number | null;
+  longitude: number | null;
   entfernung_km: number | null;
 };
 
@@ -43,14 +45,18 @@ const props = defineProps<{
 
 const loading = ref(false);
 const assigning = ref(false);
+const autoGeocoding = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+const autoGeocodingMessage = ref("");
 const schools = ref<SchoolRow[]>([]);
 const students = ref<StudentRow[]>([]);
 const selectedSchoolSnr = ref("");
 const selectedStudentRowIds = ref<number[]>([]);
 const distanceMode = ref("");
 const geocodeInfoOverlayOpen = ref(false);
+const attemptedVisibleGeocodingRowIds = new Set<number>();
+let loadSequence = 0;
 
 const selectedSchool = computed(
   () => schools.value.find((school) => school.snr === selectedSchoolSnr.value) || null,
@@ -123,16 +129,65 @@ function closeGeocodeInfoOverlay() {
   geocodeInfoOverlayOpen.value = false;
 }
 
+function getVisibleStudentsMissingCoordinates() {
+  return students.value
+    .filter((student) =>
+      student.row_id > 0
+      && (student.latitude === null || student.longitude === null)
+      && !attemptedVisibleGeocodingRowIds.has(student.row_id),
+    )
+    .map((student) => student.row_id);
+}
+
+async function geocodeVisibleStudentsInBackground(loadToken: number) {
+  if (autoGeocoding.value) return;
+  if (!props.verfahrenId || !props.rundeId) return;
+
+  const rowIds = getVisibleStudentsMissingCoordinates();
+  if (!rowIds.length) {
+    autoGeocodingMessage.value = "";
+    return;
+  }
+
+  rowIds.forEach((rowId) => attemptedVisibleGeocodingRowIds.add(rowId));
+  autoGeocoding.value = true;
+  autoGeocodingMessage.value = "Fehlende Koordinaten der aktuell sichtbaren Schueler werden im Hintergrund ergaenzt.";
+
+  try {
+    await koordinationService.geocodeVisibleStudents(
+      {
+        verfahren_id: props.verfahrenId,
+        runde_id: props.rundeId,
+        row_ids: rowIds,
+      },
+      props.token,
+    );
+
+    if (loadToken !== loadSequence) return;
+    autoGeocodingMessage.value = "";
+    autoGeocoding.value = false;
+    await loadData(selectedSchoolSnr.value);
+  } catch (_error: any) {
+    if (loadToken !== loadSequence) return;
+    autoGeocodingMessage.value = "Die automatischen Geocodes konnten nicht vollstaendig aktualisiert werden.";
+  } finally {
+    autoGeocoding.value = false;
+  }
+}
+
 async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
+  const loadToken = ++loadSequence;
   if (!props.verfahrenId || !props.rundeId) {
       schools.value = [];
       students.value = [];
       selectedSchoolSnr.value = "";
       selectedStudentRowIds.value = [];
       distanceMode.value = "";
+      autoGeocodingMessage.value = "";
       return;
   }
 
+  let loadedSuccessfully = false;
   try {
     loading.value = true;
     errorMessage.value = "";
@@ -153,13 +208,20 @@ async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
     selectedStudentRowIds.value = selectedStudentRowIds.value.filter((rowId) =>
       students.value.some((student) => student.row_id === rowId),
     );
+    loadedSuccessfully = true;
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Koordinationsansicht konnte nicht geladen werden.";
     schools.value = [];
     students.value = [];
     distanceMode.value = "";
   } finally {
-    loading.value = false;
+    if (loadToken === loadSequence) {
+      loading.value = false;
+    }
+  }
+
+  if (loadedSuccessfully && loadToken === loadSequence) {
+    void geocodeVisibleStudentsInBackground(loadToken);
   }
 }
 
@@ -167,6 +229,12 @@ async function handleSchoolSelect(snr: string) {
   selectedSchoolSnr.value = snr;
   selectedStudentRowIds.value = [];
   await loadData(snr);
+}
+
+async function refreshData() {
+  attemptedVisibleGeocodingRowIds.clear();
+  autoGeocodingMessage.value = "";
+  await loadData(selectedSchoolSnr.value);
 }
 
 function isStudentSelected(rowId: number) {
@@ -222,6 +290,8 @@ async function handleAssign() {
 watch(
   () => [props.verfahrenId, props.rundeId],
   () => {
+    attemptedVisibleGeocodingRowIds.clear();
+    autoGeocodingMessage.value = "";
     selectedSchoolSnr.value = "";
     selectedStudentRowIds.value = [];
     void loadData("");
@@ -235,7 +305,7 @@ watch(
     <div v-if="loading && verfahrenId && rundeId" class="loading-overlay" role="status" aria-live="polite">
       <div class="loading-overlay-card">
         <p class="loading-overlay-title">Koordination wird geladen</p>
-        <p>Fehlende Geokoordinaten werden ermittelt.</p>
+        <p>Schulen und Schuelerdaten werden geladen.</p>
       </div>
     </div>
 
@@ -251,10 +321,15 @@ watch(
         <button class="btn-secondary" type="button" @click="openGeocodeInfoOverlay">
           ? Info Geocodes
         </button>
-        <button class="btn-secondary" type="button" @click="loadData(selectedSchoolSnr)" :disabled="loading">
-          {{ loading ? "Aktualisiere..." : "Aktualisieren" }}
+        <button class="btn-secondary" type="button" @click="refreshData" :disabled="loading || autoGeocoding">
+          {{ loading ? "Aktualisiere..." : autoGeocoding ? "Geocodiere..." : "Aktualisieren" }}
         </button>
       </div>
+    </div>
+
+    <div v-if="autoGeocodingMessage" class="feedback-panel feedback-panel-warning">
+      <p class="feedback-title">Geocodes im Hintergrund</p>
+      <p>{{ autoGeocodingMessage }}</p>
     </div>
 
     <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning">

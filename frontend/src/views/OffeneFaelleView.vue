@@ -16,6 +16,8 @@ type OpenCaseRow = {
   schueler_ident: string;
   aktuelle_snr: string;
   aktuelle_schule: string;
+  erwartete_snr: string;
+  erwartete_schule: string;
   zugewiesene_snr: string;
   zugewiesene_schule: string;
   fallgrund_code: string;
@@ -108,6 +110,8 @@ const filteredRows = computed(() => {
       row.schueler_ident,
       row.aktuelle_snr,
       row.aktuelle_schule,
+      row.erwartete_snr,
+      row.erwartete_schule,
       row.zugewiesene_snr,
       row.zugewiesene_schule,
       row.fallgrund,
@@ -389,7 +393,8 @@ watch(
                       <h3>{{ detailTitle(row) }}</h3>
                       <dl class="open-case-meta">
                         <div><dt>Geburtsdatum</dt><dd>{{ formatDate(row.geburtsdatum) }}</dd></div>
-                        <div><dt>Zugewiesen</dt><dd>{{ row.zugewiesene_snr || "-" }}<template v-if="row.zugewiesene_schule"> / {{ row.zugewiesene_schule }}</template></dd></div>
+                        <div><dt>Erwartete Schule</dt><dd>{{ row.erwartete_snr || row.zugewiesene_snr || "-" }}<template v-if="row.erwartete_schule || row.zugewiesene_schule"> / {{ row.erwartete_schule || row.zugewiesene_schule }}</template></dd></div>
+                        <div><dt>Tatsaechliche Anmeldung</dt><dd>{{ row.aktuelle_snr || "-" }}<template v-if="row.aktuelle_schule"> / {{ row.aktuelle_schule }}</template></dd></div>
                         <div><dt>Quelle</dt><dd>{{ row.quelle || "-" }}</dd></div>
                         <div><dt>Zuletzt geaendert</dt><dd>{{ formatDateTime(row.updated_at || row.created_at) }}</dd></div>
                       </dl>

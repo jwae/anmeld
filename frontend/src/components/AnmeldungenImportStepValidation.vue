@@ -22,6 +22,9 @@ function fieldValue(row: Row, field: string) {
 function previousFieldValue(row: Row, field: string) {
   return row.existing_data?.[field] || "-";
 }
+function isEmptyPreviousFieldValue(row: Row, field: string) {
+  return !String(row.existing_data?.[field] || "").trim();
+}
 function normalizeStatusValue(value: string) {
   return String(value || "").trim().toLowerCase();
 }
@@ -31,12 +34,15 @@ function statusInlineClass(value: string) {
   if (normalized === "warteliste") return "status-inline-new-amber";
   return "status-inline-new-blue";
 }
-function schulNrInlineClass() {
-  return "status-inline-new-red";
+function schulNrInlineClass(row: Row) {
+  return isEmptyPreviousFieldValue(row, "schul_nr") ? "status-inline-new-blue" : "status-inline-new-red";
+}
+function previousSchulNrLabel(row: Row) {
+  return isEmptyPreviousFieldValue(row, "schul_nr") ? "Ohne" : previousFieldValue(row, "schul_nr");
 }
 function fieldTitle(row: Row, field: string) {
   if (!hasFieldChanged(row, field)) return "";
-  const previousValue = previousFieldValue(row, field);
+  const previousValue = field === "schul_nr" ? previousSchulNrLabel(row) : previousFieldValue(row, field);
   const nextValue = fieldValue(row, field);
   return `Vorher: ${previousValue} | Neu: ${nextValue}`;
 }
@@ -54,8 +60,8 @@ function fieldTitle(row: Row, field: string) {
             <td>{{ fieldValue(row, 'schueler_id') }}</td>
             <td :title="fieldTitle(row, 'schul_nr')">
               <template v-if="hasFieldChanged(row, 'schul_nr')">
-                <span>{{ previousFieldValue(row, 'schul_nr') }} -> </span>
-                <span class="status-inline-new" :class="schulNrInlineClass()">{{ fieldValue(row, 'schul_nr') }}</span>
+                <span>{{ previousSchulNrLabel(row) }} -> </span>
+                <span class="status-inline-new" :class="schulNrInlineClass(row)">{{ fieldValue(row, 'schul_nr') }}</span>
               </template>
               <template v-else>{{ fieldValue(row, 'schul_nr') }}</template>
             </td>

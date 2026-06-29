@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import AnmeldungenImportOverlay from "./AnmeldungenImportOverlay.vue";
+import type { Anmeldeverfahrenstyp } from "../types";
 
 type SchoolRow = {
   snr: string;
@@ -16,6 +17,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  verfahrenstyp?: Anmeldeverfahrenstyp | null;
 }>();
 
 const schools = ref<SchoolRow[]>([]);

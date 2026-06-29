@@ -139,6 +139,26 @@ async function fetchOrsGeocode(addressRow) {
   }
 }
 
+async function mapWithConcurrency(items, concurrency, worker) {
+  const queue = Array.isArray(items) ? [...items] : [];
+  if (!queue.length) return [];
+
+  const limit = Math.max(1, Math.min(Number(concurrency) || 1, queue.length));
+  const results = new Array(queue.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < queue.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(queue[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runWorker()));
+  return results;
+}
+
 function truncateName(value, maxLength = 30) {
   const text = normalizeText(value);
   if (!text || text.length <= maxLength) return text;
@@ -200,7 +220,11 @@ async function loadFallstatusOptions(pool) {
 
 async function loadOffeneFaelleRows(pool, verfahrenId) {
   const offeneFallColumns = await loadTableColumns(pool, "anm_offener_fall");
+  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
   if (!offeneFallColumns.size) return [];
+  const erwarteteSnrExpr = offeneFallColumns.has("schueler_id") && schuelerColumns.has("erwartete_snr")
+    ? "s.erwartete_snr"
+    : "''";
 
   const [rows] = await pool.query(
     `
@@ -218,6 +242,8 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
       COALESCE(NULLIF(TRIM(s.schueler_id), ''), NULLIF(TRIM(sa.schueler_schul_id), ''), NULLIF(TRIM(sp.id), ''), '') AS schueler_ident,
       COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''), '') AS aktuelle_snr,
       COALESCE(NULLIF(TRIM(curr.name), ''), '') AS aktuelle_schule,
+      COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''), '') AS erwartete_snr,
+      COALESCE(NULLIF(TRIM(expected.name), ''), '') AS erwartete_schule,
       COALESCE(NULLIF(TRIM(f.zugewiesene_snr), ''), '') AS zugewiesene_snr,
       COALESCE(NULLIF(TRIM(assign.name), ''), '') AS zugewiesene_schule,
       COALESCE(NULLIF(TRIM(fg.code), ''), '') AS fallgrund_code,
@@ -245,6 +271,8 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
       ON fs.id = f.fallstatus_id
     LEFT JOIN anm_schulen curr
       ON curr.snr = COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''))
+    LEFT JOIN anm_schulen expected
+      ON expected.snr = COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''))
     LEFT JOIN anm_schulen assign
       ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
@@ -267,6 +295,8 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
     schueler_ident: normalizeText(row?.schueler_ident),
     aktuelle_snr: normalizeText(row?.aktuelle_snr),
     aktuelle_schule: normalizeText(row?.aktuelle_schule),
+    erwartete_snr: normalizeText(row?.erwartete_snr),
+    erwartete_schule: normalizeText(row?.erwartete_schule),
     zugewiesene_snr: normalizeText(row?.zugewiesene_snr),
     zugewiesene_schule: normalizeText(row?.zugewiesene_schule),
     fallgrund_code: normalizeText(row?.fallgrund_code),
@@ -449,7 +479,7 @@ async function fetchOrsDistancesKm(selectedSchool, students) {
   }
 }
 
-async function loadStudentsForKoordinationGeocoding(pool, verfahrenId, rundeId) {
+async function loadStudentsForKoordinationGeocoding(pool, verfahrenId, rundeId, rowIds = []) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) return { rows: [], columns };
 
@@ -473,6 +503,13 @@ async function loadStudentsForKoordinationGeocoding(pool, verfahrenId, rundeId) 
   if (columns.has("runde_id")) {
     whereParts.push("runde_id = ?");
     params.push(rundeId);
+  }
+  const targetRowIds = Array.isArray(rowIds)
+    ? Array.from(new Set(rowIds.map((value) => Number(value || 0)).filter((value) => Number.isInteger(value) && value > 0)))
+    : [];
+  if (targetRowIds.length) {
+    whereParts.push(`id IN (${targetRowIds.map(() => "?").join(", ")})`);
+    params.push(...targetRowIds);
   }
 
   const [rows] = await pool.query(
@@ -541,8 +578,8 @@ async function updateStudentGeocoding(connection, columns, update) {
   );
 }
 
-async function ensureKoordinationStudentGeocoding(connection, verfahrenId, rundeId) {
-  const { columns, rows } = await loadStudentsForKoordinationGeocoding(connection, verfahrenId, rundeId);
+async function geocodeKoordinationStudents(connection, verfahrenId, rundeId, rowIds = []) {
+  const { columns, rows } = await loadStudentsForKoordinationGeocoding(connection, verfahrenId, rundeId, rowIds);
   if (!rows.length) return;
 
   const missingColumns = ["latitude", "longitude"].filter((column) => !columns.has(column));
@@ -552,29 +589,27 @@ async function ensureKoordinationStudentGeocoding(connection, verfahrenId, runde
     throw error;
   }
 
-  const updates = [];
-  for (const row of rows) {
+  const updates = await mapWithConcurrency(rows, 6, async (row) => {
     const addressLabel = createAddressLabel(row);
     if (!addressLabel) {
-      updates.push({
+      return {
         id: row.id,
         latitude: null,
         longitude: null,
         status: columns.has("geocoding_status") ? "Fehler" : "",
         errorMessage: "Adresse unvollstaendig.",
-      });
-      continue;
+      };
     }
 
     const result = await fetchOrsGeocode(row);
-    updates.push({
+    return {
       id: row.id,
       latitude: result.latitude,
       longitude: result.longitude,
       status: columns.has("geocoding_status") ? (result.ok ? "OK" : "Fehler") : "",
       errorMessage: result.ok ? null : result.message,
-    });
-  }
+    };
+  });
 
   if (!updates.length) return;
 
@@ -588,6 +623,14 @@ async function ensureKoordinationStudentGeocoding(connection, verfahrenId, runde
     await connection.rollback().catch(() => {});
     throw error;
   }
+
+  const successCount = updates.filter((update) => update.latitude !== null && update.longitude !== null).length;
+  const failedCount = updates.length - successCount;
+  return {
+    processedCount: updates.length,
+    successCount,
+    failedCount,
+  };
 }
 
 async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
@@ -725,8 +768,6 @@ function createKoordinationController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
 
-        await ensureKoordinationStudentGeocoding(connection, verfahrenId, rundeId);
-
         const schools = await loadSchoolRows(connection, verfahrenId, rundeId);
         const selectedSchool = selectedSnr
           ? schools.find((school) => school.snr === selectedSnr) || null
@@ -742,6 +783,47 @@ function createKoordinationController({ getPool }) {
       } catch (error) {
         console.error("koordination overview failed:", error);
         return sendError(res, error?.statusCode || 500, error?.message || "Die Koordinationsansicht konnte nicht geladen werden.");
+      } finally {
+        connection.release();
+      }
+    },
+
+    geocodeVisibleStudents: async (req, res) => {
+      const connection = await getPool().getConnection();
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        const rowIds = Array.from(
+          new Set(
+            (Array.isArray(req.body?.row_ids) ? req.body.row_ids : [])
+              .map((value) => Number(value || 0))
+              .filter((value) => Number.isInteger(value) && value > 0),
+          ),
+        );
+
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        if (!rowIds.length) {
+          return res.json({
+            success: true,
+            requested_count: 0,
+            processed_count: 0,
+            success_count: 0,
+            failed_count: 0,
+          });
+        }
+
+        const result = await geocodeKoordinationStudents(connection, verfahrenId, rundeId, rowIds);
+        return res.json({
+          success: true,
+          requested_count: rowIds.length,
+          processed_count: Number(result?.processedCount || 0),
+          success_count: Number(result?.successCount || 0),
+          failed_count: Number(result?.failedCount || 0),
+        });
+      } catch (error) {
+        console.error("koordination visible geocoding failed:", error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die sichtbaren Schuelerdaten konnten nicht geocodiert werden.");
       } finally {
         connection.release();
       }

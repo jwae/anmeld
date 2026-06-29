@@ -59,6 +59,7 @@ async function handleDeleteAll() {
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
+      :verfahrenstyp="verfahrenstyp"
       title="KiTa Schuelerpool importieren (CSV, EWO-Datei)"
     />
 
@@ -68,14 +69,17 @@ async function handleDeleteAll() {
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
+      :verfahrenstyp="verfahrenstyp"
       title="GS Schuelerpool importieren (CSV, EWO-Datei)"
     />
 
     <AnmeldungImport
+      v-if="verfahrenstyp === 'SEK1'"
       :key="`anmeldungen-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
+      :verfahrenstyp="verfahrenstyp"
     />
 
     <section class="importe-danger-zone">

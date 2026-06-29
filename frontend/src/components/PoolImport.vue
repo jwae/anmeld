@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import CsvImportOverlay from "./CsvImportOverlay.vue";
+import type { Anmeldeverfahrenstyp } from "../types";
 
 type PoolSchuelerRow = {
   schueler_id: number;
@@ -32,6 +33,7 @@ type PoolSortKey =
   | "schueler_schul_id"
   | "nachname"
   | "vorname"
+  | "von"
   | "geburtsdatum"
   | "foerderbedarf"
   | "zieldifferent"
@@ -47,6 +49,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
+  verfahrenstyp?: Anmeldeverfahrenstyp | null;
   title?: string;
 }>();
 
@@ -86,6 +89,8 @@ const poolCountLabel = computed(() => (
     ? "Kinder im GS-Pool:"
     : "Kinder im Pool:"
 ));
+
+const isSek1Procedure = computed(() => props.verfahrenstyp === "SEK1");
 
 const herkunftOptions = ["Pool", "Anmeldung", "Manuell"];
 const abgleichStatusOptions = ["Nur Pool", "Nur Anmeldung", "Pool + Anm"];
@@ -192,6 +197,8 @@ const sortedPoolSchuelerRows = computed(() => {
           return isPositiveFlag(row.ef) ? "1" : "0";
         case "herkunft":
           return displayHerkunft(row);
+        case "von":
+          return sourceDisplayTitle(row);
         default:
           return normalizeText(row[poolSortKey.value] as string | number | null | undefined);
       }
@@ -299,6 +306,20 @@ function isPositiveFlag(value: unknown) {
 
 function foerderbedarfHoverText(row: PoolSchuelerRow) {
   return normalizeText(row.foerder_label) || normalizeText(row.foerder_id) || "-";
+}
+
+function sourceDisplayText(row: PoolSchuelerRow, maxSchoolLength = 15) {
+  const sourceNo = normalizeText(row.quell_snr);
+  const schoolName = normalizeText(row.schule);
+  if (sourceNo && schoolName) return `${sourceNo} / ${truncateText(schoolName, maxSchoolLength)}`;
+  return sourceNo || truncateText(schoolName, maxSchoolLength) || "-";
+}
+
+function sourceDisplayTitle(row: PoolSchuelerRow) {
+  const sourceNo = normalizeText(row.quell_snr);
+  const schoolName = normalizeText(row.schule);
+  if (sourceNo && schoolName) return `${sourceNo} / ${schoolName}`;
+  return sourceNo || schoolName || "-";
 }
 
 function setPoolSort(nextKey: PoolSortKey) {
@@ -660,11 +681,12 @@ onUnmounted(() => {
               <th>Nr.</th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('schueler_schul_id')">Schueler-ID{{ poolSortMarker('schueler_schul_id') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('nachname')">Name + Vorname{{ poolSortMarker('nachname') }}</button></th>
+              <th v-if="isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('von')">Von{{ poolSortMarker('von') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('geburtsdatum')">Geburtsdatum{{ poolSortMarker('geburtsdatum') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('foerderbedarf')">LE{{ poolSortMarker('foerderbedarf') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('zieldifferent')">ZD{{ poolSortMarker('zieldifferent') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('ef')">EF{{ poolSortMarker('ef') }}</button></th>
-              <th><button type="button" class="table-sort-btn" @click="setPoolSort('quell_snr')">Quell-SNR / Schule{{ poolSortMarker('quell_snr') }}</button></th>
+              <th v-if="!isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('quell_snr')">Quell-SNR / Schule{{ poolSortMarker('quell_snr') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('herkunft')">Herkunft{{ poolSortMarker('herkunft') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('abgleich_status')">Abgleichstatus{{ poolSortMarker('abgleich_status') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('anmeldestatus')">Anmeldestatus{{ poolSortMarker('anmeldestatus') }}</button></th>
@@ -689,6 +711,7 @@ onUnmounted(() => {
                 {{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}
                 <span v-if="isDuplicatePoolChild(row)" class="duplicate-hint">Dublette</span>
               </td>
+              <td v-if="isSek1Procedure" :title="sourceDisplayTitle(row)">{{ sourceDisplayText(row) }}</td>
               <td>{{ formatDate(row.geburtsdatum) }}</td>
               <td>
                 <span
@@ -703,7 +726,7 @@ onUnmounted(() => {
               <td>
                 <span v-if="isPositiveFlag(row.ef)" class="status-badge status-badge-ef">ja</span>
               </td>
-              <td>{{ row.quell_snr || "-" }}<template v-if="row.schule"> / {{ truncateText(row.schule, 25) }}</template></td>
+              <td v-if="!isSek1Procedure" :title="sourceDisplayTitle(row)">{{ sourceDisplayText(row, 25) }}</td>
               <td>{{ displayHerkunft(row) }}</td>
               <td>{{ row.abgleich_status || "-" }}</td>
               <td>

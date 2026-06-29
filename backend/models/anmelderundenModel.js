@@ -312,9 +312,17 @@ async function startNextRound(pool, currentRoundId) {
 
     let copiedStudents = 0;
     if (copyColumns.length) {
-      const insertColumns = ["verfahren_id", "runde_id", ...copyColumns, "created_at", "updated_at"];
-      const selectColumns = ["?", "?", ...copyColumns.map((column) => `s.${column}`), "NOW()", "NOW()"];
-      const updateAssignments = copyColumns.map((column) => `${column} = VALUES(${column})`);
+      const insertColumns = ["verfahren_id", "runde_id", ...copyColumns];
+      const selectColumns = ["?", "?", ...copyColumns.map((column) => `s.${column}`)];
+      if (schuelerColumns.has("erwartete_snr") && schuelerColumns.has("schul_nr")) {
+        insertColumns.push("erwartete_snr");
+        selectColumns.push("s.schul_nr");
+      }
+      insertColumns.push("created_at", "updated_at");
+      selectColumns.push("NOW()", "NOW()");
+      const updateAssignments = insertColumns
+        .filter((column) => !["verfahren_id", "runde_id", "created_at", "updated_at"].includes(column))
+        .map((column) => `${column} = VALUES(${column})`);
       updateAssignments.push("updated_at = VALUES(updated_at)");
 
       const [insertResult] = await connection.query(

@@ -28,6 +28,18 @@ export default {
     return response.data;
   },
 
+  async geocodeVisibleStudents(
+    payload: {
+      verfahren_id: number;
+      runde_id: number;
+      row_ids: number[];
+    },
+    token?: string,
+  ) {
+    const response = await apiClient.post("/api/koordination/sichtbare-schueler/geocoding", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
   async getOffeneFaelle(
     verfahrenId: number,
     rundeId: number,

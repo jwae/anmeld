@@ -69,6 +69,27 @@ async function loadFallgrundOptions(pool) {
   })).filter((row) => row.id > 0);
 }
 
+async function loadProcedureSchoolNumbers(pool, verfahrenId) {
+  const [rows] = await pool.query(
+    `
+    SELECT DISTINCT s.snr
+    FROM anm_verfahren_schulgruppe vsg
+    JOIN anm_schulgruppe_schule sgs
+      ON sgs.schulgruppe_id = vsg.schulgruppe_id
+    JOIN anm_schulen s
+      ON s.snr = sgs.snr
+    WHERE vsg.verfahren_id = ?
+      AND vsg.rolle = 'Zielschulen'
+    ORDER BY s.snr ASC
+    `,
+    [verfahrenId],
+  );
+
+  return (rows || [])
+    .map((row) => normalizeText(row?.snr))
+    .filter(Boolean);
+}
+
 async function loadOpenCaseCountsByStudent(pool, verfahrenId) {
   if (!(await tableExists(pool, "anm_offener_fall"))) return new Map();
   const columns = await loadTableColumns(pool, "anm_offener_fall");
@@ -522,6 +543,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ${foerderLabelExpr} AS foerder_label,
       COALESCE(s.zieldifferent, 0) AS zieldifferent,
       COALESCE(s.herkunft, '') AS herkunft,
+      ${columns.has("quell_snr") ? "NULLIF(TRIM(s.quell_snr), '')" : "''"} AS quell_snr,
+      COALESCE(src.name, '') AS quell_schule,
       COALESCE(sch.name, sref.name, '') AS schule,
       COALESCE(sch.ort, sref.ort, sref.city, '') AS ort,
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
@@ -532,6 +555,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ${columns.has("plz") ? "COALESCE(s.plz, '')" : "''"} AS plz,
       ${columns.has("bemerkung") ? "COALESCE(s.bemerkung, '')" : "''"} AS bemerkung
     FROM anm_schueler s
+    LEFT JOIN anm_schulen src
+      ON src.snr = ${columns.has("quell_snr") ? "NULLIF(TRIM(s.quell_snr), '')" : "NULL"}
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
     LEFT JOIN school sref
@@ -553,6 +578,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     foerder_label: normalizeText(row?.foerder_label),
     zieldifferent: normalizeText(row?.zieldifferent),
     herkunft: normalizeText(row?.herkunft),
+    quell_snr: normalizeText(row?.quell_snr),
+    quell_schule: normalizeText(row?.quell_schule),
     schule: normalizeText(row?.schule),
     ort: normalizeText(row?.ort),
     schulnummer: normalizeText(row?.schulnummer),
@@ -911,9 +938,10 @@ function createAbgleichController({ getPool }) {
         const rows = await loadSchuelerRows(pool, verfahrenId, rundeId);
         const summary = await loadSchuelerCardSummary(pool, verfahrenId, rundeId);
         const schoolOverview = await loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId);
+        const schoolNumbersInProcedure = await loadProcedureSchoolNumbers(pool, verfahrenId);
         const anmeldestatusOptions = await loadAnmeldestatusCodes(pool);
         const fallgrundOptions = await loadFallgrundOptions(pool);
-        return res.json({ rows, summary, schoolOverview, anmeldestatusOptions, fallgrundOptions });
+        return res.json({ rows, summary, schoolOverview, schoolNumbersInProcedure, anmeldestatusOptions, fallgrundOptions });
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");
