@@ -30,6 +30,7 @@ type VerfahrenFormState = {
   bezeichnung: string;
   verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
+  sichtbar: boolean;
 };
 
 type RundenFormState = {
@@ -44,7 +45,8 @@ type RundenFormState = {
 const verfahren = ref<Anmeldeverfahren[]>([]);
 const runden = ref<Anmelderunde[]>([]);
 const selectedVerfahrenId = ref<number | null>(props.initialVerfahrenId ?? null);
-const selectedRundenId = ref<number | null>(props.initialRundeId ?? null);
+const activeRundenId = ref<number | null>(props.initialRundeId ?? null);
+const focusedRundenId = ref<number | null>(null);
 const loadingVerfahren = ref<boolean>(false);
 const loadingRunden = ref<boolean>(false);
 const savingVerfahren = ref<boolean>(false);
@@ -53,8 +55,9 @@ const deletingVerfahrenId = ref<number | null>(null);
 const deletingRundenId = ref<number | null>(null);
 const errorMessage = ref<string>("");
 const successMessage = ref<string>("");
-const showNextRoundOverlay = ref<boolean>(false);
-const savingNextRound = ref<boolean>(false);
+const showHiddenVerfahren = ref<boolean>(false);
+const showProcedureOverlay = ref<boolean>(false);
+const showRoundOverlay = ref<boolean>(false);
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
 const rundenForm = ref<RundenFormState>(createEmptyRundenForm());
@@ -65,7 +68,8 @@ function createEmptyVerfahrenForm(): VerfahrenFormState {
     schuljahr: "",
     bezeichnung: "",
     verfahrenstyp: "GS",
-    status: "geplant",
+    status: "Vorbereitet",
+    sichtbar: true,
   };
 }
 
@@ -76,7 +80,7 @@ function createEmptyRundenForm(): RundenFormState {
     bezeichnung: "",
     startdatum: "",
     enddatum: "",
-    status: "geplant",
+    status: "Vorbereitet",
   };
 }
 
@@ -84,21 +88,15 @@ const selectedVerfahren = computed<Anmeldeverfahren | null>(
   () => verfahren.value.find((item) => item.id === selectedVerfahrenId.value) || null,
 );
 
-const selectedRunde = computed<Anmelderunde | null>(
-  () => runden.value.find((item) => item.id === selectedRundenId.value) || null,
+const activeRunde = computed<Anmelderunde | null>(
+  () => runden.value.find((item) => item.id === activeRundenId.value) || null,
 );
 
-const nextRoundCandidate = computed<Anmelderunde | null>(() => {
-  const currentRound = selectedRunde.value;
-  if (!currentRound) return null;
-  return runden.value.find((item) => item.runden_nummer === currentRound.runden_nummer + 1) || null;
-});
+const focusedRunde = computed<Anmelderunde | null>(
+  () => runden.value.find((item) => item.id === focusedRundenId.value) || activeRunde.value || null,
+);
 
-const canStartNextRound = computed<boolean>(() => (
-  Boolean(selectedVerfahrenId.value)
-  && Boolean(selectedRunde.value)
-  && selectedRunde.value?.status === "aktiv"
-));
+const selectedProcedureLocked = computed<boolean>(() => selectedVerfahren.value?.status === "Beendet");
 
 const currentVerfahrenTitle = computed<string>(() => (
   selectedVerfahren.value
@@ -107,9 +105,32 @@ const currentVerfahrenTitle = computed<string>(() => (
 ));
 
 const currentRundenTitle = computed<string>(() => (
-  selectedRunde.value
-    ? `Runde ${selectedRunde.value.runden_nummer} ${selectedRunde.value.bezeichnung}`
-    : "Keine Runde ausgewaehlt"
+  activeRunde.value
+    ? `Runde ${activeRunde.value.runden_nummer} ${activeRunde.value.bezeichnung}`
+    : "Keine Arbeitsrunde gesetzt"
+));
+
+const currentInProgressRound = computed<Anmelderunde | null>(
+  () => runden.value.find((item) => item.status === "In Bearbeitung") || null,
+);
+
+const nextStartableRound = computed<Anmelderunde | null>(() => {
+  if (selectedVerfahren.value?.status !== "In Bearbeitung") return null;
+  if (!currentInProgressRound.value) return null;
+  return runden.value.find((item) => (
+    item.runden_nummer === currentInProgressRound.value!.runden_nummer + 1
+    && item.status === "Vorbereitet"
+  )) || null;
+});
+
+const hasSimilarProcedure = computed<boolean>(() => verfahren.value.some((item) => (
+  item.id !== verfahrenForm.value.id
+  && String(item.schuljahr || "").trim() === String(verfahrenForm.value.schuljahr || "").trim()
+  && String(item.verfahrenstyp || "").trim() === String(verfahrenForm.value.verfahrenstyp || "").trim()
+)));
+
+const similarProcedureLabel = computed<string>(() => (
+  verfahrenForm.value.verfahrenstyp === "SEK1" ? "SEK-I-Verfahren" : "Grundschul-Verfahren"
 ));
 
 function emitContext() {
@@ -120,8 +141,8 @@ function emitContext() {
   emit("update-selection", {
     verfahrenId: selectedVerfahrenId.value,
     verfahrenstyp: selectedVerfahren.value?.verfahrenstyp || null,
-    rundeId: selectedRundenId.value,
-    rundeStatus: selectedRunde.value?.status || null,
+    rundeId: activeRundenId.value,
+    rundeStatus: activeRunde.value?.status || null,
   });
 }
 
@@ -142,32 +163,36 @@ function showSuccess(message: string) {
   errorMessage.value = "";
 }
 
+function applyLocalWorkingRound(rundenId: number | null) {
+  activeRundenId.value = rundenId;
+  focusedRundenId.value = rundenId;
+  runden.value = runden.value.map((item) => ({
+    ...item,
+    ist_arbeitsrunde: rundenId !== null && item.id === rundenId,
+  }));
+}
+
 async function loadVerfahren(preferredSelectionId?: number | null) {
   loadingVerfahren.value = true;
   try {
-    const rows = await anmeldeverfahrenService.list(props.token);
+    const rows = await anmeldeverfahrenService.list(props.token, { includeHidden: showHiddenVerfahren.value });
     verfahren.value = rows;
-    loadingVerfahren.value = false;
-
     const desiredSelection = preferredSelectionId ?? selectedVerfahrenId.value;
     const stillExists = rows.some((item) => item.id === desiredSelection);
-    const nextSelectionId = stillExists ? desiredSelection : null;
-    selectedVerfahrenId.value = nextSelectionId;
+    selectedVerfahrenId.value = stillExists ? desiredSelection : (rows[0]?.id ?? null);
 
-    if (nextSelectionId) {
-      void loadRunden(nextSelectionId);
+    if (selectedVerfahrenId.value) {
+      await loadRunden(selectedVerfahrenId.value);
     } else {
       runden.value = [];
-      selectedRundenId.value = null;
+      activeRundenId.value = null;
+      focusedRundenId.value = null;
       emitContext();
     }
   } catch (error) {
     showError(error, "Anmeldeverfahren konnten nicht geladen werden.");
-    loadingVerfahren.value = false;
   } finally {
-    if (loadingVerfahren.value) {
-      loadingVerfahren.value = false;
-    }
+    loadingVerfahren.value = false;
   }
 }
 
@@ -175,8 +200,8 @@ async function loadRunden(verfahrenId?: number | null) {
   const effectiveId = verfahrenId ?? selectedVerfahrenId.value;
   if (!effectiveId) {
     runden.value = [];
-    selectedRundenId.value = null;
-    resetRundenForm();
+    activeRundenId.value = null;
+    focusedRundenId.value = null;
     emitContext();
     return;
   }
@@ -185,9 +210,16 @@ async function loadRunden(verfahrenId?: number | null) {
   try {
     const rows = await anmelderundenService.listByVerfahren(effectiveId, props.token);
     runden.value = rows;
-    const currentSelectedExists = rows.some((item) => item.id === selectedRundenId.value);
-    selectedRundenId.value = currentSelectedExists ? selectedRundenId.value : null;
-    syncRundenFormToSelection();
+    const activeRound = rows.find((item) => item.ist_arbeitsrunde)
+      || rows.find((item) => item.id === activeRundenId.value)
+      || null;
+    activeRundenId.value = activeRound?.id ?? null;
+    if (rows.some((item) => item.id === focusedRundenId.value)) {
+      focusedRundenId.value = focusedRundenId.value;
+    } else {
+      focusedRundenId.value = activeRound?.id ?? rows[0]?.id ?? null;
+    }
+    emitContext();
   } catch (error) {
     showError(error, "Anmelderunden konnten nicht geladen werden.");
   } finally {
@@ -202,26 +234,38 @@ function resetVerfahrenForm() {
 function resetRundenForm() {
   const nextRoundNumber = runden.value.length
     ? Math.max(...runden.value.map((item) => Number(item.runden_nummer || 0))) + 1
-    : 1;
-
+    : 4;
   rundenForm.value = {
     ...createEmptyRundenForm(),
-    runden_nummer: selectedVerfahrenId.value ? nextRoundNumber : null,
+    runden_nummer: nextRoundNumber,
+    bezeichnung: `Runde ${nextRoundNumber}`,
   };
 }
 
-function editVerfahren(item: Anmeldeverfahren) {
+function openCreateProcedureOverlay() {
+  resetVerfahrenForm();
+  showProcedureOverlay.value = true;
+}
+
+function openEditProcedureOverlay(item: Anmeldeverfahren) {
   verfahrenForm.value = {
     id: item.id,
     schuljahr: item.schuljahr,
     bezeichnung: item.bezeichnung,
     verfahrenstyp: item.verfahrenstyp,
     status: item.status,
+    sichtbar: item.sichtbar,
   };
+  showProcedureOverlay.value = true;
 }
 
-function editRunde(item: Anmelderunde) {
-  selectedRundenId.value = item.id;
+function openCreateRoundOverlay() {
+  resetRundenForm();
+  showRoundOverlay.value = true;
+}
+
+function openEditRoundOverlay(item: Anmelderunde) {
+  focusedRundenId.value = item.id;
   rundenForm.value = {
     id: item.id,
     runden_nummer: item.runden_nummer,
@@ -230,28 +274,16 @@ function editRunde(item: Anmelderunde) {
     enddatum: item.enddatum || "",
     status: item.status,
   };
-  emitContext();
-}
-
-function syncRundenFormToSelection() {
-  const currentRound = runden.value.find((item) => item.id === selectedRundenId.value) || null;
-  if (currentRound) {
-    editRunde(currentRound);
-    return;
-  }
-  resetRundenForm();
-  emitContext();
+  showRoundOverlay.value = true;
 }
 
 async function selectVerfahren(id: number) {
   selectedVerfahrenId.value = id;
-  selectedRundenId.value = null;
   await loadRunden(id);
 }
 
 function selectRunde(id: number) {
-  selectedRundenId.value = id;
-  syncRundenFormToSelection();
+  focusedRundenId.value = id;
 }
 
 async function submitVerfahren() {
@@ -267,6 +299,12 @@ async function submitVerfahren() {
     successMessage.value = "";
     return;
   }
+  if (hasSimilarProcedure.value) {
+    const confirmed = window.confirm(
+      `Fuer das Schuljahr ${schuljahr} existiert bereits ein ${similarProcedureLabel.value}. Moechten Sie trotzdem ein weiteres Verfahren anlegen?`,
+    );
+    if (!confirmed) return;
+  }
 
   savingVerfahren.value = true;
   try {
@@ -275,6 +313,7 @@ async function submitVerfahren() {
       bezeichnung,
       verfahrenstyp: verfahrenForm.value.verfahrenstyp,
       status: verfahrenForm.value.status,
+      sichtbar: verfahrenForm.value.sichtbar,
     };
 
     const response = verfahrenForm.value.id
@@ -282,7 +321,7 @@ async function submitVerfahren() {
       : await anmeldeverfahrenService.create(payload, props.token);
 
     await loadVerfahren(response.row?.id || null);
-    editVerfahren(response.row);
+    showProcedureOverlay.value = false;
     showSuccess(response.message || "Anmeldeverfahren erfolgreich gespeichert.");
   } catch (error) {
     showError(error, "Anmeldeverfahren konnte nicht gespeichert werden.");
@@ -300,8 +339,6 @@ async function deleteVerfahren(item: Anmeldeverfahren) {
   deletingVerfahrenId.value = item.id;
   try {
     const response = await anmeldeverfahrenService.remove(item.id, props.token);
-    if (verfahrenForm.value.id === item.id) resetVerfahrenForm();
-    resetRundenForm();
     await loadVerfahren(selectedVerfahrenId.value === item.id ? null : selectedVerfahrenId.value);
     showSuccess(response.message || "Anmeldeverfahren erfolgreich geloescht.");
   } catch (error) {
@@ -354,12 +391,7 @@ async function submitRunde() {
       : await anmelderundenService.create(selectedVerfahrenId.value, payload, props.token);
 
     await loadRunden(selectedVerfahrenId.value);
-    selectedRundenId.value = response.row?.id ?? selectedRundenId.value;
-    if (rundenForm.value.id) {
-      editRunde(response.row);
-    } else {
-      resetRundenForm();
-    }
+    showRoundOverlay.value = false;
     showSuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
   } catch (error) {
     showError(error, "Anmelderunde konnte nicht gespeichert werden.");
@@ -369,21 +401,12 @@ async function submitRunde() {
 }
 
 async function deleteRunde(item: Anmelderunde) {
-  if (item.status === "abgeschlossen") {
-    errorMessage.value = "Abgeschlossene Runden koennen nicht geloescht werden.";
-    successMessage.value = "";
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`,
-  );
+  const confirmed = window.confirm(`Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`);
   if (!confirmed) return;
 
   deletingRundenId.value = item.id;
   try {
     const response = await anmelderundenService.remove(item.id, props.token);
-    if (rundenForm.value.id === item.id) resetRundenForm();
     await loadRunden(selectedVerfahrenId.value);
     showSuccess(response.message || "Anmelderunde erfolgreich geloescht.");
   } catch (error) {
@@ -393,41 +416,76 @@ async function deleteRunde(item: Anmelderunde) {
   }
 }
 
-function openNextRoundOverlay() {
-  if (!canStartNextRound.value) return;
-  showNextRoundOverlay.value = true;
-}
-
-function closeNextRoundOverlay() {
-  if (savingNextRound.value) return;
-  showNextRoundOverlay.value = false;
-}
-
-async function startNextRound() {
-  if (!selectedRunde.value) {
-    errorMessage.value = "Bitte zuerst eine aktive Runde auswaehlen.";
-    successMessage.value = "";
-    return;
-  }
-
-  savingNextRound.value = true;
+async function startProcedure() {
+  if (!selectedVerfahren.value) return;
   try {
-    const response = await anmelderundenService.startNextRound(selectedRunde.value.id, props.token);
-    await loadRunden(selectedVerfahrenId.value);
-    if (response.next_round?.id) {
-      selectedRundenId.value = response.next_round.id;
-      const refreshedNextRound = runden.value.find((item) => item.id === response.next_round.id) || response.next_round;
-      editRunde(refreshedNextRound);
-    } else {
-      resetRundenForm();
+    const response = await anmeldeverfahrenService.start(selectedVerfahren.value.id, props.token);
+    if (response.row?.id) {
+      selectedVerfahrenId.value = response.row.id;
+    }
+    await loadVerfahren(response.row?.id || selectedVerfahren.value.id);
+    const roundOne = runden.value.find((item) => item.runden_nummer === 1) || null;
+    if (roundOne) {
+      applyLocalWorkingRound(roundOne.id);
+      runden.value = runden.value.map((item) => ({
+        ...item,
+        status: item.id === roundOne.id ? "In Bearbeitung" : item.status,
+      }));
       emitContext();
     }
-    showNextRoundOverlay.value = false;
-    showSuccess(response.message || "Die naechste Runde wurde erfolgreich gestartet.");
+    showSuccess(response.message);
+  } catch (error) {
+    showError(error, "Das Verfahren konnte nicht gestartet werden.");
+  }
+}
+
+async function finishProcedure() {
+  if (!selectedVerfahren.value) return;
+  const confirmed = window.confirm(`Soll das Verfahren "${selectedVerfahren.value.bezeichnung}" wirklich beendet werden?`);
+  if (!confirmed) return;
+  try {
+    const response = await anmeldeverfahrenService.finish(selectedVerfahren.value.id, props.token);
+    await loadVerfahren(response.row?.id || selectedVerfahren.value.id);
+    showSuccess(response.message);
+  } catch (error) {
+    showError(error, "Das Verfahren konnte nicht beendet werden.");
+  }
+}
+
+async function setWorkingRound(item: Anmelderunde) {
+  try {
+    const response = await anmelderundenService.setWorkingRound(item.id, props.token);
+    applyLocalWorkingRound(response.row?.id ?? item.id);
+    emitContext();
+    await loadVerfahren(selectedVerfahrenId.value);
+    applyLocalWorkingRound(response.row?.id ?? item.id);
+    emitContext();
+    showSuccess(response.message);
+  } catch (error) {
+    showError(error, "Die Arbeitsrunde konnte nicht gesetzt werden.");
+  }
+}
+
+async function startRound(item: Anmelderunde) {
+  const confirmed = window.confirm(`Soll Runde ${item.runden_nummer} jetzt gestartet werden?`);
+  if (!confirmed) return;
+  try {
+    const response = await anmelderundenService.startRound(item.id, props.token);
+    applyLocalWorkingRound(response.next_round?.id ?? item.id);
+    if (response.current_round?.id && response.next_round?.id) {
+      runden.value = runden.value.map((entry) => {
+        if (entry.id === response.current_round.id) return { ...entry, status: "Beendet", ist_arbeitsrunde: false };
+        if (entry.id === response.next_round.id) return { ...entry, status: "In Bearbeitung", ist_arbeitsrunde: true };
+        return entry;
+      });
+    }
+    emitContext();
+    await loadVerfahren(selectedVerfahrenId.value);
+    applyLocalWorkingRound(response.next_round?.id ?? item.id);
+    emitContext();
+    showSuccess(response.message);
   } catch (error) {
     showError(error, "Der Rundenwechsel konnte nicht ausgefuehrt werden.");
-  } finally {
-    savingNextRound.value = false;
   }
 }
 
@@ -438,57 +496,42 @@ onMounted(async () => {
 
 <template>
   <section class="verfahren-und-runden-bereich">
-    <section class="anm-current-selection-card">
-      <div class="anm-card-head">
-        <div>
-          <p class="anm-roadmap-eyebrow">Aktuelle Auswahl</p>
-          <h3>Verfahren und Runde festlegen</h3>
-          <p>Diese Auswahl bildet den aktuellen Arbeitskontext fuer die weiteren Module.</p>
-        </div>
+    <section class="anm-toolbar-card">
+      <div class="anm-toolbar-head">
+        <label class="anm-toggle-row">
+          <input v-model="showHiddenVerfahren" type="checkbox" @change="loadVerfahren(selectedVerfahrenId)" />
+          <span>Ausgeblendete Verfahren anzeigen</span>
+        </label>
       </div>
 
-      <div class="anm-form-grid anm-current-selection-grid">
-        <label class="field-block anm-current-selection-field">
-          <span class="field-label anm-current-selection-label">Aktuelles Verfahren</span>
-          <select
-            :value="selectedVerfahrenId ?? ''"
-            :disabled="loadingVerfahren || !verfahren.length"
-            @change="selectVerfahren(Number(($event.target as HTMLSelectElement).value || 0))"
-          >
-            <option disabled value="">Bitte Verfahren waehlen</option>
-            <option v-for="item in verfahren" :key="item.id" :value="item.id">
-              {{ item.schuljahr }} - {{ item.bezeichnung }}
-            </option>
-          </select>
-        </label>
-
-        <div class="anm-current-selection-round-row">
-          <label class="field-block anm-current-selection-field">
-            <span class="field-label anm-current-selection-label">Aktuelle Runde</span>
-            <select
-              :value="selectedRundenId ?? ''"
-              :disabled="loadingRunden || !selectedVerfahrenId || !runden.length"
-              @change="selectRunde(Number(($event.target as HTMLSelectElement).value || 0))"
-            >
-              <option disabled value="">
-                {{ selectedVerfahrenId ? "Bitte Runde waehlen" : "Zuerst Verfahren waehlen" }}
-              </option>
-              <option v-for="item in runden" :key="item.id" :value="item.id">
-                Runde {{ item.runden_nummer }} - {{ item.bezeichnung }}
-              </option>
-            </select>
-          </label>
-
-          <button
-            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
-            type="button"
-            :disabled="!canStartNextRound"
-            title="Die aktive Runde abschliessen und die naechste Runde starten."
-            @click="openNextRoundOverlay"
-          >
-            Naechste Runde starten
-          </button>
-        </div>
+      <div class="anm-toolbar">
+        <button class="btn-secondary anm-toolbar-btn" type="button" @click="openCreateProcedureOverlay">
+          Neues Verfahren
+        </button>
+        <button
+          class="btn-secondary anm-toolbar-btn"
+          type="button"
+          :disabled="!selectedVerfahrenId || selectedProcedureLocked"
+          @click="openCreateRoundOverlay"
+        >
+          Weitere Runde anlegen
+        </button>
+        <button
+          class="btn-secondary anm-toolbar-btn"
+          type="button"
+          :disabled="selectedVerfahren?.status !== 'Vorbereitet'"
+          @click="startProcedure"
+        >
+          Verfahren starten
+        </button>
+        <button
+          class="btn-secondary anm-toolbar-btn anm-toolbar-btn-danger"
+          type="button"
+          :disabled="!selectedVerfahrenId || selectedProcedureLocked"
+          @click="finishProcedure"
+        >
+          Verfahren beenden
+        </button>
       </div>
     </section>
 
@@ -503,96 +546,92 @@ onMounted(async () => {
       </div>
     </transition>
 
-    <div
-      v-if="showNextRoundOverlay"
-      class="anm-overlay-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="anm-next-round-overlay-title"
-      @click.self="closeNextRoundOverlay"
-    >
-      <section class="anm-overlay-card">
-        <div class="anm-overlay-head">
-          <h3 id="anm-next-round-overlay-title">Naechste Runde starten</h3>
-        </div>
-        <div class="anm-overlay-copy">
-          <p>
-            Die aktuelle Runde bleibt unveraendert erhalten und wird auf "abgeschlossen" gesetzt.
-            Alle aktiven Schueler werden in die naechste Runde uebernommen.
-          </p>
-          <p>
-            Achtung: Abgeschlossene Runden sind nur noch lesbar und koennen nicht mehr bearbeitet werden.
-          </p>
-          <p>
-            <strong>
-              Runde {{ selectedRunde?.runden_nummer || "-" }} abschliessen und
-              Runde {{ (selectedRunde?.runden_nummer || 0) + 1 }} starten?
-            </strong>
-          </p>
-          <p v-if="nextRoundCandidate">
-            Die vorhandene Runde {{ nextRoundCandidate.runden_nummer }} wird verwendet.
-          </p>
-          <p v-else>
-            Die naechste Runde wird automatisch angelegt.
-          </p>
-          <p class="anm-overlay-warning">
-            Fortfahren?
-          </p>
-        </div>
-        <div class="anm-overlay-actions">
-          <button class="btn-secondary anm-overlay-close" type="button" :disabled="savingNextRound" @click="closeNextRoundOverlay">
-            Abbrechen
-          </button>
-          <button
-            class="btn-secondary anm-current-selection-button anm-current-selection-button-danger"
-            type="button"
-            :disabled="savingNextRound"
-            @click="startNextRound"
-          >
-            {{ savingNextRound ? "Starte..." : "Fortfahren" }}
-          </button>
-        </div>
-      </section>
-    </div>
-
-    <div class="anm-grid anm-grid-top">
+    <div class="anm-grid">
       <AnmeldeverfahrenListe
         :items="verfahren"
         :selected-id="selectedVerfahrenId"
         :loading="loadingVerfahren"
         :deleting-id="deletingVerfahrenId"
         @select="selectVerfahren"
-        @edit="editVerfahren"
+        @edit="openEditProcedureOverlay"
         @delete="deleteVerfahren"
       />
 
-      <AnmeldeverfahrenForm
-        v-model="verfahrenForm"
-        :saving="savingVerfahren"
-        @submit="submitVerfahren"
-        @reset="resetVerfahrenForm"
-      />
-    </div>
-
-    <div class="anm-grid">
       <AnmelderundenListe
         :verfahren="selectedVerfahren"
         :items="runden"
-        :selected-id="selectedRundenId"
+        :selected-id="focusedRundenId"
         :loading="loadingRunden"
         :deleting-id="deletingRundenId"
+        :next-round-id="nextStartableRound?.id ?? null"
+        :procedure-locked="selectedProcedureLocked"
         @select="selectRunde"
-        @edit="editRunde"
+        @edit="openEditRoundOverlay"
         @delete="deleteRunde"
+        @set-working="setWorkingRound"
+        @start-round="startRound"
       />
+    </div>
 
-      <AnmelderundenForm
-        v-model="rundenForm"
-        :verfahren="selectedVerfahren"
-        :saving="savingRunden"
-        @submit="submitRunde"
-        @reset="resetRundenForm"
-      />
+    <div
+      v-if="showProcedureOverlay"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-procedure-overlay-title"
+      @click.self="showProcedureOverlay = false"
+    >
+      <section class="anm-overlay-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-procedure-overlay-title">
+            {{ verfahrenForm.id ? "Verfahren bearbeiten" : "Verfahren anlegen" }}
+          </h3>
+          <button class="anm-overlay-close" type="button" @click="showProcedureOverlay = false">Schliessen</button>
+        </div>
+        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
+          {{ errorMessage }}
+        </div>
+        <div v-else-if="successMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+          {{ successMessage }}
+        </div>
+        <AnmeldeverfahrenForm
+          v-model="verfahrenForm"
+          :saving="savingVerfahren"
+          @submit="submitVerfahren"
+          @reset="resetVerfahrenForm"
+        />
+      </section>
+    </div>
+
+    <div
+      v-if="showRoundOverlay"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-round-overlay-title"
+      @click.self="showRoundOverlay = false"
+    >
+      <section class="anm-overlay-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-round-overlay-title">
+            {{ rundenForm.id ? "Runde bearbeiten" : "Weitere Runde anlegen" }}
+          </h3>
+          <button class="anm-overlay-close" type="button" @click="showRoundOverlay = false">Schliessen</button>
+        </div>
+        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
+          {{ errorMessage }}
+        </div>
+        <div v-else-if="successMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+          {{ successMessage }}
+        </div>
+        <AnmelderundenForm
+          v-model="rundenForm"
+          :verfahren="selectedVerfahren"
+          :saving="savingRunden"
+          @submit="submitRunde"
+          @reset="resetRundenForm"
+        />
+      </section>
     </div>
   </section>
 </template>
@@ -603,71 +642,59 @@ onMounted(async () => {
   gap: 18px;
 }
 
-.anm-current-selection-card {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
+.anm-toolbar-card,
+.anm-overlay-card {
   border: 1px solid #dbe4f0;
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 16px 32px rgba(23, 58, 108, 0.05);
 }
 
-.anm-roadmap-eyebrow {
-  margin: 0 0 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 12px;
+.anm-toolbar-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.anm-toolbar-head {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.anm-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #27486f;
+  font-weight: 600;
+}
+
+.anm-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.anm-toolbar-btn {
+  min-height: 34px;
+  padding: 8px 14px;
+  border-radius: 999px;
   font-weight: 700;
-  color: #6680a3;
-}
-
-.anm-current-selection-card h3 {
-  margin: 0;
-  color: #19385e;
-  font-size: 1.12rem;
-  line-height: 1.25;
-}
-
-.anm-current-selection-card p {
-  margin: 8px 0 0;
-  color: #4a607e;
-  line-height: 1.55;
-}
-
-.anm-current-selection-card .anm-card-head p {
-  margin-top: 4px;
-  color: #607794;
   font-size: 12px;
-  line-height: 1.4;
+}
+
+.anm-toolbar-btn-danger {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .anm-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
-}
-
-.anm-grid-top {
-  align-items: stretch;
-}
-
-.anm-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 12px;
-}
-
-.anm-current-selection-button {
-  min-height: 34px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-  white-space: nowrap;
-  justify-self: end;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  grid-template-columns: 1fr;
 }
 
 .anm-overlay-backdrop {
@@ -678,169 +705,66 @@ onMounted(async () => {
   place-items: center;
   padding: 20px;
   background: rgba(18, 34, 56, 0.42);
-  backdrop-filter: blur(2px);
 }
 
 .anm-overlay-card {
-  width: min(560px, 100%);
+  width: min(760px, 100%);
   display: grid;
   gap: 16px;
   padding: 18px;
-  border: 1px solid #dbe4f0;
-  border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 20px 48px rgba(16, 39, 73, 0.18);
 }
 
 .anm-overlay-head {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: center;
   gap: 12px;
 }
 
 .anm-overlay-head h3 {
   margin: 0;
   color: #19385e;
-  font-size: 1.12rem;
-  line-height: 1.25;
-}
-
-.anm-overlay-card p {
-  margin: 0;
-  color: #4a607e;
-  line-height: 1.55;
-}
-
-.anm-overlay-copy {
-  display: grid;
-  gap: 12px;
-}
-
-.anm-overlay-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.anm-overlay-warning {
-  color: #8c2e2e !important;
-  font-weight: 700;
 }
 
 .anm-overlay-close {
   min-height: 34px;
-  padding: 10px 18px;
-  border: 1px solid #fca5a5;
+  padding: 8px 14px;
+  border: 1px solid #cfdceb;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #991b1b;
+  background: #f8fbff;
+  color: #19385e;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.anm-overlay-close:hover {
-  background: #fecaca;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+.anm-overlay-feedback {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.anm-form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.anm-overlay-feedback-error {
+  border: 1px solid #f3b4b4;
+  background: #fff1f1;
+  color: #8f2525;
 }
 
-.anm-current-selection-grid {
-  gap: 10px;
-  grid-template-columns: auto auto;
-  justify-content: start;
-  align-items: end;
+.anm-overlay-feedback-success {
+  border: 1px solid #b9e2c0;
+  background: #f2fbf4;
+  color: #266b35;
 }
 
-.anm-current-selection-field {
-  gap: 5px;
-  min-width: 0;
-  width: min(320px, 100%);
-  max-width: 100%;
-}
-
-.anm-current-selection-round-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.anm-current-selection-label {
-  color: #607794;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.anm-current-selection-field :deep(select) {
-  min-height: 34px;
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #cfdceb;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
-  color: #19385e;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-}
-
-.anm-current-selection-field :deep(select:disabled) {
-  background: #f5f8fc;
-  color: #7d90a8;
-}
-
-.anm-current-selection-button-danger {
-  border: 1px solid #fca5a5;
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.anm-current-selection-button-danger:hover:not(:disabled) {
-  background: #fecaca;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-}
-
-.anm-current-selection-button-danger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-@media (max-width: 1080px) {
-  .anm-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .anm-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .anm-current-selection-round-row {
-    grid-template-columns: 1fr;
-  }
-
-  .anm-current-selection-field {
-    width: 100%;
-  }
-
-  .anm-current-selection-button {
-    justify-self: start;
-  }
-
+@media (max-width: 900px) {
+  .anm-card-head,
   .anm-overlay-head {
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .anm-overlay-actions {
-    justify-content: stretch;
+  .anm-current-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

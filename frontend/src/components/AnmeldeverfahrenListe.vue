@@ -40,7 +40,8 @@ function formatTimestamp(value: string) {
             <th>Bezeichnung</th>
             <th>Typ</th>
             <th>Status</th>
-            <th>Erstellt am</th>
+            <th>Sichtbar</th>
+            <th>Arbeitsrunde</th>
             <th>Geaendert am</th>
             <th>Aktionen</th>
           </tr>
@@ -58,7 +59,8 @@ function formatTimestamp(value: string) {
             </td>
             <td class="anm-cell-primary">{{ item.verfahrenstyp }}</td>
             <td><span class="anm-status-pill" :data-status="item.status">{{ item.status }}</span></td>
-            <td class="anm-cell-muted">{{ formatTimestamp(item.created_at) }}</td>
+            <td>{{ item.sichtbar ? "Ja" : "Nein" }}</td>
+            <td>{{ item.arbeitsrunde_nummer ? `Runde ${item.arbeitsrunde_nummer}` : "-" }}</td>
             <td class="anm-cell-muted">{{ formatTimestamp(item.updated_at) }}</td>
             <td class="anm-cell-actions">
               <div class="anm-actions">
@@ -86,7 +88,7 @@ function formatTimestamp(value: string) {
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td colspan="7" class="anm-empty-cell">Noch kein Anmeldeverfahren vorhanden.</td>
+            <td colspan="8" class="anm-empty-cell">Noch kein Anmeldeverfahren vorhanden.</td>
           </tr>
         </tbody>
       </table>
@@ -157,7 +159,7 @@ function formatTimestamp(value: string) {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 690px;
+  min-width: 900px;
 }
 
 .anm-table thead th {
@@ -185,7 +187,7 @@ function formatTimestamp(value: string) {
 
 .anm-table tbody tr {
   cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
+  transition: background-color 0.18s ease;
 }
 
 .anm-table tbody tr:hover {
@@ -197,19 +199,6 @@ function formatTimestamp(value: string) {
   box-shadow: inset 4px 0 0 #7da8d8;
 }
 
-.anm-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.anm-cell-primary,
-.anm-cell-actions {
-  white-space: nowrap;
-}
-
-.anm-cell-title {
-  min-width: 180px;
-}
-
 .anm-cell-title strong {
   color: #18395f;
   font-size: 13px;
@@ -217,7 +206,6 @@ function formatTimestamp(value: string) {
 
 .anm-cell-muted {
   color: #6b819c;
-  font-size: 12px;
 }
 
 .anm-status-pill {
@@ -230,15 +218,14 @@ function formatTimestamp(value: string) {
   color: #38526e;
   font-size: 11px;
   font-weight: 800;
-  text-transform: capitalize;
 }
 
-.anm-status-pill[data-status="aktiv"] {
+.anm-status-pill[data-status="In Bearbeitung"] {
   background: #e8f7eb;
   color: #266b35;
 }
 
-.anm-status-pill[data-status="abgeschlossen"] {
+.anm-status-pill[data-status="Beendet"] {
   background: #eef1f4;
   color: #5b6775;
 }
@@ -266,26 +253,11 @@ function formatTimestamp(value: string) {
   background: #eef5fc;
 }
 
-.anm-icon-btn i {
-  font-size: 13px;
-}
-
-.anm-icon-btn-text {
-  font-weight: 700;
-  font-size: 11px;
-}
-
 .anm-danger-btn {
   color: #9a3a3a;
 }
 
 .anm-danger-btn:hover:not(:disabled) {
   background: #faeeee;
-}
-
-@media (max-width: 900px) {
-  .anm-table {
-    min-width: 620px;
-  }
 }
 </style>

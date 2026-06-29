@@ -1,4 +1,6 @@
-const STATUS_VALUES = ["geplant", "aktiv", "abgeschlossen"];
+const verfahrenModel = require("./anmeldeverfahrenModel");
+
+const STATUS_VALUES = ["Vorbereitet", "In Bearbeitung", "Beendet"];
 
 async function tableExists(pool, tableName) {
   const [rows] = await pool.query("SHOW TABLES LIKE ?", [tableName]);
@@ -19,50 +21,71 @@ function mapRoundRow(row) {
     startdatum: row.startdatum,
     enddatum: row.enddatum,
     status: String(row.status || "").trim(),
+    ist_arbeitsrunde: Number(row.ist_arbeitsrunde || 0) === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
 }
 
-async function listByVerfahrenId(pool, verfahrenId) {
-  const [rows] = await pool.query(
-    `SELECT
-      id,
-      verfahren_id,
-      runden_nummer,
-      bezeichnung,
-      DATE_FORMAT(startdatum, '%Y-%m-%d') AS startdatum,
-      DATE_FORMAT(enddatum, '%Y-%m-%d') AS enddatum,
-      status,
-      DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-      DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
-    FROM anm_runde
-    WHERE verfahren_id = ?
-    ORDER BY runden_nummer ASC, id ASC`,
-    [verfahrenId],
-  );
-  return (rows || []).map(mapRoundRow);
-}
-
 async function findById(pool, id) {
+  const schema = await verfahrenModel.loadSchemaConfig(pool);
+  const workingRoundCondition = schema.workingRoundIdColumn
+    ? `CASE WHEN v.${schema.workingRoundIdColumn} = r.id THEN 1 ELSE 0 END`
+    : schema.roundWorkingFlagColumn
+      ? `COALESCE(r.${schema.roundWorkingFlagColumn}, 0)`
+      : "0";
+
   const [rows] = await pool.query(
     `SELECT
-      id,
-      verfahren_id,
-      runden_nummer,
-      bezeichnung,
-      DATE_FORMAT(startdatum, '%Y-%m-%d') AS startdatum,
-      DATE_FORMAT(enddatum, '%Y-%m-%d') AS enddatum,
-      status,
-      DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-      DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
-    FROM anm_runde
-    WHERE id = ?
+      r.id,
+      r.verfahren_id,
+      r.runden_nummer,
+      r.bezeichnung,
+      DATE_FORMAT(r.startdatum, '%Y-%m-%d') AS startdatum,
+      DATE_FORMAT(r.enddatum, '%Y-%m-%d') AS enddatum,
+      r.status,
+      ${workingRoundCondition} AS ist_arbeitsrunde,
+      DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+      DATE_FORMAT(r.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
+    FROM anm_runde r
+    LEFT JOIN anm_verfahren v
+      ON v.id = r.verfahren_id
+    WHERE r.id = ?
     LIMIT 1`,
     [id],
   );
   if (!Array.isArray(rows) || !rows.length) return null;
   return mapRoundRow(rows[0]);
+}
+
+async function listByVerfahrenId(pool, verfahrenId) {
+  const schema = await verfahrenModel.loadSchemaConfig(pool);
+  const workingRoundCondition = schema.workingRoundIdColumn
+    ? `CASE WHEN v.${schema.workingRoundIdColumn} = r.id THEN 1 ELSE 0 END`
+    : schema.roundWorkingFlagColumn
+      ? `COALESCE(r.${schema.roundWorkingFlagColumn}, 0)`
+      : "0";
+
+  const [rows] = await pool.query(
+    `SELECT
+      r.id,
+      r.verfahren_id,
+      r.runden_nummer,
+      r.bezeichnung,
+      DATE_FORMAT(r.startdatum, '%Y-%m-%d') AS startdatum,
+      DATE_FORMAT(r.enddatum, '%Y-%m-%d') AS enddatum,
+      r.status,
+      ${workingRoundCondition} AS ist_arbeitsrunde,
+      DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+      DATE_FORMAT(r.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
+    FROM anm_runde r
+    LEFT JOIN anm_verfahren v
+      ON v.id = r.verfahren_id
+    WHERE r.verfahren_id = ?
+    ORDER BY r.runden_nummer ASC, r.id ASC`,
+    [verfahrenId],
+  );
+  return (rows || []).map(mapRoundRow);
 }
 
 async function existsForVerfahren(pool, verfahrenId) {
@@ -91,23 +114,24 @@ async function hasDuplicateRoundNumber(pool, verfahrenId, rundenNummer, excludeI
 }
 
 async function create(pool, verfahrenId, payload) {
+  const schema = await verfahrenModel.loadSchemaConfig(pool);
+  const fields = ["verfahren_id", "runden_nummer", "bezeichnung", "startdatum", "enddatum", "status"];
+  const values = [
+    verfahrenId,
+    payload.runden_nummer,
+    payload.bezeichnung,
+    payload.startdatum || null,
+    payload.enddatum || null,
+    payload.status,
+  ];
+  if (schema.roundWorkingFlagColumn) {
+    fields.push(schema.roundWorkingFlagColumn);
+    values.push(0);
+  }
+
   const [result] = await pool.query(
-    `INSERT INTO anm_runde (
-      verfahren_id,
-      runden_nummer,
-      bezeichnung,
-      startdatum,
-      enddatum,
-      status
-    ) VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      verfahrenId,
-      payload.runden_nummer,
-      payload.bezeichnung,
-      payload.startdatum || null,
-      payload.enddatum || null,
-      payload.status,
-    ],
+    `INSERT INTO anm_runde (${fields.join(", ")}) VALUES (${fields.map(() => "?").join(", ")})`,
+    values,
   );
   return findById(pool, result.insertId);
 }
@@ -175,97 +199,135 @@ async function countRoundWorkingData(pool, rundenId) {
   return total;
 }
 
-async function startNextRound(pool, currentRoundId) {
+async function findProcedureForRound(connection, roundId) {
+  const [rows] = await connection.query(
+    `SELECT
+      r.id,
+      r.verfahren_id,
+      r.runden_nummer,
+      r.status,
+      v.status AS verfahren_status
+    FROM anm_runde r
+    JOIN anm_verfahren v
+      ON v.id = r.verfahren_id
+    WHERE r.id = ?
+    LIMIT 1
+    FOR UPDATE`,
+    [roundId],
+  );
+  if (!Array.isArray(rows) || !rows.length) return null;
+  return rows[0];
+}
+
+async function setWorkingRound(pool, roundId) {
   const connection = await pool.getConnection();
   try {
+    const schema = await verfahrenModel.loadSchemaConfig(connection);
     await connection.beginTransaction();
 
-    const currentRound = await findById(connection, currentRoundId);
-    if (!currentRound) {
+    const round = await findProcedureForRound(connection, roundId);
+    if (!round) {
       const error = new Error("Anmelderunde nicht gefunden.");
       error.statusCode = 404;
       throw error;
     }
-    if (currentRound.status !== "aktiv") {
-      const error = new Error("Nur aktive Runden koennen abgeschlossen und fortgesetzt werden.");
+    if (String(round.verfahren_status || "").trim() === "Beendet") {
+      const error = new Error("Bei beendeten Verfahren kann die Arbeitsrunde nicht mehr geaendert werden.");
       error.statusCode = 409;
       throw error;
     }
 
-    const nextRoundNumber = Number(currentRound.runden_nummer || 0) + 1;
-    const [nextRoundRows] = await connection.query(
-      `SELECT
-         id,
-         verfahren_id,
-         runden_nummer,
-         bezeichnung,
-         DATE_FORMAT(startdatum, '%Y-%m-%d') AS startdatum,
-         DATE_FORMAT(enddatum, '%Y-%m-%d') AS enddatum,
-         status,
-         DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-         DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
+    await verfahrenModel.setWorkingRound(connection, Number(round.verfahren_id), Number(round.id), schema);
+    await connection.commit();
+    return findById(pool, roundId);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function startRound(pool, targetRoundId) {
+  const connection = await pool.getConnection();
+  try {
+    const schema = await verfahrenModel.loadSchemaConfig(connection);
+    await connection.beginTransaction();
+
+    const targetRound = await findProcedureForRound(connection, targetRoundId);
+    if (!targetRound) {
+      const error = new Error("Anmelderunde nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+    if (String(targetRound.verfahren_status || "").trim() === "Beendet") {
+      const error = new Error("Beendete Verfahren koennen keine neue Runde starten.");
+      error.statusCode = 409;
+      throw error;
+    }
+    if (String(targetRound.verfahren_status || "").trim() !== "In Bearbeitung") {
+      const error = new Error("Eine neue Runde kann erst gestartet werden, wenn das Verfahren in Bearbeitung ist.");
+      error.statusCode = 409;
+      throw error;
+    }
+    if (String(targetRound.status || "").trim() !== "Vorbereitet") {
+      const error = new Error("Nur vorbereitete Runden koennen gestartet werden.");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const [roundRows] = await connection.query(
+      `SELECT id, verfahren_id, runden_nummer, status
        FROM anm_runde
        WHERE verfahren_id = ?
-         AND runden_nummer = ?
-       LIMIT 1`,
-      [currentRound.verfahren_id, nextRoundNumber],
+       ORDER BY runden_nummer ASC, id ASC
+       FOR UPDATE`,
+      [targetRound.verfahren_id],
     );
+    const currentRound = (roundRows || []).find((row) => String(row.status || "").trim() === "In Bearbeitung");
+    if (!currentRound) {
+      const error = new Error("Es gibt keine aktuelle Runde in Bearbeitung.");
+      error.statusCode = 409;
+      throw error;
+    }
+    if (Number(targetRound.runden_nummer) !== Number(currentRound.runden_nummer) + 1) {
+      const error = new Error("Es kann nur die naechste vorbereitete Runde gestartet werden.");
+      error.statusCode = 409;
+      throw error;
+    }
 
-    let nextRound = Array.isArray(nextRoundRows) && nextRoundRows.length
-      ? mapRoundRow(nextRoundRows[0])
-      : null;
-    const created = !nextRound;
-
-    if (nextRound) {
-      if (nextRound.status === "abgeschlossen") {
-        const error = new Error(
-          `Die vorhandene Runde ${nextRoundNumber} ist bereits abgeschlossen und kann nicht erneut aktiviert werden.`,
-        );
-        error.statusCode = 409;
-        throw error;
-      }
-      const hasWorkingData = await countRoundWorkingData(connection, nextRound.id);
-      if (hasWorkingData > 0) {
-        const error = new Error(
-          `Die vorhandene Runde ${nextRoundNumber} enthaelt bereits Arbeitsdaten und kann nicht automatisch vorbereitet werden.`,
-        );
-        error.statusCode = 409;
-        throw error;
-      }
-    } else {
-      const [insertResult] = await connection.query(
-        `INSERT INTO anm_runde (
-          verfahren_id,
-          runden_nummer,
-          bezeichnung,
-          startdatum,
-          enddatum,
-          status
-        ) VALUES (?, ?, ?, CURDATE(), NULL, 'aktiv')`,
-        [currentRound.verfahren_id, nextRoundNumber, currentRound.bezeichnung],
+    const targetHasWorkingData = await countRoundWorkingData(connection, Number(targetRound.id));
+    if (targetHasWorkingData > 0) {
+      const error = new Error(
+        `Die Runde ${targetRound.runden_nummer} enthaelt bereits Arbeitsdaten und kann nicht gestartet werden.`,
       );
-      nextRound = await findById(connection, insertResult.insertId);
+      error.statusCode = 409;
+      throw error;
     }
 
     await connection.query(
       `UPDATE anm_runde
-       SET status = 'abgeschlossen', updated_at = NOW()
+       SET status = 'Beendet', updated_at = NOW()
        WHERE id = ?`,
       [currentRound.id],
     );
 
     await connection.query(
       `UPDATE anm_runde
-       SET status = 'aktiv', updated_at = NOW()
+       SET status = 'In Bearbeitung', updated_at = NOW()
        WHERE id = ?`,
-      [nextRound.id],
+      [targetRound.id],
     );
+
+    await verfahrenModel.setWorkingRound(connection, Number(targetRound.verfahren_id), Number(targetRound.id), schema);
 
     const schuelerColumns = await loadTableColumns(connection, "anm_schueler");
     const excludedColumns = new Set(["id", "verfahren_id", "runde_id", "created_at", "updated_at"]);
     const copyColumns = [
       "schueler_id",
       "schueler_nr",
+      "quell_snr",
+      "quell_schueler_nr",
       "schul_nr",
       "herkunft",
       "abgleich_status",
@@ -275,6 +337,7 @@ async function startNextRound(pool, currentRoundId) {
       "vorname",
       "nachname",
       "geburtsdatum",
+      "ef",
       "foerderbedarf",
       "foerder_id",
       "zieldifferent",
@@ -293,23 +356,6 @@ async function startNextRound(pool, currentRoundId) {
       "quelle",
     ].filter((column) => schuelerColumns.has(column) && !excludedColumns.has(column));
 
-    await connection.query(
-      `DELETE FROM anm_schueler
-       WHERE verfahren_id = ?
-         AND runde_id = ?
-         AND schueler_id NOT IN (
-           SELECT source.schueler_id
-           FROM (
-             SELECT schueler_id
-             FROM anm_schueler
-             WHERE verfahren_id = ?
-               AND runde_id = ?
-               AND teilnahmestatus = 'Aktiv'
-           ) AS source
-         )`,
-      [currentRound.verfahren_id, nextRound.id, currentRound.verfahren_id, currentRound.id],
-    );
-
     let copiedStudents = 0;
     if (copyColumns.length) {
       const insertColumns = ["verfahren_id", "runde_id", ...copyColumns];
@@ -320,10 +366,6 @@ async function startNextRound(pool, currentRoundId) {
       }
       insertColumns.push("created_at", "updated_at");
       selectColumns.push("NOW()", "NOW()");
-      const updateAssignments = insertColumns
-        .filter((column) => !["verfahren_id", "runde_id", "created_at", "updated_at"].includes(column))
-        .map((column) => `${column} = VALUES(${column})`);
-      updateAssignments.push("updated_at = VALUES(updated_at)");
 
       const [insertResult] = await connection.query(
         `INSERT INTO anm_schueler (${insertColumns.join(", ")})
@@ -331,22 +373,21 @@ async function startNextRound(pool, currentRoundId) {
          FROM anm_schueler s
          WHERE s.verfahren_id = ?
            AND s.runde_id = ?
-           AND s.teilnahmestatus = 'Aktiv'
-         ON DUPLICATE KEY UPDATE ${updateAssignments.join(", ")}`,
-        [currentRound.verfahren_id, nextRound.id, currentRound.verfahren_id, currentRound.id],
+           AND s.teilnahmestatus = 'Aktiv'`,
+        [targetRound.verfahren_id, targetRound.id, targetRound.verfahren_id, currentRound.id],
       );
       copiedStudents = Number(insertResult?.affectedRows || 0);
     }
 
     await connection.commit();
     return {
-      created,
+      created: false,
       copied_students: copiedStudents,
       current_round: {
-        ...currentRound,
-        status: "abgeschlossen",
+        ...(await findById(pool, Number(currentRound.id))),
+        status: "Beendet",
       },
-      next_round: await findById(pool, nextRound.id),
+      next_round: await findById(pool, Number(targetRound.id)),
     };
   } catch (error) {
     await connection.rollback();
@@ -366,6 +407,7 @@ module.exports = {
   update,
   countBlockingDependencies,
   countRoundWorkingData,
-  startNextRound,
+  setWorkingRound,
+  startRound,
   remove,
 };

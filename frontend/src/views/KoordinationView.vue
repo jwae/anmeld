@@ -36,7 +36,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
   rundeId: number | null;
-  rundeStatus?: "geplant" | "aktiv" | "abgeschlossen" | null;
+  rundeStatus?: "Vorbereitet" | "In Bearbeitung" | "Beendet" | null;
   context: {
     verfahren: string;
     runde: string;
@@ -65,7 +65,7 @@ const selectedStudentCount = computed(() => selectedStudentRowIds.value.length);
 const allStudentsSelected = computed(
   () => students.value.length > 0 && students.value.every((student) => selectedStudentRowIds.value.includes(student.row_id)),
 );
-const isActiveRound = computed(() => props.rundeStatus === "aktiv");
+const isActiveRound = computed(() => props.rundeStatus === "In Bearbeitung");
 const assignButtonLabel = computed(() => {
   if (assigning.value) return "Speichere...";
   if (selectedStudentCount.value === 1) return "1 Schueler zuordnen";

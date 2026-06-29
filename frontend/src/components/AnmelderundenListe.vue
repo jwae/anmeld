@@ -7,12 +7,16 @@ defineProps<{
   selectedId?: number | null;
   loading?: boolean;
   deletingId?: number | null;
+  nextRoundId?: number | null;
+  procedureLocked?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "select", id: number): void;
   (e: "edit", item: Anmelderunde): void;
   (e: "delete", item: Anmelderunde): void;
+  (e: "set-working", item: Anmelderunde): void;
+  (e: "start-round", item: Anmelderunde): void;
 }>();
 
 function formatDate(value: string | null) {
@@ -41,12 +45,12 @@ function formatDate(value: string | null) {
       <table class="anm-table">
         <thead>
           <tr>
-            <th>Nr.</th>
-            <th>Bezeichnung</th>
-            <th>Startdatum</th>
-            <th>Enddatum</th>
+            <th>Runde</th>
+            <th>Zeitraum</th>
             <th>Status</th>
-            <th>Aktionen</th>
+            <th>Arbeitsrunde</th>
+            <th>Aktion</th>
+            <th>Bearbeiten</th>
           </tr>
         </thead>
         <tbody>
@@ -56,19 +60,42 @@ function formatDate(value: string | null) {
             :class="{ 'is-selected': item.id === selectedId }"
             @click="emit('select', item.id)"
           >
-            <td class="anm-cell-primary">{{ item.runden_nummer }}</td>
             <td class="anm-cell-title">
-              <strong>{{ item.bezeichnung }}</strong>
+              <strong>Runde {{ item.runden_nummer }}</strong>
+              <span>{{ item.bezeichnung }}</span>
             </td>
-            <td class="anm-cell-date">{{ formatDate(item.startdatum) }}</td>
-            <td class="anm-cell-date">{{ formatDate(item.enddatum) }}</td>
+            <td class="anm-cell-date">{{ formatDate(item.startdatum) }} bis {{ formatDate(item.enddatum) }}</td>
             <td><span class="anm-status-pill" :data-status="item.status">{{ item.status }}</span></td>
+            <td>{{ item.ist_arbeitsrunde ? "Ja" : "Nein" }}</td>
+            <td class="anm-cell-actions">
+              <div class="anm-action-stack">
+                <button
+                  v-if="!item.ist_arbeitsrunde"
+                  class="btn-secondary anm-inline-btn"
+                  type="button"
+                  :disabled="procedureLocked"
+                  @click.stop="emit('set-working', item)"
+                >
+                  Als Arbeitsrunde setzen
+                </button>
+                <button
+                  v-if="item.id === nextRoundId"
+                  class="btn-secondary anm-inline-btn"
+                  type="button"
+                  :disabled="procedureLocked"
+                  @click.stop="emit('start-round', item)"
+                >
+                  Runde starten
+                </button>
+                <span v-if="item.ist_arbeitsrunde && item.id !== nextRoundId" class="anm-muted-action">-</span>
+              </div>
+            </td>
             <td class="anm-cell-actions">
               <div class="anm-actions">
                 <button
                   class="btn-secondary anm-icon-btn"
                   type="button"
-                  :disabled="item.status === 'abgeschlossen'"
+                  :disabled="procedureLocked"
                   title="Bearbeiten"
                   aria-label="Bearbeiten"
                   @click.stop="emit('edit', item)"
@@ -78,7 +105,7 @@ function formatDate(value: string | null) {
                 <button
                   class="btn-secondary anm-icon-btn anm-danger-btn"
                   type="button"
-                  :disabled="deletingId === item.id || item.status === 'abgeschlossen'"
+                  :disabled="deletingId === item.id || procedureLocked || item.ist_arbeitsrunde || item.status === 'Beendet'"
                   title="Loeschen"
                   aria-label="Loeschen"
                   @click.stop="emit('delete', item)"
@@ -162,7 +189,7 @@ function formatDate(value: string | null) {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 690px;
+  min-width: 880px;
 }
 
 .anm-table thead th {
@@ -190,7 +217,7 @@ function formatDate(value: string | null) {
 
 .anm-table tbody tr {
   cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
+  transition: background-color 0.18s ease;
 }
 
 .anm-table tbody tr:hover {
@@ -206,23 +233,20 @@ function formatDate(value: string | null) {
   border-bottom: 0;
 }
 
-.anm-cell-primary,
-.anm-cell-actions {
-  white-space: nowrap;
-}
-
 .anm-cell-title {
   min-width: 180px;
 }
 
 .anm-cell-title strong {
+  display: block;
   color: #18395f;
   font-size: 13px;
 }
 
-.anm-cell-date {
+.anm-cell-title span,
+.anm-cell-date,
+.anm-muted-action {
   color: #6b819c;
-  font-size: 12px;
 }
 
 .anm-status-pill {
@@ -235,17 +259,31 @@ function formatDate(value: string | null) {
   color: #38526e;
   font-size: 11px;
   font-weight: 800;
-  text-transform: capitalize;
 }
 
-.anm-status-pill[data-status="aktiv"] {
+.anm-status-pill[data-status="In Bearbeitung"] {
   background: #e8f7eb;
   color: #266b35;
 }
 
-.anm-status-pill[data-status="abgeschlossen"] {
+.anm-status-pill[data-status="Beendet"] {
   background: #eef1f4;
   color: #5b6775;
+}
+
+.anm-inline-btn {
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.anm-action-stack {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .anm-actions {
@@ -275,22 +313,11 @@ function formatDate(value: string | null) {
   font-size: 13px;
 }
 
-.anm-icon-btn-text {
-  font-weight: 700;
-  font-size: 11px;
-}
-
 .anm-danger-btn {
   color: #9a3a3a;
 }
 
 .anm-danger-btn:hover:not(:disabled) {
   background: #faeeee;
-}
-
-@media (max-width: 900px) {
-  .anm-table {
-    min-width: 620px;
-  }
 }
 </style>

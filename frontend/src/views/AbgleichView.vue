@@ -280,8 +280,9 @@ function openEditDialog(row: SchuelerRow) {
   editDialogOpen.value = true;
 }
 
-function closeEditDialog(force = false) {
-  if (editDialogSaving.value && !force) return;
+function closeEditDialog(force: boolean | Event = false) {
+  const shouldForce = typeof force === "boolean" ? force : false;
+  if (editDialogSaving.value && !shouldForce) return;
   editDialogOpen.value = false;
   selectedEditRow.value = null;
   editForm.value = {};

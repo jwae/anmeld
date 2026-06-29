@@ -1,4 +1,5 @@
 const model = require("../models/anmelderundenModel");
+const verfahrenModel = require("../models/anmeldeverfahrenModel");
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -22,17 +23,20 @@ function parseRoundPayload(body = {}) {
     bezeichnung: normalizeText(body.bezeichnung),
     startdatum: normalizeDate(body.startdatum),
     enddatum: normalizeDate(body.enddatum),
-    status: normalizeText(body.status) || "geplant",
+    status: normalizeText(body.status) || "Vorbereitet",
   };
 }
 
-function validateRoundPayload(payload) {
+function validateRoundPayload(payload, options = {}) {
   if (!Number.isInteger(payload.runden_nummer) || payload.runden_nummer <= 0) {
     return "Rundennummer muss eine positive ganze Zahl sein.";
   }
   if (!payload.bezeichnung) return "Bezeichnung darf nicht leer sein.";
   if (!model.STATUS_VALUES.includes(payload.status)) {
     return `Status ist ungueltig. Erlaubt: ${model.STATUS_VALUES.join(", ")}.`;
+  }
+  if (!options.allowAnyStatus && payload.status !== "Vorbereitet") {
+    return "Neue Runden duerfen nur im Status 'Vorbereitet' angelegt werden.";
   }
   if (payload.startdatum && payload.enddatum && payload.startdatum > payload.enddatum) {
     return "Startdatum darf nicht nach dem Enddatum liegen.";
@@ -63,8 +67,11 @@ function createAnmelderundenController({ getPool }) {
         const verfahrenId = Number(req.params.verfahrenId || 0);
         if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
 
-        const exists = await model.existsForVerfahren(getPool(), verfahrenId);
-        if (!exists) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+        const verfahren = await verfahrenModel.findById(getPool(), verfahrenId);
+        if (!verfahren) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+        if (verfahren.status === "Beendet") {
+          return sendError(res, 409, "Beendete Verfahren sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
+        }
 
         const payload = parseRoundPayload(req.body);
         const validationError = validateRoundPayload(payload);
@@ -97,12 +104,19 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
-        if (existing.status === "abgeschlossen") {
-          return sendError(res, 409, "Abgeschlossene Runden sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
+        if (existing.status === "Beendet") {
+          return sendError(res, 409, "Beendete Runden sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
+        }
+
+        const verfahren = await verfahrenModel.findById(getPool(), existing.verfahren_id);
+        if (!verfahren) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+        if (verfahren.status === "Beendet") {
+          return sendError(res, 409, "Beendete Verfahren sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
         }
 
         const payload = parseRoundPayload(req.body);
-        const validationError = validateRoundPayload(payload);
+        payload.status = existing.status;
+        const validationError = validateRoundPayload(payload, { allowAnyStatus: true });
         if (validationError) return sendError(res, 400, validationError);
 
         const duplicate = await model.hasDuplicateRoundNumber(
@@ -133,8 +147,17 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
-        if (existing.status === "abgeschlossen") {
-          return sendError(res, 409, "Abgeschlossene Runden sind schreibgeschuetzt und koennen nicht geloescht werden.");
+        if (existing.status === "Beendet") {
+          return sendError(res, 409, "Beendete Runden sind schreibgeschuetzt und koennen nicht geloescht werden.");
+        }
+        if (existing.ist_arbeitsrunde) {
+          return sendError(res, 409, "Die aktuelle Arbeitsrunde kann nicht geloescht werden.");
+        }
+
+        const verfahren = await verfahrenModel.findById(getPool(), existing.verfahren_id);
+        if (!verfahren) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+        if (verfahren.status === "Beendet") {
+          return sendError(res, 409, "Beendete Verfahren sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
         }
 
         const blockers = await model.countBlockingDependencies(getPool(), id);
@@ -158,16 +181,30 @@ function createAnmelderundenController({ getPool }) {
       }
     },
 
-    startNextRound: async (req, res) => {
+    setWorkingRound: async (req, res) => {
       try {
         const id = Number(req.params.id || 0);
         if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
 
-        const result = await model.startNextRound(getPool(), id);
+        const row = await model.setWorkingRound(getPool(), id);
+        res.json({
+          message: `Runde ${row.runden_nummer} ist jetzt die Arbeitsrunde.`,
+          row,
+        });
+      } catch (error) {
+        console.error(error);
+        sendError(res, error?.statusCode || 500, error?.message || "Die Arbeitsrunde konnte nicht gesetzt werden.");
+      }
+    },
+
+    startRound: async (req, res) => {
+      try {
+        const id = Number(req.params.id || 0);
+        if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const result = await model.startRound(getPool(), id);
         res.status(201).json({
-          message: result.created
-            ? `Runde ${result.current_round.runden_nummer} wurde abgeschlossen und Runde ${result.next_round.runden_nummer} neu gestartet.`
-            : `Runde ${result.current_round.runden_nummer} wurde abgeschlossen und die vorhandene Runde ${result.next_round.runden_nummer} aktiviert.`,
+          message: `Runde ${result.current_round.runden_nummer} wurde beendet und Runde ${result.next_round.runden_nummer} gestartet.`,
           ...result,
         });
       } catch (error) {

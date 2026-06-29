@@ -143,7 +143,7 @@ export interface ConnectionResponse {
   database: string;
 }
 
-export type AnmeldeStatus = "geplant" | "aktiv" | "abgeschlossen";
+export type AnmeldeStatus = "Vorbereitet" | "In Bearbeitung" | "Beendet";
 export type Anmeldeverfahrenstyp = "GS" | "SEK1";
 
 export interface Anmeldeverfahren {
@@ -152,6 +152,9 @@ export interface Anmeldeverfahren {
   bezeichnung: string;
   verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
+  sichtbar: boolean;
+  arbeitsrunde_id: number | null;
+  arbeitsrunde_nummer?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -164,6 +167,7 @@ export interface Anmelderunde {
   startdatum: string | null;
   enddatum: string | null;
   status: AnmeldeStatus;
+  ist_arbeitsrunde: boolean;
   created_at: string;
   updated_at: string;
 }

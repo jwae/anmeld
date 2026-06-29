@@ -10,6 +10,7 @@ type VerfahrenPayload = {
   bezeichnung: string;
   verfahrenstyp: Anmeldeverfahrenstyp;
   status: AnmeldeStatus;
+  sichtbar: boolean;
 };
 
 export type VerfahrenSchulgruppe = {
@@ -37,10 +38,13 @@ function buildAuthConfig(token?: string): AuthConfig {
 }
 
 export const anmeldeverfahrenService = {
-  async list(token?: string) {
+  async list(token?: string, options: { includeHidden?: boolean } = {}) {
     const resp = await apiClient.get<{ rows: Anmeldeverfahren[] }>(
       "/api/anmeldeverfahren",
-      buildAuthConfig(token),
+      {
+        ...buildAuthConfig(token),
+        params: options.includeHidden ? { includeHidden: "1" } : {},
+      },
     );
     return resp.data.rows || [];
   },
@@ -66,6 +70,24 @@ export const anmeldeverfahrenService = {
     const resp = await apiClient.put<{ row: Anmeldeverfahren; message: string }>(
       `/api/anmeldeverfahren/${encodeURIComponent(String(id))}`,
       payload,
+      buildAuthConfig(token),
+    );
+    return resp.data;
+  },
+
+  async start(id: number, token?: string) {
+    const resp = await apiClient.post<{ row: Anmeldeverfahren; message: string }>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/start`,
+      {},
+      buildAuthConfig(token),
+    );
+    return resp.data;
+  },
+
+  async finish(id: number, token?: string) {
+    const resp = await apiClient.post<{ row: Anmeldeverfahren; message: string }>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/finish`,
+      {},
       buildAuthConfig(token),
     );
     return resp.data;
