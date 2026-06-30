@@ -84,6 +84,17 @@
       >
         Offene Faelle
       </button>
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'auswertungen' }"
+        :aria-selected="activeMenu === 'auswertungen' ? 'true' : 'false'"
+        :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
+        :disabled="!hasMenuSelectionContext"
+        @click="emitNavigate('auswertungen')"
+      >
+        Auswertungen
+      </button>
     </nav>
   </div>
 </section>

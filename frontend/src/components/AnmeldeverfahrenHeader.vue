@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UserSessionCard from "./UserSessionCard.vue";
 
-type CredentialsMenu = "verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle";
+type CredentialsMenu = "verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle" | "auswertungen";
 
 const emit = defineEmits<{
   (e: "navigate", menu: CredentialsMenu): void;

@@ -7,6 +7,7 @@ export const APP_PATHS = {
   anmAbgleich: "/anm/abgleich",
   anmKoordination: "/anm/koordination",
   anmOffeneFaelle: "/anm/offene-faelle",
+  anmAuswertungen: "/anm/auswertungen",
 } as const;
 
 const validPaths = new Set<string>(Object.values(APP_PATHS));

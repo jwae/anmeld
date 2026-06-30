@@ -6,6 +6,7 @@ import ImporteView from "../views/ImporteView.vue";
 import AbgleichView from "../views/AbgleichView.vue";
 import KoordinationView from "../views/KoordinationView.vue";
 import OffeneFaelleView from "../views/OffeneFaelleView.vue";
+import AuswertungenView from "../views/AuswertungenView.vue";
 import SchulenImVerfahrenBereich from "./anmeldeverfahren/SchulenImVerfahrenBereich.vue";
 import type { AnmeldeStatus, Anmeldeverfahrenstyp } from "../types";
 import { APP_PATHS, navigateTo, replaceRoute, routeState } from "../router";
@@ -38,7 +39,7 @@ const hasMenuSelectionContext = computed<boolean>(
 const hasSelectionAttentionContext = computed<boolean>(
   () => selectedVerfahrenId.value === null || selectedRundenId.value === null,
 );
-const activeCredentialsMenu = computed<"verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle">(() => {
+const activeCredentialsMenu = computed<"verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle" | "auswertungen">(() => {
   switch (routeState.path) {
     case APP_PATHS.anmVerfahrensdaten:
       return "verfahrensdaten";
@@ -48,6 +49,8 @@ const activeCredentialsMenu = computed<"verfahren" | "verfahrensdaten" | "abglei
       return "koordination";
     case APP_PATHS.anmOffeneFaelle:
       return "offene-faelle";
+    case APP_PATHS.anmAuswertungen:
+      return "auswertungen";
     default:
       return "verfahren";
   }
@@ -72,7 +75,7 @@ function handleSelectionUpdate(payload: {
   selectedRundenStatus.value = payload?.rundeStatus ?? null;
 }
 
-function navigateToMenu(menu: "verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle") {
+function navigateToMenu(menu: "verfahren" | "verfahrensdaten" | "abgleich" | "koordination" | "offene-faelle" | "auswertungen") {
   if (menu !== "verfahren" && !hasMenuSelectionContext.value) return;
 
   const routeByMenu = {
@@ -81,6 +84,7 @@ function navigateToMenu(menu: "verfahren" | "verfahrensdaten" | "abgleich" | "ko
     abgleich: APP_PATHS.anmAbgleich,
     koordination: APP_PATHS.anmKoordination,
     "offene-faelle": APP_PATHS.anmOffeneFaelle,
+    auswertungen: APP_PATHS.anmAuswertungen,
   } as const;
 
   navigateTo(routeByMenu[menu]);

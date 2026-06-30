@@ -2,7 +2,8 @@
 
 ## Ziel
 
-Erstelle eine neue Seite **Auswertungen** (Menü Auswertungen), über die alle fachlichen Auswertungen des aktuellen Verfahrens und der aktuellen Runde erstellt werden können.
+
+Erstelle einen neuen Menüpunkt **Auswertungen**, über die alle fachlichen Auswertungen des aktuellen Verfahrens und der aktuellen Runde erstellt werden können.
 
 Die Seite dient als zentrale Ausgabe- und Druckzentrale der Anwendung.
 
@@ -34,7 +35,7 @@ Beispiel:
 └──────────────────────────┘
 ```
 
-Die Kacheln sollen responsiv dargestellt werden.
+Die Kacheln sollen responsiv dargestellt werden. Sie sollen mit einem chevron-Icon ein- und ausgeblendet werden können.
 
 ---
 
@@ -73,11 +74,10 @@ Mögliche Listen:
 * Pool + Anmeldung
 * Neuaufnahme
 * Warteliste
-* Zugeordnet
-* Abgelehnt
+* Zugeordnete Schüler
 * Ohne Anmeldung
-* Nach Zielschule
-* Nach Herkunftsschule
+* Nach Zielschule mit Herkunftsschule
+* Nach Herkunftsschule mit Zielschule
 * Förderbedarf
 * Zieldifferent
 
@@ -100,7 +100,6 @@ Mögliche Listen:
 * Zugeordnete Schüler
 * Freie Plätze
 * Kapazitätsübersicht
-* Koordinierungsübersicht
 
 Ausgabe:
 
@@ -117,12 +116,7 @@ Auswertungen aller offenen Fälle.
 
 Mögliche Listen:
 
-* Alle offenen Fälle
-* Nach Fallgrund
-* Nach Schule
-* Nach Bearbeiter
-* Erledigte Fälle
-* Importfehler
+* Alle offenen Fälle, mit Fallgrund und status
 
 Ausgabe:
 
@@ -139,11 +133,8 @@ Erzeugung von Serienanschreiben.
 
 Mögliche Dokumente:
 
-* Aufnahmebescheid
-* Wartelistenbescheid
-* Ablehnungsbescheid
-* Zuweisungsschreiben
-* Anschreiben an Schulen
+* Schreiben an die Erzieher
+* Anschreiben an Schulen über die Zugeordnete Schüler
 
 Ausgabe:
 
