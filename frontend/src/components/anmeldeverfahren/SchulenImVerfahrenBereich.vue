@@ -154,13 +154,13 @@ function applyProcedureSchoolGroupSelection(response: VerfahrenSchulgruppenRespo
   if (selectedTargetId) {
     selectedSchulgruppeId.value = String(selectedTargetId);
   } else if (!sortedSchulgruppen.value.some((item) => String(item.id) === selectedSchulgruppeId.value)) {
-    selectedSchulgruppeId.value = String(sortedSchulgruppen.value[0]?.id || "");
+    selectedSchulgruppeId.value = "";
   }
 
   if (selectedSourceId) {
     selectedAbgebendeSchulgruppeId.value = String(selectedSourceId);
   } else if (!sortedSchulgruppen.value.some((item) => String(item.id) === selectedAbgebendeSchulgruppeId.value)) {
-    selectedAbgebendeSchulgruppeId.value = String(sortedSchulgruppen.value[0]?.id || "");
+    selectedAbgebendeSchulgruppeId.value = "";
   }
 }
 
@@ -331,6 +331,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             <label class="anm-field">
               <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
               <select v-model="selectedAbgebendeSchulgruppeId" class="anm-select" :disabled="savingBeteiligteSchulen">
+                <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
                   :key="`abgebende-schulgruppe-${gruppe.id}`"
@@ -352,6 +353,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
           <p v-if="selectedAbgebendeSchulgruppe?.beschreibung" class="anm-inline-hint">
             {{ selectedAbgebendeSchulgruppe.beschreibung }}
+          </p>
+          <p v-else class="anm-inline-hint">
+            Fuer dieses Verfahren ist aktuell keine abgebende Schulgruppe definiert.
           </p>
 
           <div class="anm-table-wrap">
@@ -381,11 +385,15 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               </tr>
             </thead>
             <tbody>
+              <tr v-if="!selectedAbgebendeSchulgruppe">
+                <td colspan="4" class="anm-empty-cell">Es ist noch keine abgebende Schulgruppe fuer dieses Verfahren festgelegt.</td>
+              </tr>
               <tr v-if="!schoolsInSelectedAbgebendeSchulgruppe.length">
-                <td colspan="4" class="anm-empty-cell">Die ausgewaehlte Schulgruppe enthaelt keine Schulen.</td>
+                <td v-if="selectedAbgebendeSchulgruppe" colspan="4" class="anm-empty-cell">Die ausgewaehlte Schulgruppe enthaelt keine Schulen.</td>
               </tr>
               <tr
                 v-for="item in schoolsInSelectedAbgebendeSchulgruppe"
+                v-if="selectedAbgebendeSchulgruppe"
                 :key="`abgebend-${item.snr}`"
                 class="is-selected"
               >
@@ -442,6 +450,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             <label class="anm-field">
               <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
               <select v-model="selectedSchulgruppeId" class="anm-select" :disabled="savingBeteiligteSchulen">
+                <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
                   :key="`schulgruppe-${gruppe.id}`"
@@ -463,6 +472,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
           <p v-if="selectedSchulgruppe?.beschreibung" class="anm-inline-hint">
             {{ selectedSchulgruppe.beschreibung }}
+          </p>
+          <p v-else class="anm-inline-hint">
+            Fuer dieses Verfahren ist aktuell keine aufnehmende Schulgruppe definiert.
           </p>
 
           <div class="anm-table-wrap">
@@ -492,11 +504,15 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               </tr>
             </thead>
             <tbody>
+              <tr v-if="!selectedSchulgruppe">
+                <td colspan="4" class="anm-empty-cell">Es ist noch keine aufnehmende Schulgruppe fuer dieses Verfahren festgelegt.</td>
+              </tr>
               <tr v-if="!schoolsInSelectedSchulgruppe.length">
-                <td colspan="4" class="anm-empty-cell">Die ausgewaehlte Schulgruppe enthaelt keine Schulen.</td>
+                <td v-if="selectedSchulgruppe" colspan="4" class="anm-empty-cell">Die ausgewaehlte Schulgruppe enthaelt keine Schulen.</td>
               </tr>
               <tr
                 v-for="item in schoolsInSelectedSchulgruppe"
+                v-if="selectedSchulgruppe"
                 :key="item.snr"
                 class="is-selected"
               >
@@ -517,7 +533,11 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 <style scoped>
 .anm-view {
   display: grid;
-  gap: 18px;
+  gap: 0;
+}
+
+.feedback-panel {
+  margin-bottom: 18px;
 }
 
 .anm-card {
@@ -564,6 +584,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 1.3em;
 }
 
 .anm-section-toggle {

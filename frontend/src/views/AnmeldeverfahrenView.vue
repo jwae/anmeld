@@ -59,7 +59,7 @@ function handleBereichSelectionUpdate(payload: {
 <style scoped>
 .anm-view {
   display: grid;
-  gap: 18px;
+  gap: 0;
 }
 
 .anm-roadmap-card {
@@ -96,6 +96,10 @@ function handleBereichSelectionUpdate(payload: {
 .anm-card h3 {
   margin: 0;
   color: #19385e;
+}
+
+.anm-roadmap-card h2 {
+  font-size: 1.2em;
 }
 
 .anm-roadmap-card p,

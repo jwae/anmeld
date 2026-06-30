@@ -104,7 +104,7 @@ async function handleDeleteAll() {
 <style scoped>
 .importe-view {
   display: grid;
-  gap: 18px;
+  gap: 0;
 }
 
 .importe-eyebrow {
@@ -138,6 +138,7 @@ async function handleDeleteAll() {
 .importe-danger-zone-copy h3 {
   margin: 0;
   color: #7f1d1d;
+  font-size: 1.3em;
 }
 
 .importe-danger-zone-copy p:not(.importe-eyebrow) {

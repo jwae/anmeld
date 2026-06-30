@@ -33,7 +33,7 @@ const selectedRundenId = ref<number | null>(null);
 const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
 const hasMountedVerfahrenView = ref(routeState.path === APP_PATHS.anmVerfahren);
 const hasMenuSelectionContext = computed<boolean>(
-  () => selectedVerfahrenId.value !== null || selectedRundenId.value !== null,
+  () => selectedRundenId.value !== null,
 );
 const hasSelectionAttentionContext = computed<boolean>(
   () => selectedVerfahrenId.value === null || selectedRundenId.value === null,

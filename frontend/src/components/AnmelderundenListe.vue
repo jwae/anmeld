@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { Anmelderunde, Anmeldeverfahren } from "../types";
 
-defineProps<{
+const props = defineProps<{
   verfahren: Anmeldeverfahren | null;
   items: Anmelderunde[];
   selectedId?: number | null;
   loading?: boolean;
   deletingId?: number | null;
   nextRoundId?: number | null;
+  nextAvailableRoundNumber?: number | null;
   procedureLocked?: boolean;
   canCreateRound?: boolean;
 }>();
@@ -24,6 +26,14 @@ const emit = defineEmits<{
 function formatDate(value: string | null) {
   return String(value || "").trim() || "-";
 }
+
+const workingRound = computed<Anmelderunde | null>(
+  () => props.items.find((item) => item.ist_arbeitsrunde) || null,
+);
+
+const selectedRound = computed<Anmelderunde | null>(
+  () => props.items.find((item) => item.id === props.selectedId) || null,
+);
 </script>
 
 <template>
@@ -36,10 +46,31 @@ function formatDate(value: string | null) {
       </div>
       <div v-if="verfahren" class="anm-card-head-actions">
         <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreateRound === false" @click="emit('create-round')">
-          Weitere Runde anlegen
+          {{ nextAvailableRoundNumber ? `Runde ${nextAvailableRoundNumber} anlegen` : "Runden vollstaendig" }}
         </button>
         <span class="anm-badge">{{ items.length }}</span>
       </div>
+    </div>
+
+    <div v-if="verfahren" class="anm-round-guidance">
+      <p v-if="workingRound">
+        Arbeitsrunde: <strong>Runde {{ workingRound.runden_nummer }}</strong> ist aktuell fachlich aktiv.
+      </p>
+      <p v-else>
+        Es ist noch keine Arbeitsrunde gesetzt.
+      </p>
+      <p v-if="selectedRound && selectedRound.id !== workingRound?.id">
+        Ausgewaehlt ist aktuell <strong>Runde {{ selectedRound.runden_nummer }}</strong> zur Ansicht oder Bearbeitung.
+      </p>
+      <p v-if="nextRoundId">
+        Als naechster fachlicher Schritt kann nur die direkt folgende vorbereitete Runde gestartet werden.
+      </p>
+      <p v-else-if="nextAvailableRoundNumber">
+        Fuer dieses Verfahren ist als naechste Runde <strong>Runde {{ nextAvailableRoundNumber }}</strong> vorgesehen.
+      </p>
+      <p v-else>
+        Die fachlich vorgesehenen Runden 1 bis 3 sind bereits angelegt.
+      </p>
     </div>
 
     <div v-if="!verfahren" class="anm-empty-state">
@@ -77,14 +108,20 @@ function formatDate(value: string | null) {
             <td class="anm-cell-actions">
               <div class="anm-action-stack">
                 <button
-                  v-if="!item.ist_arbeitsrunde"
+                  v-if="!item.ist_arbeitsrunde && (item.status === 'In Bearbeitung' || item.status === 'Beendet')"
                   class="btn-secondary anm-inline-btn"
                   type="button"
                   :disabled="procedureLocked"
                   @click.stop="emit('set-working', item)"
                 >
-                  Als Arbeitsrunde setzen
+                  Als Arbeitsrunde aktivieren
                 </button>
+                <span
+                  v-else-if="!item.ist_arbeitsrunde && item.status === 'Vorbereitet'"
+                  class="anm-muted-action"
+                >
+                  Vorbereitete Runde erst starten
+                </span>
                 <button
                   v-if="item.id === nextRoundId"
                   class="btn-secondary anm-inline-btn"
@@ -102,7 +139,6 @@ function formatDate(value: string | null) {
                 <button
                   class="btn-secondary anm-icon-btn"
                   type="button"
-                  :disabled="procedureLocked"
                   title="Bearbeiten"
                   aria-label="Bearbeiten"
                   @click.stop="emit('edit', item)"
@@ -230,6 +266,27 @@ function formatDate(value: string | null) {
   background: #f8fbff;
   color: #607794;
   font-size: 12px;
+}
+
+.anm-round-guidance {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e3ebf4;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.anm-round-guidance p {
+  margin: 0;
+  color: #5f7693;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.anm-round-guidance strong {
+  color: #19385e;
 }
 
 .anm-table-wrap {

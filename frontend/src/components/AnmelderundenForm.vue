@@ -3,6 +3,8 @@ import type { Anmeldeverfahren } from "../types";
 
 defineProps<{
   verfahren: Anmeldeverfahren | null;
+  availableRoundNumbers?: number[];
+  renameOnly?: boolean;
   modelValue: {
     id: number | null;
     runden_nummer: number | null;
@@ -35,20 +37,23 @@ const emit = defineEmits<{
       <div class="anm-form-grid">
         <label class="field-block anm-form-field">
           <span class="field-label">Rundennummer</span>
-          <input
-            type="number"
-            min="1"
+          <select
             :value="modelValue.runden_nummer ?? ''"
-            :disabled="saving || !verfahren"
-            @input="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLInputElement).value || 0) || null })"
-          />
+            :disabled="saving || !verfahren || renameOnly"
+            @change="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLSelectElement).value || 0) || null })"
+          >
+            <option value="" disabled>Bitte waehlen</option>
+            <option v-for="roundNumber in (availableRoundNumbers || [])" :key="roundNumber" :value="roundNumber">
+              Runde {{ roundNumber }}
+            </option>
+          </select>
         </label>
 
         <label class="field-block anm-form-field">
           <span class="field-label">Bezeichnung</span>
           <input
             :value="modelValue.bezeichnung"
-            placeholder="Runde 4"
+            placeholder="Runde 2"
             :disabled="saving || !verfahren"
             @input="emit('update:modelValue', { ...modelValue, bezeichnung: String(($event.target as HTMLInputElement).value || '') })"
           />
@@ -59,7 +64,7 @@ const emit = defineEmits<{
           <input
             type="date"
             :value="modelValue.startdatum"
-            :disabled="saving || !verfahren"
+            :disabled="saving || !verfahren || renameOnly"
             @input="emit('update:modelValue', { ...modelValue, startdatum: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
@@ -69,11 +74,14 @@ const emit = defineEmits<{
           <input
             type="date"
             :value="modelValue.enddatum"
-            :disabled="saving || !verfahren"
+            :disabled="saving || !verfahren || renameOnly"
             @input="emit('update:modelValue', { ...modelValue, enddatum: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
       </div>
+      <p v-if="renameOnly" class="anm-inline-hint">
+        Fuer diese Runde kann aktuell nur die Bezeichnung geaendert werden.
+      </p>
     </details>
 
     <details class="anm-section" open>
@@ -146,6 +154,13 @@ const emit = defineEmits<{
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.anm-inline-hint {
+  margin: 4px 0 0;
+  color: #607794;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .anm-form-primary-btn,

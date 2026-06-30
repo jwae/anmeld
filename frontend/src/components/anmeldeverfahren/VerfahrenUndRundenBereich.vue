@@ -42,6 +42,8 @@ type RundenFormState = {
   status: AnmeldeStatus;
 };
 
+const CANONICAL_ROUND_NUMBERS = [1, 2, 3] as const;
+
 const verfahren = ref<Anmeldeverfahren[]>([]);
 const runden = ref<Anmelderunde[]>([]);
 const selectedVerfahrenId = ref<number | null>(props.initialVerfahrenId ?? null);
@@ -58,6 +60,8 @@ const successMessage = ref<string>("");
 const showHiddenVerfahren = ref<boolean>(false);
 const showProcedureOverlay = ref<boolean>(false);
 const showRoundOverlay = ref<boolean>(false);
+const showStartRoundOverlay = ref<boolean>(false);
+const pendingStartRound = ref<Anmelderunde | null>(null);
 let successMessageTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
@@ -98,6 +102,13 @@ const focusedRunde = computed<Anmelderunde | null>(
 );
 
 const selectedProcedureLocked = computed<boolean>(() => selectedVerfahren.value?.status === "Beendet");
+const canOnlyEditRoundLabel = computed<boolean>(() => (
+  !!rundenForm.value.id
+  && (
+    selectedProcedureLocked.value
+    || runden.value.some((item) => item.id === rundenForm.value.id && item.status === "Beendet")
+  )
+));
 
 const currentVerfahrenTitle = computed<string>(() => (
   selectedVerfahren.value
@@ -115,6 +126,31 @@ const currentInProgressRound = computed<Anmelderunde | null>(
   () => runden.value.find((item) => item.status === "In Bearbeitung") || null,
 );
 
+const nextSuggestedRoundNumber = computed<number | null>(() => (
+  CANONICAL_ROUND_NUMBERS.find((roundNumber) => (
+    !runden.value.some((item) => Number(item.runden_nummer) === roundNumber)
+  )) ?? null
+));
+
+const canCreateRound = computed<boolean>(() => (
+  !!selectedVerfahrenId.value
+  && !selectedProcedureLocked.value
+  && nextSuggestedRoundNumber.value !== null
+));
+
+const assignableRoundNumbers = computed<number[]>(() => {
+  const available = CANONICAL_ROUND_NUMBERS.filter((roundNumber) => (
+    !runden.value.some((item) => (
+      item.id !== rundenForm.value.id && Number(item.runden_nummer) === roundNumber
+    ))
+  ));
+  const currentNumber = Number(rundenForm.value.runden_nummer || 0);
+  if (Number.isInteger(currentNumber) && currentNumber > 0 && !available.includes(currentNumber as 1 | 2 | 3)) {
+    return [...available, currentNumber].sort((a, b) => a - b);
+  }
+  return available;
+});
+
 const nextStartableRound = computed<Anmelderunde | null>(() => {
   if (selectedVerfahren.value?.status !== "In Bearbeitung") return null;
   if (!currentInProgressRound.value) return null;
@@ -123,6 +159,18 @@ const nextStartableRound = computed<Anmelderunde | null>(() => {
     && item.status === "Vorbereitet"
   )) || null;
 });
+
+const startRoundCurrentLabel = computed<string>(() => (
+  currentInProgressRound.value
+    ? `Runde ${currentInProgressRound.value.runden_nummer} ${currentInProgressRound.value.bezeichnung}`.trim()
+    : "keine laufende Runde"
+));
+
+const startRoundTargetLabel = computed<string>(() => (
+  pendingStartRound.value
+    ? `Runde ${pendingStartRound.value.runden_nummer} ${pendingStartRound.value.bezeichnung}`.trim()
+    : "keine Zielrunde"
+));
 
 const hasSimilarProcedure = computed<boolean>(() => verfahren.value.some((item) => (
   item.id !== verfahrenForm.value.id
@@ -206,7 +254,7 @@ async function loadVerfahren(preferredSelectionId?: number | null) {
   }
 }
 
-async function loadRunden(verfahrenId?: number | null) {
+async function loadRunden(verfahrenId?: number | null, preferredFocusedRoundId?: number | null) {
   const effectiveId = verfahrenId ?? selectedVerfahrenId.value;
   if (!effectiveId) {
     runden.value = [];
@@ -224,7 +272,9 @@ async function loadRunden(verfahrenId?: number | null) {
       || rows.find((item) => item.id === activeRundenId.value)
       || null;
     activeRundenId.value = activeRound?.id ?? null;
-    if (rows.some((item) => item.id === focusedRundenId.value)) {
+    if (preferredFocusedRoundId && rows.some((item) => item.id === preferredFocusedRoundId)) {
+      focusedRundenId.value = preferredFocusedRoundId;
+    } else if (rows.some((item) => item.id === focusedRundenId.value)) {
       focusedRundenId.value = focusedRundenId.value;
     } else {
       focusedRundenId.value = activeRound?.id ?? rows[0]?.id ?? null;
@@ -242,13 +292,11 @@ function resetVerfahrenForm() {
 }
 
 function resetRundenForm() {
-  const nextRoundNumber = runden.value.length
-    ? Math.max(...runden.value.map((item) => Number(item.runden_nummer || 0))) + 1
-    : 4;
+  const nextRoundNumber = nextSuggestedRoundNumber.value;
   rundenForm.value = {
     ...createEmptyRundenForm(),
     runden_nummer: nextRoundNumber,
-    bezeichnung: `Runde ${nextRoundNumber}`,
+    bezeichnung: nextRoundNumber ? `Runde ${nextRoundNumber}` : "",
   };
 }
 
@@ -270,6 +318,14 @@ function openEditProcedureOverlay(item: Anmeldeverfahren) {
 }
 
 function openCreateRoundOverlay() {
+  if (!selectedVerfahrenId.value) {
+    showError(null, "Bitte zuerst ein Anmeldeverfahren auswaehlen.");
+    return;
+  }
+  if (nextSuggestedRoundNumber.value === null) {
+    showError(null, "Fachlich sind pro Verfahren derzeit nur Runde 1 bis 3 vorgesehen.");
+    return;
+  }
   resetRundenForm();
   showRoundOverlay.value = true;
 }
@@ -367,12 +423,24 @@ async function submitRunde() {
 
   const bezeichnung = rundenForm.value.bezeichnung.trim();
   if (!rundenForm.value.runden_nummer) {
-    errorMessage.value = "Rundennummer muss eine positive Zahl sein.";
+    errorMessage.value = "Bitte eine Rundennummer auswaehlen.";
+    successMessage.value = "";
+    return;
+  }
+  if (!CANONICAL_ROUND_NUMBERS.includes(rundenForm.value.runden_nummer as 1 | 2 | 3)) {
+    errorMessage.value = "Fachlich sind nur Runde 1 bis 3 vorgesehen.";
     successMessage.value = "";
     return;
   }
   if (!bezeichnung) {
     errorMessage.value = "Bezeichnung darf nicht leer sein.";
+    successMessage.value = "";
+    return;
+  }
+  if (runden.value.some((item) => (
+    item.id !== rundenForm.value.id && item.runden_nummer === rundenForm.value.runden_nummer
+  ))) {
+    errorMessage.value = `Runde ${rundenForm.value.runden_nummer} ist in diesem Verfahren bereits vorhanden.`;
     successMessage.value = "";
     return;
   }
@@ -400,7 +468,7 @@ async function submitRunde() {
       ? await anmelderundenService.update(rundenForm.value.id, payload, props.token)
       : await anmelderundenService.create(selectedVerfahrenId.value, payload, props.token);
 
-    await loadRunden(selectedVerfahrenId.value);
+    await loadRunden(selectedVerfahrenId.value, response.row?.id ?? null);
     showRoundOverlay.value = false;
     showSuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
   } catch (error) {
@@ -476,11 +544,22 @@ async function setWorkingRound(item: Anmelderunde) {
   }
 }
 
-async function startRound(item: Anmelderunde) {
-  const confirmed = window.confirm(`Soll Runde ${item.runden_nummer} jetzt gestartet werden?`);
-  if (!confirmed) return;
+function openStartRoundOverlay(item: Anmelderunde) {
+  pendingStartRound.value = item;
+  showStartRoundOverlay.value = true;
+}
+
+function closeStartRoundOverlay() {
+  showStartRoundOverlay.value = false;
+  pendingStartRound.value = null;
+}
+
+async function startRound() {
+  if (!pendingStartRound.value) return;
+  const item = pendingStartRound.value;
   try {
     const response = await anmelderundenService.startRound(item.id, props.token);
+    closeStartRoundOverlay();
     applyLocalWorkingRound(response.next_round?.id ?? item.id);
     if (response.current_round?.id && response.next_round?.id) {
       runden.value = runden.value.map((entry) => {
@@ -559,12 +638,13 @@ onBeforeUnmount(() => {
         :deleting-id="deletingRundenId"
         :next-round-id="nextStartableRound?.id ?? null"
         :procedure-locked="selectedProcedureLocked"
-        :can-create-round="!!selectedVerfahrenId && !selectedProcedureLocked"
+        :can-create-round="canCreateRound"
+        :next-available-round-number="nextSuggestedRoundNumber"
         @select="selectRunde"
         @edit="openEditRoundOverlay"
         @delete="deleteRunde"
         @set-working="setWorkingRound"
-        @start-round="startRound"
+        @start-round="openStartRoundOverlay"
         @create-round="openCreateRoundOverlay"
       />
     </div>
@@ -623,10 +703,59 @@ onBeforeUnmount(() => {
         <AnmelderundenForm
           v-model="rundenForm"
           :verfahren="selectedVerfahren"
+          :available-round-numbers="assignableRoundNumbers"
+          :rename-only="canOnlyEditRoundLabel"
           :saving="savingRunden"
           @submit="submitRunde"
           @reset="resetRundenForm"
         />
+      </section>
+    </div>
+
+    <div
+      v-if="showStartRoundOverlay && pendingStartRound"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-start-round-overlay-title"
+      @click.self="closeStartRoundOverlay"
+    >
+      <section class="anm-overlay-card anm-start-round-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-start-round-overlay-title">
+            Runde starten
+          </h3>
+          <button class="anm-overlay-close" type="button" @click="closeStartRoundOverlay">Schliessen</button>
+        </div>
+
+        <div class="anm-start-round-intro">
+          Sie starten jetzt <strong>{{ startRoundTargetLabel }}</strong> als naechste Runde des Verfahrens.
+        </div>
+
+        <div class="anm-start-round-summary">
+          <p><strong>Aktuelle Runde:</strong> {{ startRoundCurrentLabel }}</p>
+          <p><strong>Naechste Runde:</strong> {{ startRoundTargetLabel }}</p>
+        </div>
+
+        <div class="anm-start-round-info">
+          <p>Beim Start dieser Runde passiert Folgendes:</p>
+          <ul>
+            <li>{{ startRoundCurrentLabel }} wird beendet.</li>
+            <li>{{ startRoundTargetLabel }} wechselt in den Status <strong>In Bearbeitung</strong>.</li>
+            <li>{{ startRoundTargetLabel }} wird zur neuen Arbeitsrunde und damit zum aktuellen Arbeitskontext.</li>
+            <li>Die Schuelerdaten der laufenden Runde werden in die neue Runde uebernommen.</li>
+            <li>Abgeschlossene Runden koennen wieder aktiviert werden.</li>
+          </ul>
+        </div>
+
+        <div class="anm-actions">
+          <button class="btn-secondary anm-form-secondary-btn" type="button" @click="closeStartRoundOverlay">
+            Abbrechen
+          </button>
+          <button class="btn-primary anm-form-primary-btn" type="button" @click="startRound">
+            Runde jetzt starten
+          </button>
+        </div>
       </section>
     </div>
   </section>
@@ -635,7 +764,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .verfahren-und-runden-bereich {
   display: grid;
-  gap: 18px;
+  gap: 0;
+}
+
+.feedback-panel {
+  margin-bottom: 18px;
 }
 
 .anm-toolbar-card,
@@ -750,6 +883,38 @@ onBeforeUnmount(() => {
   border: 1px solid #b9e2c0;
   background: #f2fbf4;
   color: #266b35;
+}
+
+.anm-start-round-card {
+  width: min(680px, 100%);
+}
+
+.anm-start-round-intro,
+.anm-start-round-summary,
+.anm-start-round-info {
+  padding: 14px 16px;
+  border: 1px solid #dbe6f2;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.anm-start-round-intro,
+.anm-start-round-summary p,
+.anm-start-round-info p {
+  margin: 0;
+}
+
+.anm-start-round-summary,
+.anm-start-round-info {
+  display: grid;
+  gap: 8px;
+}
+
+.anm-start-round-info ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #4a607e;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {

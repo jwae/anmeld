@@ -236,6 +236,11 @@ async function setWorkingRound(pool, roundId) {
       error.statusCode = 409;
       throw error;
     }
+    if (!["In Bearbeitung", "Beendet"].includes(String(round.status || "").trim())) {
+      const error = new Error("Nur Runden im Status 'In Bearbeitung' oder 'Beendet' koennen als Arbeitsrunde gesetzt werden.");
+      error.statusCode = 409;
+      throw error;
+    }
 
     await verfahrenModel.setWorkingRound(connection, Number(round.verfahren_id), Number(round.id), schema);
     await connection.commit();

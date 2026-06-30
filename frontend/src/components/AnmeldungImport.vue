@@ -233,6 +233,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 1.3em;
 }
 
 .section-panel {

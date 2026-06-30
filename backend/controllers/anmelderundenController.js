@@ -1,5 +1,6 @@
 const model = require("../models/anmelderundenModel");
 const verfahrenModel = require("../models/anmeldeverfahrenModel");
+const MAX_CANONICAL_ROUND_NUMBER = 3;
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -44,6 +45,16 @@ function validateRoundPayload(payload, options = {}) {
   return "";
 }
 
+function areDatesEqual(left, right) {
+  return normalizeDate(left) === normalizeDate(right);
+}
+
+function canRenameOnly(existing, payload) {
+  return Number(existing?.runden_nummer || 0) === Number(payload?.runden_nummer || 0)
+    && areDatesEqual(existing?.startdatum, payload?.startdatum)
+    && areDatesEqual(existing?.enddatum, payload?.enddatum);
+}
+
 function createAnmelderundenController({ getPool }) {
   return {
     listByVerfahren: async (req, res) => {
@@ -76,6 +87,9 @@ function createAnmelderundenController({ getPool }) {
         const payload = parseRoundPayload(req.body);
         const validationError = validateRoundPayload(payload);
         if (validationError) return sendError(res, 400, validationError);
+        if (payload.runden_nummer > MAX_CANONICAL_ROUND_NUMBER) {
+          return sendError(res, 400, "Fachlich sind derzeit nur Runde 1 bis 3 vorgesehen.");
+        }
 
         const duplicate = await model.hasDuplicateRoundNumber(
           getPool(),
@@ -104,20 +118,21 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
-        if (existing.status === "Beendet") {
-          return sendError(res, 409, "Beendete Runden sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
-        }
 
         const verfahren = await verfahrenModel.findById(getPool(), existing.verfahren_id);
         if (!verfahren) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
-        if (verfahren.status === "Beendet") {
-          return sendError(res, 409, "Beendete Verfahren sind schreibgeschuetzt und koennen nicht bearbeitet werden.");
-        }
 
         const payload = parseRoundPayload(req.body);
         payload.status = existing.status;
         const validationError = validateRoundPayload(payload, { allowAnyStatus: true });
         if (validationError) return sendError(res, 400, validationError);
+        const renameOnlyEdit = canRenameOnly(existing, payload);
+        if (existing.status === "Beendet" && !renameOnlyEdit) {
+          return sendError(res, 409, "Bei beendeten Runden kann nur die Bezeichnung geaendert werden.");
+        }
+        if (verfahren.status === "Beendet" && !renameOnlyEdit) {
+          return sendError(res, 409, "Bei beendeten Verfahren kann in Runden nur die Bezeichnung geaendert werden.");
+        }
 
         const duplicate = await model.hasDuplicateRoundNumber(
           getPool(),
