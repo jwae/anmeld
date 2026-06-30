@@ -109,7 +109,7 @@ const selectedRound = computed<Anmelderunde | null>(
               <div class="anm-action-stack">
                 <button
                   v-if="!item.ist_arbeitsrunde && (item.status === 'In Bearbeitung' || item.status === 'Beendet')"
-                  class="btn-secondary anm-inline-btn"
+                  class="btn-secondary anm-inline-btn anm-inline-btn-primary"
                   type="button"
                   :disabled="procedureLocked"
                   @click.stop="emit('set-working', item)"
@@ -386,9 +386,37 @@ const selectedRound = computed<Anmelderunde | null>(
 .anm-inline-btn {
   min-height: 30px;
   padding: 6px 12px;
+  border: 1px solid #c8dbef;
   border-radius: 999px;
+  background: #ffffff;
+  color: #1f466f;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.anm-inline-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
+}
+
+.anm-inline-btn:disabled {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.anm-inline-btn-primary {
+  border-color: #c8dbef;
+  background: #ffffff;
 }
 
 .anm-action-stack {

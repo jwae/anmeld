@@ -1,4 +1,4 @@
-﻿<div class="page">
+<div class="page" :class="{ 'page-anm-route': isAnmRoute }">
   <template v-if="showDatabaseConnectStep">
     <DatabaseConnectPanel
       v-model:host="host"
@@ -219,34 +219,30 @@
     :get-school-trend-students="getSchoolTrendStudents"
   />
 
-  <!-- ===== Dashboard: Lehrerdaten ===== -->
   <TeachersDashboard
-    v-if="view === 'lehrerdaten'"
-    :active-snapshot-selection="activeSnapshotSelection"
+    v-if="view === 'lehrkraefte'"
+    :selected-snapshot="selectedSnapshotForOverview"
     :loading="loadingTeachers"
     :error="errorTeachers"
-    :total-teachers="teachersData?.totalTeachers || 0"
-    :teacher-sex-chart-option="teacherSexChartOption"
-    :teacher-age-chart-option="teacherAgeChartOption"
-    :teacher-nation-chart-option="teacherNationChartOption"
-    :teacher-city-chart-option="teacherCityChartOption"
+    :teacher-chart-option="teacherChartOption"
+    :teacher-summary="teacherSummary"
+    :teacher-school-rows="teacherSchoolRows"
   />
 
-  <!-- ===== Dashboard 3 DAZ ===== -->
   <DazDashboard
     v-if="view === 'daz'"
-    v-model:daz-lower-threshold="dazLowerThreshold"
-    v-model:daz-upper-threshold="dazUpperThreshold"
-    :daz-class-codes="dazClassCodes"
-    :daz-rows-count="dazRows.length"
+    v-model:lower-threshold="dazLowerThreshold"
+    v-model:upper-threshold="dazUpperThreshold"
+    :class-codes="dazClassCodes"
+    :class-rows-count="dazRows.length"
     :error="errorDaz"
-    :grand-total-daz="grandTotalDaz"
-    :schools-in-daz-matrix="schoolsInDazMatrix"
-    :get-daz="getDaz"
-    :get-daz-class-header-label="getDazClassHeaderLabel"
-    :total-daz-for-class="totalDazForClass"
-    :total-daz-for-school="totalDazForSchool"
-    :daz-cell-class="dazCellClass"
+    :grand-total-classes="grandTotalDaz"
+    :schools-in-class-matrix="schoolsInDazMatrix"
+    :get-class-header-label="getDazClassHeaderLabel"
+    :get-class-students="getDaz"
+    :total-for-class="totalDazForClass"
+    :total-for-school="totalDazForSchool"
+    :class-cell-class="dazCellClass"
   />
-</template>
+  </template>
 </div>

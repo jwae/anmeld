@@ -1,0 +1,89 @@
+<section class="anmeldeverfahren-header">
+  <div class="anmeldeverfahren-header-sticky">
+    <header class="header header-auth-row anmeldeverfahren-header-top">
+      <div class="anmeldeverfahren-header-copy">
+        <div>
+          <h1>Anmeldeverfahren für Schulen</h1>
+          <p>Verwaltung von Anmeldeverfahren GS und SEK I und den zugehoerigen Anmelderunden.</p>
+
+          <div class="anmeldeverfahren-header-context-badges" aria-label="Aktueller Kontext kompakt">
+            <span class="anmeldeverfahren-header-context-badge">
+              <span class="anmeldeverfahren-header-context-badge-label">Verfahren:</span>
+              <strong>{{ currentContext.verfahren }}</strong>
+            </span>
+            <span class="anmeldeverfahren-header-context-badge">
+            <span class="anmeldeverfahren-header-context-badge-label">Runde:</span>
+              <strong>{{ formatCompactRoundLabel(currentContext.runde) }}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <UserSessionCard
+        :user="user"
+        :user-label="userLabel"
+        :connected-host="connectedHost"
+        :connected-port="connectedPort"
+        :connected-database="connectedDatabase"
+        action-label="Logout"
+        @action="emit('logout')"
+      />
+    </header>
+
+    <nav class="anmeldeverfahren-header-menu" role="tablist" aria-label="Anmeldedaten Bereiche">
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'verfahren' }"
+        :aria-selected="activeMenu === 'verfahren' ? 'true' : 'false'"
+        @click="emitNavigate('verfahren')"
+      >
+        Verfahren und Runden
+      </button>
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'verfahrensdaten' }"
+        :aria-selected="activeMenu === 'verfahrensdaten' ? 'true' : 'false'"
+        :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
+        :disabled="!hasMenuSelectionContext"
+        @click="emitNavigate('verfahrensdaten')"
+      >
+        Verfahrensdaten
+      </button>
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'abgleich' }"
+        :aria-selected="activeMenu === 'abgleich' ? 'true' : 'false'"
+        :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
+        :disabled="!hasMenuSelectionContext"
+        @click="emitNavigate('abgleich')"
+      >
+        Abgleich
+      </button>
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'koordination' }"
+        :aria-selected="activeMenu === 'koordination' ? 'true' : 'false'"
+        :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
+        :disabled="!hasMenuSelectionContext"
+        @click="emitNavigate('koordination')"
+      >
+        Koordination
+      </button>
+      <button
+        type="button"
+        class="anmeldeverfahren-header-menu-btn"
+        :class="{ 'is-active': activeMenu === 'offene-faelle' }"
+        :aria-selected="activeMenu === 'offene-faelle' ? 'true' : 'false'"
+        :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
+        :disabled="!hasMenuSelectionContext"
+        @click="emitNavigate('offene-faelle')"
+      >
+        Offene Faelle
+      </button>
+    </nav>
+  </div>
+</section>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import UserSessionCard from "./UserSessionCard.vue";
+import AnmeldeverfahrenHeader from "./AnmeldeverfahrenHeader.vue";
 import AnmeldeverfahrenView from "../views/AnmeldeverfahrenView.vue";
 import ImporteView from "../views/ImporteView.vue";
 import AbgleichView from "../views/AbgleichView.vue";
