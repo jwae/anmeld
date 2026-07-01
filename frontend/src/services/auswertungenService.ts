@@ -41,6 +41,62 @@ export type AuswertungsDownloadResponse = {
   fileName: string;
 };
 
+export type SchuelerRundenuebersichtRow = {
+  lfd_nr: number;
+  schueler_id: string;
+  name_vorname: string;
+  geburtsdatum: string;
+  abgebende_schule_nr: string;
+  abgebende_schule_name: string;
+  r1_status: string;
+  r1_schule: string;
+  r2_status: string;
+  r2_schule: string;
+  r3_status: string;
+  r3_schule: string;
+};
+
+export type SchuelerRundenuebersichtResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  generated_at: string;
+  total: number;
+  rows: SchuelerRundenuebersichtRow[];
+};
+
+export type OffeneAnmeldungenRow = {
+  lfd_nr: number;
+  schueler_id: string;
+  name_vorname: string;
+  geburtsdatum: string;
+  abgebende_schule_nr: string;
+  abgebende_schule_name: string;
+  anmeldestatus: string;
+  schule: string;
+  bemerkung: string;
+};
+
+export type OffeneAnmeldungenResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  runde: {
+    id: number;
+    bezeichnung: string;
+    runden_nummer: number;
+  };
+  generated_at: string;
+  total: number;
+  rows: OffeneAnmeldungenRow[];
+};
+
 function buildAuthConfig(token?: string): AuthConfig {
   const trimmedToken = String(token || "").trim();
   if (!trimmedToken) return {};
@@ -108,6 +164,27 @@ const auswertungenService = {
       contentType: String(response.headers["content-type"] || ""),
       fileName: String(fileNameMatch?.[1] || "auswertung-download"),
     };
+  },
+
+  async getSchuelerRundenuebersicht(verfahrenId: number, token?: string) {
+    const response = await apiClient.get<SchuelerRundenuebersichtResponse>("/api/auswertungen/schueler-rundenuebersicht", {
+      params: {
+        verfahren_id: verfahrenId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getOffeneAnmeldungen(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.get<OffeneAnmeldungenResponse>("/api/auswertungen/offene-anmeldungen", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
   },
 };
 

@@ -1366,7 +1366,7 @@ function toggleSchuleFilter(schuleName: string) {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 220;
   display: grid;
   place-items: center;
   padding: 20px;

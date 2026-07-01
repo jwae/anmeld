@@ -1,4 +1,6 @@
 const { createAuswertungDownload } = require("../lib/auswertungenExportService");
+const { buildSchuelerRundenuebersichtReport } = require("../lib/schuelerRundenuebersichtService");
+const { buildOffeneAnmeldungenReport } = require("../lib/offeneAnmeldungenReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -23,15 +25,15 @@ const CARD_DEFINITIONS = [
     title: "Schuelerlisten",
     description: "Auswertungen der Schuelerdaten.",
     formats: ["pdf", "excel"],
-    options: [
-      { key: "alle-schueler", label: "Alle Schueler" },
-      { key: "nur-pool", label: "Nur Pool" },
-      { key: "nur-anmeldung", label: "Nur Anmeldung" },
-      { key: "pool-plus-anmeldung", label: "Pool + Anmeldung" },
-      { key: "neuaufnahme", label: "Neuaufnahme" },
-      { key: "warteliste", label: "Warteliste" },
-      { key: "zugeordnete-schueler", label: "Zugeordnete Schueler" },
-      { key: "ohne-anmeldung", label: "Ohne Anmeldung" },
+      options: [
+        { key: "alle-schueler", label: "Alle Schueler" },
+        { key: "nur-pool", label: "Nur Pool" },
+        { key: "nur-anmeldung", label: "Nur Anmeldung" },
+        { key: "pool-plus-anmeldung", label: "Pool + Anmeldung" },
+        { key: "neuaufnahme", label: "Neuaufnahme" },
+        { key: "warteliste", label: "Warteliste / Zuordnungen" },
+        { key: "zugeordnete-schueler", label: "Zugeordnete Schueler" },
+        { key: "ohne-anmeldung", label: "Ohne Anmeldung" },
       { key: "nach-zielschule", label: "Nach Zielschule mit Herkunftsschule" },
       { key: "nach-herkunftsschule", label: "Nach Herkunftsschule mit Zielschule" },
       { key: "foerderbedarf", label: "Foerderbedarf" },
@@ -109,6 +111,67 @@ function createAuswertungenController({ getPool }) {
       res.json({
         cards: CARD_DEFINITIONS,
       });
+    },
+
+    schuelerRundenuebersicht: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+
+        const report = await buildSchuelerRundenuebersichtReport(getPool(), verfahrenId);
+        return res.json({
+          title: "Schueleruebersicht ueber alle Runden",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Schueleruebersicht konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    offeneAnmeldungen: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildOffeneAnmeldungenReport(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: "Schueler mit offenem Anmeldestatus",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Liste der offenen Anmeldestatus konnte nicht geladen werden.",
+        );
+      }
     },
 
     generate: async (req, res) => {

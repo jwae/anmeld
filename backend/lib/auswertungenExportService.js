@@ -1,6 +1,18 @@
 const anmeldeverfahrenModel = require("../models/anmeldeverfahrenModel");
 const anmelderundenModel = require("../models/anmelderundenModel");
 const { createSimplePdf } = require("./simplePdf");
+const {
+  buildSchuelerRundenuebersichtReport,
+  buildSchuelerRundenuebersichtCsv,
+  buildSchuelerRundenuebersichtPdfLines,
+  sanitizeFileName: sanitizeRoundOverviewFileName,
+} = require("./schuelerRundenuebersichtService");
+const {
+  buildOffeneAnmeldungenReport,
+  buildOffeneAnmeldungenCsv,
+  buildOffeneAnmeldungenPdfLines,
+  sanitizeFileName: sanitizeOpenStatusesFileName,
+} = require("./offeneAnmeldungenReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -14,13 +26,6 @@ function csvValue(value) {
 
 function buildCsv(rows) {
   return `\uFEFF${rows.map((row) => row.map(csvValue).join(";")).join("\r\n")}`;
-}
-
-function sanitizeFileName(value) {
-  return normalizeText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "auswertung";
 }
 
 function formatDate(value) {
@@ -116,7 +121,7 @@ function buildProcedureDataCsv(report, rundeId) {
 async function createAuswertungDownload({ pool, verfahrenId, rundeId, bereich, auswertung, format }) {
   if (bereich === "verfahrensuebersicht" && auswertung === "verfahrensdaten") {
     const report = await buildProcedureDataReport(pool, verfahrenId);
-    const baseName = sanitizeFileName(`verfahrensdaten-${report.procedure.schuljahr}-${report.procedure.bezeichnung}`);
+    const baseName = sanitizeRoundOverviewFileName(`verfahrensdaten-${report.procedure.schuljahr}-${report.procedure.bezeichnung}`);
 
     if (format === "pdf") {
       return {
@@ -129,6 +134,66 @@ async function createAuswertungDownload({ pool, verfahrenId, rundeId, bereich, a
     if (format === "excel") {
       return {
         buffer: buildProcedureDataCsv(report, rundeId),
+        contentType: "text/csv; charset=utf-8",
+        fileName: `${baseName}.csv`,
+      };
+    }
+  }
+
+  if (bereich === "statistiken" && auswertung === "entwicklung-ueber-die-runden") {
+    const report = await buildSchuelerRundenuebersichtReport(pool, verfahrenId);
+    const csvExport = buildSchuelerRundenuebersichtCsv(report);
+    const pdfExport = buildSchuelerRundenuebersichtPdfLines(report);
+    const baseName = sanitizeRoundOverviewFileName(`schueleruebersicht-runden-${report.procedure.id}-${report.procedure.bezeichnung}`);
+
+    if (format === "pdf") {
+      return {
+        buffer: createSimplePdf(pdfExport.lines, {
+          landscape: true,
+          fontSize: 8,
+          lineHeight: 11,
+          marginLeft: 24,
+          marginTop: 28,
+          marginBottom: 18,
+        }),
+        contentType: "application/pdf",
+        fileName: `${baseName}.pdf`,
+      };
+    }
+
+    if (format === "excel") {
+      return {
+        buffer: Buffer.from(buildCsv(csvExport.rows), "utf8"),
+        contentType: "text/csv; charset=utf-8",
+        fileName: `${baseName}.csv`,
+      };
+    }
+  }
+
+  if (bereich === "schuelerlisten" && auswertung === "warteliste") {
+    const report = await buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId);
+    const csvExport = buildOffeneAnmeldungenCsv(report);
+    const pdfExport = buildOffeneAnmeldungenPdfLines(report);
+    const baseName = sanitizeOpenStatusesFileName(`offene-anmeldungen-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`);
+
+    if (format === "pdf") {
+      return {
+        buffer: createSimplePdf(pdfExport.lines, {
+          landscape: true,
+          fontSize: 8,
+          lineHeight: 11,
+          marginLeft: 24,
+          marginTop: 28,
+          marginBottom: 18,
+        }),
+        contentType: "application/pdf",
+        fileName: `${baseName}.pdf`,
+      };
+    }
+
+    if (format === "excel") {
+      return {
+        buffer: Buffer.from(buildCsv(csvExport.rows), "utf8"),
         contentType: "text/csv; charset=utf-8",
         fileName: `${baseName}.csv`,
       };

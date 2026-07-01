@@ -8,6 +8,8 @@ function createAuswertungenRouter({ authenticateToken, requireAdmin, getPool }) 
   router.use(authenticateToken, requireAdmin);
 
   router.get("/catalog", controller.catalog);
+  router.get("/offene-anmeldungen", controller.offeneAnmeldungen);
+  router.get("/schueler-rundenuebersicht", controller.schuelerRundenuebersicht);
   router.post("/generate", controller.generate);
   router.post("/download", controller.download);
 

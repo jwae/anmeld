@@ -5,28 +5,52 @@ function escapePdfText(value) {
     .replace(/\)/g, "\\)");
 }
 
-function createSimplePdf(lines = []) {
+function createSimplePdf(lines = [], options = {}) {
   const safeLines = Array.isArray(lines) ? lines : [];
-  const startY = 800;
-  const lineHeight = 18;
+  const landscape = options?.landscape === true;
+  const pageWidth = landscape ? 842 : 595;
+  const pageHeight = landscape ? 595 : 842;
+  const marginLeft = Number(options?.marginLeft || 40);
+  const marginTop = Number(options?.marginTop || 36);
+  const marginBottom = Number(options?.marginBottom || 28);
+  const fontSize = Number(options?.fontSize || 12);
+  const lineHeight = Number(options?.lineHeight || 18);
+  const usableHeight = Math.max(pageHeight - marginTop - marginBottom - lineHeight, lineHeight);
+  const linesPerPage = Math.max(1, Math.floor(usableHeight / lineHeight));
 
-  const contentLines = [
-    "BT",
-    "/F1 12 Tf",
-  ];
+  const pageLines = [];
+  for (let index = 0; index < safeLines.length; index += linesPerPage) {
+    pageLines.push(safeLines.slice(index, index + linesPerPage));
+  }
+  if (!pageLines.length) pageLines.push([]);
 
-  safeLines.forEach((line, index) => {
-    const y = startY - (index * lineHeight);
-    contentLines.push(`1 0 0 1 50 ${y} Tm (${escapePdfText(line)}) Tj`);
+  const contentStreams = pageLines.map((page, pageIndex) => {
+    const contentLines = [
+      "BT",
+      `/F1 ${fontSize} Tf`,
+    ];
+
+    page.forEach((line, lineIndex) => {
+      const y = pageHeight - marginTop - (lineIndex * lineHeight);
+      contentLines.push(`1 0 0 1 ${marginLeft} ${y} Tm (${escapePdfText(line)}) Tj`);
+    });
+
+    const footerText = `Seite ${pageIndex + 1} / ${pageLines.length}`;
+    contentLines.push(`1 0 0 1 ${marginLeft} ${marginBottom} Tm (${escapePdfText(footerText)}) Tj`);
+    contentLines.push("ET");
+    return contentLines.join("\n");
   });
-  contentLines.push("ET");
 
-  const stream = contentLines.join("\n");
+  const pageObjectStart = 3;
+  const contentObjectStart = pageObjectStart + contentStreams.length;
+  const pageKids = contentStreams.map((_, index) => `${pageObjectStart + index} 0 R`).join(" ");
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-    `<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`,
+    `<< /Type /Pages /Count ${contentStreams.length} /Kids [${pageKids}] >>`,
+    ...contentStreams.map((_, index) => (
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${contentObjectStart + contentStreams.length} 0 R >> >> /Contents ${contentObjectStart + index} 0 R >>`
+    )),
+    ...contentStreams.map((stream) => `<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`),
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
   ];
 
