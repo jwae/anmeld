@@ -108,6 +108,14 @@
         <button class="btn-primary" type="button" @click="saveManagementSchoolSource" :disabled="managementSaving">
           {{ managementSaving ? "Speichere..." : (selectedManagementSchoolSourceId ? "Aenderungen speichern" : "Schule hinzufuegen") }}
         </button>
+        <button
+          class="btn-secondary"
+          type="button"
+          @click="testManagementSchoolSource"
+          :disabled="managementSaving || !canTestSchoolSource"
+        >
+          Zugangsdaten testen
+        </button>
         <div class="school-management-inline-actions-right">
           <button
             class="btn-secondary school-management-import-info-button"

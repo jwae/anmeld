@@ -245,27 +245,23 @@ function createAnmeldeverfahrenController({ getPool }) {
         const id = Number(req.params.id || 0);
         if (!id) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
 
-        const row = await model.findById(getPool(), id);
-        if (!row) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
-
-        const blockers = await model.countBlockingDependencies(getPool(), id);
-        if (blockers.length) {
-          const details = blockers
-            .map((blocker) => `${blocker.label}: ${blocker.count}`)
-            .join(", ");
-          return sendError(
-            res,
-            409,
-            "Das Anmeldeverfahren kann nicht geloescht werden, weil noch abhaengige Daten vorhanden sind.",
-            details,
-          );
-        }
-
-        await model.removeWithRounds(getPool(), id);
-        res.json({ message: "Anmeldeverfahren erfolgreich geloescht." });
+        await model.removeProcedureCompletely(getPool(), id);
+        res.json({
+          success: true,
+          message: "Verfahren wurde vollstaendig geloescht.",
+        });
       } catch (error) {
         console.error(error);
-        sendError(res, 500, "Anmeldeverfahren konnte nicht geloescht werden.");
+        const statusCode = error?.statusCode || 500;
+        const message = error?.message || "Anmeldeverfahren konnte nicht geloescht werden.";
+        if (statusCode === 404 || statusCode === 409) {
+          return res.status(statusCode).json({
+            success: false,
+            message,
+            error: message,
+          });
+        }
+        sendError(res, statusCode, message);
       }
     },
   };

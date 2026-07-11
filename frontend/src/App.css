@@ -263,6 +263,23 @@ button:disabled {
   white-space: nowrap;
 }
 
+.login-manage-users-btn-primary {
+  background: #1d6ef5;
+  border-color: #1d6ef5;
+  color: #fff;
+}
+
+.login-manage-users-btn-primary:hover {
+  background: #1454c8;
+  border-color: #1454c8;
+}
+
+.login-manage-users-btn-primary:disabled {
+  background: #9fbef5;
+  border-color: #9fbef5;
+  color: #fff;
+}
+
 .login-actions {
   display: flex;
   gap: 12px;

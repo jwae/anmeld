@@ -1530,6 +1530,41 @@ function explainSvwsLearningSectionError(error, schoolLabel, studentId, external
   return `[Pool-Schild-Import] ${schoolLabel}: lernabschnittsdaten fuer Schueler ${studentId} konnten nicht geladen werden. Verwende Fallback aus Auswahlliste. Grund: ${message}`;
 }
 
+function normalizeSvwsStreet(payload) {
+  const source = Array.isArray(payload) ? payload[0] || {} : payload || {};
+  const directStreet = firstDefinedValue(source, [
+    "strasse",
+    "strassennameHausnummer",
+    "strassenname_hausnummer",
+    "street",
+    "addressLine1",
+  ]);
+  if (normalizeText(directStreet)) return directStreet;
+
+  const streetName = firstDefinedValue(source, [
+    "strassenname",
+    "street_name",
+    "streetName",
+  ]);
+  const houseNumber = firstDefinedValue(source, [
+    "hausnummer",
+    "haus_nr",
+    "house_number",
+    "houseNumber",
+  ]);
+  const houseNumberSuffix = firstDefinedValue(source, [
+    "hausnummerzusatz",
+    "hausnummer_zusatz",
+    "house_number_suffix",
+    "houseNumberSuffix",
+  ]);
+
+  return [
+    normalizeText(streetName),
+    [normalizeText(houseNumber), normalizeText(houseNumberSuffix)].filter(Boolean).join(" "),
+  ].filter(Boolean).join(" ");
+}
+
 function normalizeSvwsStudentMasterData(payload) {
   const source = Array.isArray(payload) ? payload[0] || {} : payload || {};
   return {
@@ -1537,6 +1572,9 @@ function normalizeSvwsStudentMasterData(payload) {
     nachname: firstDefinedValue(source, ["nachname", "last_name", "lastname", "name"]),
     vorname: firstDefinedValue(source, ["vorname", "first_name", "firstname"]),
     geburtsdatum: firstDefinedValue(source, ["geburtsdatum", "birth_date", "birthDate", "geburtstag", "dateOfBirth"]),
+    strasse: normalizeSvwsStreet(source),
+    plz: firstDefinedValue(source, ["plz", "postleitzahl", "postal_code", "postalCode"]),
+    ort: firstDefinedValue(source, ["ort", "wohnort", "wohnortname", "city", "cityName"]),
   };
 }
 
@@ -2814,9 +2852,24 @@ async function buildAnmeldungPreviewRow(parsedRow, schoolBySnr, statusByCode, po
 
 async function fetchSvwsAnmeldungenPreviewRowsForSchool(pool, school, verfahrenId, rundeId, statusByCode) {
   const schoolLabel = school?.name || school?.snr || "die Schule";
+  const diagnostics = {
+    school_name: normalizeText(school?.name),
+    school_snr: normalizeText(school?.snr),
+    host: normalizeText(school?.db_host),
+    db_name: normalizeText(school?.db_name),
+    connection_established: false,
+    current_section_label: "",
+    current_section_id: 0,
+    selection_count: 0,
+    status_0_count: 0,
+    status_1_count: 0,
+    status_2_count: 0,
+    eligible_count: 0,
+  };
   if (!school?.db_host || !school?.db_name || !school?.db_user) {
     const error = new Error(`Fuer ${schoolLabel} fehlen SVWS-Zugangsdaten in anm_schulen.`);
     error.statusCode = 400;
+    error.diagnostics = diagnostics;
     throw error;
   }
 
@@ -2831,28 +2884,41 @@ async function fetchSvwsAnmeldungenPreviewRowsForSchool(pool, school, verfahrenI
 
   const currentSectionLabel = getCurrentSchoolYearLabel();
   const schoolMetaResponse = await client.get("/schule/stammdaten");
+  diagnostics.connection_established = true;
   const externalSectionId = resolveExternalSectionId(extractSchoolSections(schoolMetaResponse?.data), currentSectionLabel);
+  diagnostics.current_section_label = currentSectionLabel;
+  diagnostics.current_section_id = Number(externalSectionId || 0);
   console.log(`[Schild3-Import] Host: ${normalizedHost}`);
   console.log(`[Schild3-Import] Aktueller Abschnitt (${currentSectionLabel}) ID: ${externalSectionId || "-"}`);
   if (!externalSectionId) {
     const error = new Error(`Fuer ${schoolLabel} wurde kein aktueller Abschnitt (${currentSectionLabel}) im SVWS-Server gefunden.`);
     error.statusCode = 400;
+    error.diagnostics = diagnostics;
     throw error;
   }
 
   const selectionResponse = await client.get(`/schueler/abschnitt/${encodeURIComponent(String(externalSectionId))}/auswahlliste`);
   const rawStudents = Array.isArray(selectionResponse?.data?.schueler) ? selectionResponse.data.schueler : extractRestArray(selectionResponse?.data);
+  diagnostics.selection_count = Number(rawStudents.length || 0);
   console.log(`[Schild3-Import] Schueler in Auswahlliste: ${Number(rawStudents.length || 0)}`);
   if (rawStudents.length > 0) {
     console.log("[Schild3-Import] Erstes Schuelerobjekt aus der Auswahlliste:");
     console.log(rawStudents[0]);
   }
-  const eligibleStudents = rawStudents
+  const normalizedStudents = rawStudents
     .map((entry) => normalizeCurrentSelectionStudent(entry))
-    .filter(Boolean)
+    .filter(Boolean);
+  diagnostics.status_0_count = normalizedStudents
+    .filter((student) => resolveStudentStatusValue(student?.status) === 0).length;
+  diagnostics.status_1_count = normalizedStudents
+    .filter((student) => resolveStudentStatusValue(student?.status) === 1).length;
+  diagnostics.status_2_count = normalizedStudents
+    .filter((student) => resolveStudentStatusValue(student?.status) === 2).length;
+  const eligibleStudents = normalizedStudents
     .filter((student) => ["0", "1"].includes(String(resolveStudentStatusValue(student?.status) ?? "")));
+  diagnostics.eligible_count = eligibleStudents.length;
 
-  return await mapWithConcurrency(eligibleStudents, async (student, index) => {
+  const rows = await mapWithConcurrency(eligibleStudents, async (student, index) => {
     const studentId = Number(student?.id || 0);
     const masterDataResponse = await client.get(`/schueler/${encodeURIComponent(String(studentId))}/stammdaten`);
     const masterData = normalizeSvwsStudentMasterData(masterDataResponse?.data);
@@ -2879,6 +2945,8 @@ async function fetchSvwsAnmeldungenPreviewRowsForSchool(pool, school, verfahrenI
       rundeId,
     );
   }, 8);
+
+  return { rows, diagnostics };
 }
 
 function buildPoolImportRowFromData(rowNumber, data, schoolBySnr) {
@@ -2903,9 +2971,23 @@ function buildPoolImportRowFromData(rowNumber, data, schoolBySnr) {
 async function fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId) {
   const schoolLabel = school?.name || school?.snr || "die Schule";
   console.log(`[Pool-Schild-Import] Starte SVWS-Abruf fuer ${schoolLabel} (SNR ${school?.snr || "-"}) | Verfahren ${verfahrenId} | Runde ${rundeId}`);
+  const diagnostics = {
+    school_name: normalizeText(school?.name),
+    school_snr: normalizeText(school?.snr),
+    host: normalizeText(school?.db_host),
+    db_name: normalizeText(school?.db_name),
+    connection_established: false,
+    current_section_label: "",
+    current_section_id: 0,
+    selection_count: 0,
+    status_2_count: 0,
+    grade_4_count: 0,
+    eligible_count: 0,
+  };
   if (!school?.db_host || !school?.db_name || !school?.db_user) {
     const error = new Error(`Fuer ${schoolLabel} fehlen SVWS-Zugangsdaten in anm_schulen.`);
     error.statusCode = 400;
+    error.diagnostics = diagnostics;
     throw error;
   }
 
@@ -2922,26 +3004,38 @@ async function fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId)
     client.get("/schule/stammdaten"),
     client.get("/jahrgaenge/jahrgangsdaten"),
   ]);
+  diagnostics.connection_established = true;
   const externalSectionId = resolveExternalSectionId(extractSchoolSections(schoolMetaResponse?.data), currentSectionLabel);
+  diagnostics.current_section_label = currentSectionLabel;
+  diagnostics.current_section_id = Number(externalSectionId || 0);
   console.log(`[Pool-Schild-Import] ${schoolLabel}: aktueller Abschnitt ${currentSectionLabel}, externe Abschnitts-ID ${externalSectionId || "-"}`);
   if (!externalSectionId) {
     const error = new Error(`Fuer ${schoolLabel} wurde kein aktueller Abschnitt (${currentSectionLabel}) im SVWS-Server gefunden.`);
     error.statusCode = 400;
+    error.diagnostics = diagnostics;
     throw error;
   }
 
   const yearGroupLookup = buildYearGroupLookup(normalizeYearGroupEntries(yearGroupsResponse?.data));
   const selectionResponse = await client.get(`/schueler/abschnitt/${encodeURIComponent(String(externalSectionId))}/auswahlliste`);
   const rawStudents = Array.isArray(selectionResponse?.data?.schueler) ? selectionResponse.data.schueler : extractRestArray(selectionResponse?.data);
+  diagnostics.selection_count = Number(rawStudents.length || 0);
   console.log(`[Pool-Schild-Import] ${schoolLabel}: Auswahlliste enthaelt ${Number(rawStudents.length || 0)} Schueler`);
-  const eligibleStudents = rawStudents
+  const normalizedStudents = rawStudents
     .map((entry) => normalizeCurrentSelectionStudent(entry))
-    .filter(Boolean)
-    .filter((student) => resolveStudentStatusValue(student?.status) === 2)
+    .filter(Boolean);
+  const statusTwoStudents = normalizedStudents
+    .filter((student) => resolveStudentStatusValue(student?.status) === 2);
+  diagnostics.status_2_count = statusTwoStudents.length;
+  const gradeFourStudents = normalizedStudents
     .filter((student) => resolveStudentGrade(student, yearGroupLookup) === "4");
+  diagnostics.grade_4_count = gradeFourStudents.length;
+  const eligibleStudents = statusTwoStudents
+    .filter((student) => resolveStudentGrade(student, yearGroupLookup) === "4");
+  diagnostics.eligible_count = eligibleStudents.length;
   console.log(`[Pool-Schild-Import] ${schoolLabel}: ${eligibleStudents.length} Schueler mit Jahrgang 4 und Status 2 gefunden`);
 
-  return await mapWithConcurrency(eligibleStudents, async (student, index) => {
+  const rows = await mapWithConcurrency(eligibleStudents, async (student, index) => {
     const studentId = Number(student?.id || 0);
     const masterDataResponse = await client.get(`/schueler/${encodeURIComponent(String(studentId))}/stammdaten`);
     let learningSectionResponse = { data: null };
@@ -2973,9 +3067,9 @@ async function fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId)
         vorname: normalizeText(masterData?.vorname || student?.vorname),
         nachname: normalizeText(masterData?.nachname || student?.nachname),
         geburtsdatum: normalizeDate(masterData?.geburtsdatum || student?.geburtsdatum),
-        strasse: "",
-        plz: "",
-        ort: "",
+        strasse: normalizeText(masterData?.strasse),
+        plz: normalizeText(masterData?.plz),
+        ort: normalizeText(masterData?.ort),
         foerderbedarf: hatFoerderbedarf ? "1" : "0",
         zieldifferent: hatZieldifferentenUnterricht ? "1" : "0",
         ef: String(ef),
@@ -2985,6 +3079,8 @@ async function fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId)
       new Map([[school.snr, school]]),
     );
   }, 8);
+
+  return { rows, diagnostics };
 }
 
 async function writeImportProtocol(pool, payload) {
@@ -3900,13 +3996,40 @@ function createImporteController({ getPool }) {
               error_rows: 0,
               rows_read: 0,
               skipped: true,
+              diagnostics: {
+                school_name: normalizeText(school?.name),
+                school_snr: normalizeText(school?.snr),
+                host: normalizeText(school?.db_host),
+                db_name: normalizeText(school?.db_name),
+                connection_established: false,
+                current_section_label: "",
+                current_section_id: 0,
+                selection_count: 0,
+                status_2_count: 0,
+                grade_4_count: 0,
+                eligible_count: 0,
+              },
               message: "Schule ist inaktiv.",
             });
             continue;
           }
 
           try {
-            const rows = await fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId);
+            const fetchResult = await fetchSvwsPoolJg4RowsForSchool(pool, school, verfahrenId, rundeId);
+            const rows = Array.isArray(fetchResult?.rows) ? fetchResult.rows : [];
+            const diagnostics = fetchResult?.diagnostics || {
+              school_name: normalizeText(school?.name),
+              school_snr: normalizeText(school?.snr),
+              host: normalizeText(school?.db_host),
+              db_name: normalizeText(school?.db_name),
+              connection_established: false,
+              current_section_label: "",
+              current_section_id: 0,
+              selection_count: 0,
+              status_2_count: 0,
+              grade_4_count: 0,
+              eligible_count: 0,
+            };
             const rowsRead = Number(rows.length || 0);
             const validRows = rows.filter((row) => row?.valid);
             const invalidRows = rows.filter((row) => !row?.valid);
@@ -3930,6 +4053,7 @@ function createImporteController({ getPool }) {
                 ef_count: 0,
                 rows_read: 0,
                 skipped: false,
+                diagnostics,
                 message: "Keine Schueler mit Jahrgang 4 und Status 2 im aktuellen Abschnitt gefunden.",
               });
               continue;
@@ -3950,6 +4074,7 @@ function createImporteController({ getPool }) {
                 ef_count: efCount,
                 rows_read: rowsRead,
                 skipped: false,
+                diagnostics,
                 message: invalidRows[0]?.errors?.join(", ") || "Keine gueltigen Schild-Pooldaten gefunden.",
               });
               continue;
@@ -4022,6 +4147,7 @@ function createImporteController({ getPool }) {
                 skipped: false,
                 updated_messages: schoolUpdatedMessages,
                 duplicate_id_conflicts: duplicateIdConflicts.filter((entry) => entry.schul_nr === school.snr),
+                diagnostics,
                 message: "",
               });
             } catch (error) {
@@ -4047,6 +4173,19 @@ function createImporteController({ getPool }) {
               skipped: false,
               updated_messages: [],
               duplicate_id_conflicts: [],
+              diagnostics: error?.diagnostics || {
+                school_name: normalizeText(school?.name),
+                school_snr: normalizeText(school?.snr),
+                host: normalizeText(school?.db_host),
+                db_name: normalizeText(school?.db_name),
+                connection_established: false,
+                current_section_label: "",
+                current_section_id: 0,
+                selection_count: 0,
+                status_2_count: 0,
+                grade_4_count: 0,
+                eligible_count: 0,
+              },
               message: error?.message || "Schild-Poolimport fehlgeschlagen.",
             });
           }
@@ -4404,19 +4543,48 @@ function createImporteController({ getPool }) {
               error_rows: 0,
               rows_read: 0,
               skipped: true,
+              diagnostics: {
+                school_name: normalizeText(school?.name),
+                school_snr: normalizeText(school?.snr),
+                host: normalizeText(school?.db_host),
+                db_name: normalizeText(school?.db_name),
+                connection_established: false,
+                current_section_label: "",
+                current_section_id: 0,
+                selection_count: 0,
+                status_0_count: 0,
+                status_1_count: 0,
+                status_2_count: 0,
+                eligible_count: 0,
+              },
               message: "Schule ist inaktiv.",
             });
             continue;
           }
 
           try {
-            const previewRows = await fetchSvwsAnmeldungenPreviewRowsForSchool(
+            const previewResult = await fetchSvwsAnmeldungenPreviewRowsForSchool(
               pool,
               school,
               verfahrenId,
               rundeId,
               statusByCode,
             );
+            const previewRows = Array.isArray(previewResult?.rows) ? previewResult.rows : [];
+            const diagnostics = previewResult?.diagnostics || {
+              school_name: normalizeText(school?.name),
+              school_snr: normalizeText(school?.snr),
+              host: normalizeText(school?.db_host),
+              db_name: normalizeText(school?.db_name),
+              connection_established: false,
+              current_section_label: "",
+              current_section_id: 0,
+              selection_count: 0,
+              status_0_count: 0,
+              status_1_count: 0,
+              status_2_count: 0,
+              eligible_count: 0,
+            };
             const rowsRead = Number(previewRows.length || 0);
             const validRows = previewRows.filter((row) => row?.valid);
             const invalidRows = previewRows.filter((row) => !row?.valid);
@@ -4433,6 +4601,7 @@ function createImporteController({ getPool }) {
                 error_rows: 0,
                 rows_read: 0,
                 skipped: false,
+                diagnostics,
                 message: "Keine Schueler mit Status 0 oder 1 im aktuellen Abschnitt gefunden.",
               });
               continue;
@@ -4450,6 +4619,7 @@ function createImporteController({ getPool }) {
                 error_rows: invalidRows.length,
                 rows_read: rowsRead,
                 skipped: false,
+                diagnostics,
                 message: invalidRows[0]?.errors?.join(", ") || "Keine gueltigen SVWS-Anmeldungen gefunden.",
               });
               continue;
@@ -4489,6 +4659,7 @@ function createImporteController({ getPool }) {
                 error_rows: errorRows,
                 rows_read: Number(payload?.rows_read || rowsRead),
                 skipped: false,
+                diagnostics,
                 message: "",
               });
             } finally {
@@ -4505,6 +4676,20 @@ function createImporteController({ getPool }) {
               error_rows: 0,
               rows_read: 0,
               skipped: false,
+              diagnostics: error?.diagnostics || {
+                school_name: normalizeText(school?.name),
+                school_snr: normalizeText(school?.snr),
+                host: normalizeText(school?.db_host),
+                db_name: normalizeText(school?.db_name),
+                connection_established: false,
+                current_section_label: "",
+                current_section_id: 0,
+                selection_count: 0,
+                status_0_count: 0,
+                status_1_count: 0,
+                status_2_count: 0,
+                eligible_count: 0,
+              },
               message: error?.message || "SVWS-Import fehlgeschlagen.",
             });
           }

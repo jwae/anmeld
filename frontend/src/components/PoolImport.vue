@@ -74,6 +74,29 @@ const duplicateConflicts = ref<Array<{
   schul_nr: string;
   schulname: string;
 }>>([]);
+const showSchildDiagnosticsOverlay = ref(false);
+const schildDiagnostics = ref<Array<{
+  snr: string;
+  message: string;
+  imported_students: number;
+  updated_students: number;
+  skipped_rows: number;
+  error_rows: number;
+  rows_read: number;
+  diagnostics?: {
+    school_name?: string;
+    school_snr?: string;
+    host?: string;
+    db_name?: string;
+    connection_established?: boolean;
+    current_section_label?: string;
+    current_section_id?: number;
+    selection_count?: number;
+    status_2_count?: number;
+    grade_4_count?: number;
+    eligible_count?: number;
+  };
+}>>([]);
 const poolCount = ref<number | null>(null);
 const poolSchuelerRows = ref<PoolSchuelerRow[]>([]);
 const loadingPoolSchueler = ref(false);
@@ -182,6 +205,7 @@ const hasOpenOverlay = computed(() => (
   || showEditPoolOverlay.value
   || showDeletePoolOverlay.value
   || showDuplicateConflictsOverlay.value
+  || showSchildDiagnosticsOverlay.value
 ));
 
 const sortedPoolSchuelerRows = computed(() => {
@@ -322,6 +346,10 @@ function sourceDisplayTitle(row: PoolSchuelerRow) {
   return sourceNo || schoolName || "-";
 }
 
+function formatDiagnosticBoolean(value: unknown) {
+  return value ? "Ja" : "Nein";
+}
+
 function setPoolSort(nextKey: PoolSortKey) {
   if (poolSortKey.value === nextKey) {
     poolSortDirection.value = poolSortDirection.value === "asc" ? "desc" : "asc";
@@ -374,11 +402,13 @@ async function importJg4ausSchild() {
       runde_id: props.rundeId,
     }, props.token);
     summary.value = response?.total_summary || response;
+    schildDiagnostics.value = Array.isArray(response?.schools) ? response.schools : [];
     duplicateConflicts.value = Array.isArray(response?.duplicate_id_conflicts)
       ? response.duplicate_id_conflicts
       : Array.isArray(response?.total_summary?.duplicate_id_conflicts)
         ? response.total_summary.duplicate_id_conflicts
         : [];
+    showSchildDiagnosticsOverlay.value = schildDiagnostics.value.length > 0;
     showDuplicateConflictsOverlay.value = duplicateConflicts.value.length > 0;
     if (duplicateConflicts.value.length > 0) {
       errorMessage.value = `${duplicateConflicts.value.length} doppelte schueler_id${duplicateConflicts.value.length === 1 ? "" : "s"} wurden uebersprungen. Details im Hinweisfenster.`;
@@ -405,6 +435,10 @@ function closeSchildImportOverlay() {
 
 function closeDuplicateConflictsOverlay() {
   showDuplicateConflictsOverlay.value = false;
+}
+
+function closeSchildDiagnosticsOverlay() {
+  showSchildDiagnosticsOverlay.value = false;
 }
 
 function handleEditPoolRow(row: PoolSchuelerRow) {
@@ -548,6 +582,8 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   pendingDeletePoolRow.value = null;
   showDuplicateConflictsOverlay.value = false;
   duplicateConflicts.value = [];
+  showSchildDiagnosticsOverlay.value = false;
+  schildDiagnostics.value = [];
   loadPoolStats();
   loadPoolSchueler();
 }, { immediate: true });
@@ -615,6 +651,12 @@ onUnmounted(() => {
       <div v-if="summary.le_count !== undefined"><strong>LE:</strong> {{ summary.le_count }}</div>
       <div v-if="summary.zd_count !== undefined"><strong>ZD:</strong> {{ summary.zd_count }}</div>
       <div v-if="summary.ef_count !== undefined"><strong>EF:</strong> {{ summary.ef_count }}</div>
+    </div>
+
+    <div v-if="schildDiagnostics.length" class="pool-diagnostic-actions">
+      <button class="btn-secondary" type="button" @click="showSchildDiagnosticsOverlay = true">
+        Diagnose anzeigen
+      </button>
     </div>
 
     <div class="import-preview">
@@ -1023,6 +1065,58 @@ onUnmounted(() => {
         </div>
       </section>
     </div>
+
+    <div
+      v-if="showSchildDiagnosticsOverlay"
+      class="pool-import-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pool-import-diagnostics-title"
+      @click.self="closeSchildDiagnosticsOverlay"
+    >
+      <section class="pool-import-overlay-card pool-import-diagnostics-card">
+        <div class="pool-import-overlay-head">
+          <h3 id="pool-import-diagnostics-title">Backend-Diagnose Schild-Import</h3>
+        </div>
+        <div class="pool-import-overlay-copy">
+          <p>Diese Werte kommen direkt aus dem Backend pro Schule und helfen beim Eingrenzen des Imports.</p>
+          <div class="pool-diagnostic-list">
+            <article
+              v-for="entry in schildDiagnostics"
+              :key="`${entry.snr}-${entry.diagnostics?.current_section_id || 0}`"
+              class="pool-diagnostic-item"
+            >
+              <div class="pool-diagnostic-item-head">
+                <strong>{{ entry.diagnostics?.school_name || entry.snr || "-" }}</strong>
+                <span>{{ entry.diagnostics?.school_snr || entry.snr || "-" }}</span>
+              </div>
+              <div class="pool-diagnostic-grid">
+                <div><strong>Verbindung:</strong> {{ formatDiagnosticBoolean(entry.diagnostics?.connection_established) }}</div>
+                <div><strong>Host:</strong> {{ entry.diagnostics?.host || "-" }}</div>
+                <div><strong>Schema:</strong> {{ entry.diagnostics?.db_name || "-" }}</div>
+                <div><strong>Abschnitt:</strong> {{ entry.diagnostics?.current_section_label || "-" }}</div>
+                <div><strong>Abschnitts-ID:</strong> {{ entry.diagnostics?.current_section_id || "-" }}</div>
+                <div><strong>Auswahlliste:</strong> {{ entry.diagnostics?.selection_count ?? "-" }}</div>
+                <div><strong>Status 2:</strong> {{ entry.diagnostics?.status_2_count ?? "-" }}</div>
+                <div><strong>Jahrgang 4:</strong> {{ entry.diagnostics?.grade_4_count ?? "-" }}</div>
+                <div><strong>Kandidaten:</strong> {{ entry.diagnostics?.eligible_count ?? "-" }}</div>
+                <div><strong>Gelesen:</strong> {{ entry.rows_read ?? "-" }}</div>
+                <div><strong>Neu:</strong> {{ entry.imported_students ?? "-" }}</div>
+                <div><strong>Aktualisiert:</strong> {{ entry.updated_students ?? "-" }}</div>
+                <div><strong>Uebersprungen:</strong> {{ entry.skipped_rows ?? "-" }}</div>
+                <div><strong>Fehler:</strong> {{ entry.error_rows ?? "-" }}</div>
+              </div>
+              <p v-if="entry.message" class="pool-diagnostic-message">{{ entry.message }}</p>
+            </article>
+          </div>
+        </div>
+        <div class="pool-import-overlay-actions">
+          <button class="btn-primary" type="button" @click="closeSchildDiagnosticsOverlay">
+            Schliessen
+          </button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -1187,6 +1281,11 @@ onUnmounted(() => {
   border-radius: 14px;
   background: #ffffff;
   color: #19365b;
+}
+
+.pool-diagnostic-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .import-preview {
@@ -1577,6 +1676,55 @@ onUnmounted(() => {
   line-height: 1.6;
 }
 
+.pool-import-diagnostics-card {
+  width: min(980px, 100%);
+}
+
+.pool-diagnostic-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pool-diagnostic-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #d8e4f3;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.pool-diagnostic-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pool-diagnostic-item-head strong {
+  color: #19365b;
+}
+
+.pool-diagnostic-item-head span {
+  color: #5f7593;
+  font-size: 0.92rem;
+}
+
+.pool-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px 14px;
+  font-size: 0.94rem;
+  color: #334e68;
+}
+
+.pool-diagnostic-message {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef4fd;
+  color: #1f3f67 !important;
+}
+
 .pool-delete-hero {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1761,6 +1909,11 @@ onUnmounted(() => {
   .pool-import-overlay-actions .btn-primary,
   .pool-import-overlay-actions .btn-secondary {
     min-width: 140px;
+  }
+
+  .pool-diagnostic-item-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

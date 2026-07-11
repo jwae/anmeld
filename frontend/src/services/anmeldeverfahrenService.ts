@@ -120,8 +120,8 @@ export const anmeldeverfahrenService = {
   },
 
   async remove(id: number, token?: string) {
-    const resp = await apiClient.delete<{ message: string }>(
-      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}`,
+    const resp = await apiClient.delete<{ success: boolean; message: string }>(
+      `/api/verfahren/${encodeURIComponent(String(id))}`,
       buildAuthConfig(token),
     );
     return resp.data;

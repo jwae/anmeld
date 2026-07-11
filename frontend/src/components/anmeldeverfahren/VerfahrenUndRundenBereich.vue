@@ -61,7 +61,9 @@ const showHiddenVerfahren = ref<boolean>(false);
 const showProcedureOverlay = ref<boolean>(false);
 const showRoundOverlay = ref<boolean>(false);
 const showStartRoundOverlay = ref<boolean>(false);
+const showDeleteProcedureOverlay = ref<boolean>(false);
 const pendingStartRound = ref<Anmelderunde | null>(null);
+const pendingDeleteProcedure = ref<Anmeldeverfahren | null>(null);
 let successMessageTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
@@ -196,7 +198,7 @@ function emitContext() {
 }
 
 function getErrorMessage(error: any, fallbackMessage: string) {
-  const apiError = String(error?.response?.data?.error || "").trim();
+  const apiError = String(error?.response?.data?.error || error?.response?.data?.message || "").trim();
   const apiDetails = String(error?.response?.data?.details || "").trim();
   if (apiError && apiDetails) return `${apiError} ${apiDetails}`;
   return apiError || fallbackMessage;
@@ -230,22 +232,36 @@ function applyLocalWorkingRound(rundenId: number | null) {
   }));
 }
 
-async function loadVerfahren(preferredSelectionId?: number | null) {
+function resetProcedureSelectionContext() {
+  selectedVerfahrenId.value = null;
+  activeRundenId.value = null;
+  focusedRundenId.value = null;
+  runden.value = [];
+  emitContext();
+}
+
+function canDeleteProcedure(item: Anmeldeverfahren | null | undefined) {
+  return item?.status === "Vorbereitet" || item?.status === "Beendet";
+}
+
+async function loadVerfahren(preferredSelectionId?: number | null, options: { allowAutoSelect?: boolean } = {}) {
   loadingVerfahren.value = true;
   try {
     const rows = await anmeldeverfahrenService.list(props.token, { includeHidden: showHiddenVerfahren.value });
     verfahren.value = rows;
+    const allowAutoSelect = options.allowAutoSelect !== false;
     const desiredSelection = preferredSelectionId ?? selectedVerfahrenId.value;
-    const stillExists = rows.some((item) => item.id === desiredSelection);
-    selectedVerfahrenId.value = stillExists ? desiredSelection : (rows[0]?.id ?? null);
+    const stillExists = desiredSelection !== null && desiredSelection !== undefined && rows.some((item) => item.id === desiredSelection);
+    selectedVerfahrenId.value = stillExists
+      ? desiredSelection
+      : allowAutoSelect
+        ? (rows[0]?.id ?? null)
+        : null;
 
     if (selectedVerfahrenId.value) {
       await loadRunden(selectedVerfahrenId.value);
     } else {
-      runden.value = [];
-      activeRundenId.value = null;
-      focusedRundenId.value = null;
-      emitContext();
+      resetProcedureSelectionContext();
     }
   } catch (error) {
     showError(error, "Anmeldeverfahren konnten nicht geladen werden.");
@@ -396,17 +412,37 @@ async function submitVerfahren() {
   }
 }
 
-async function deleteVerfahren(item: Anmeldeverfahren) {
-  const confirmed = window.confirm(
-    `Soll das Anmeldeverfahren "${item.bezeichnung}" wirklich geloescht werden? Zugehoerige Runden werden dabei ebenfalls entfernt.`,
-  );
-  if (!confirmed) return;
+function openDeleteProcedureOverlay(item: Anmeldeverfahren) {
+  if (!canDeleteProcedure(item)) {
+    showError(null, "Ein Verfahren in Bearbeitung kann nicht geloescht werden.");
+    return;
+  }
+  pendingDeleteProcedure.value = item;
+  showDeleteProcedureOverlay.value = true;
+}
+
+function closeDeleteProcedureOverlay(force = false) {
+  if (deletingVerfahrenId.value && !force) return;
+  showDeleteProcedureOverlay.value = false;
+  pendingDeleteProcedure.value = null;
+}
+
+async function confirmDeleteVerfahren() {
+  if (!pendingDeleteProcedure.value || deletingVerfahrenId.value) return;
+  const item = pendingDeleteProcedure.value;
+  const deletingSelectedProcedure = selectedVerfahrenId.value === item.id;
 
   deletingVerfahrenId.value = item.id;
   try {
     const response = await anmeldeverfahrenService.remove(item.id, props.token);
-    await loadVerfahren(selectedVerfahrenId.value === item.id ? null : selectedVerfahrenId.value);
-    showSuccess(response.message || "Anmeldeverfahren erfolgreich geloescht.");
+    closeDeleteProcedureOverlay(true);
+    if (deletingSelectedProcedure) {
+      resetProcedureSelectionContext();
+      await loadVerfahren(null, { allowAutoSelect: false });
+    } else {
+      await loadVerfahren(selectedVerfahrenId.value);
+    }
+    showSuccess(response.message || "Verfahren wurde vollstaendig geloescht.");
   } catch (error) {
     showError(error, "Anmeldeverfahren konnte nicht geloescht werden.");
   } finally {
@@ -624,7 +660,7 @@ onBeforeUnmount(() => {
         :can-finish="!!selectedVerfahrenId && !selectedProcedureLocked"
         @select="selectVerfahren"
         @edit="openEditProcedureOverlay"
-        @delete="deleteVerfahren"
+        @delete="openDeleteProcedureOverlay"
         @create="openCreateProcedureOverlay"
         @start="startProcedure"
         @finish="finishProcedure"
@@ -754,6 +790,58 @@ onBeforeUnmount(() => {
           </button>
           <button class="btn-primary anm-form-primary-btn" type="button" @click="startRound">
             Runde jetzt starten
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="showDeleteProcedureOverlay && pendingDeleteProcedure"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-delete-procedure-overlay-title"
+      @click.self="closeDeleteProcedureOverlay"
+    >
+      <section class="anm-overlay-card anm-delete-procedure-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-delete-procedure-overlay-title">Verfahren endgueltig loeschen?</h3>
+          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+            Schliessen
+          </button>
+        </div>
+
+        <div class="anm-delete-procedure-intro">
+          Das Verfahren <strong>"{{ pendingDeleteProcedure.bezeichnung }}"</strong> wird vollstaendig geloescht.
+        </div>
+
+        <div class="anm-delete-procedure-summary">
+          <p><strong>Bezeichnung:</strong> {{ pendingDeleteProcedure.bezeichnung }}</p>
+          <p><strong>Schuljahr:</strong> {{ pendingDeleteProcedure.schuljahr }}</p>
+          <p><strong>Verfahrenstyp:</strong> {{ pendingDeleteProcedure.verfahrenstyp }}</p>
+          <p><strong>Status:</strong> {{ pendingDeleteProcedure.status }}</p>
+        </div>
+
+        <div class="anm-delete-procedure-warning">
+          <p>Dabei werden auch alle zugehoerigen Daten entfernt, unter anderem:</p>
+          <ul>
+            <li>Runden</li>
+            <li>Schuelerdaten</li>
+            <li>Kapazitaeten</li>
+            <li>offene Faelle</li>
+            <li>Schulgruppen-Zuordnungen</li>
+            <li>Zuweisungen</li>
+            <li>Importdaten</li>
+          </ul>
+          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden.</strong></p>
+        </div>
+
+        <div class="anm-actions">
+          <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+            Abbrechen
+          </button>
+          <button class="btn-secondary anm-form-secondary-btn anm-form-danger-btn" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="confirmDeleteVerfahren">
+            {{ deletingVerfahrenId === pendingDeleteProcedure.id ? "Loesche..." : "Verfahren endgueltig loeschen" }}
           </button>
         </div>
       </section>
@@ -889,9 +977,16 @@ onBeforeUnmount(() => {
   width: min(680px, 100%);
 }
 
+.anm-delete-procedure-card {
+  width: min(720px, 100%);
+}
+
 .anm-start-round-intro,
 .anm-start-round-summary,
-.anm-start-round-info {
+.anm-start-round-info,
+.anm-delete-procedure-intro,
+.anm-delete-procedure-summary,
+.anm-delete-procedure-warning {
   padding: 14px 16px;
   border: 1px solid #dbe6f2;
   border-radius: 16px;
@@ -900,21 +995,48 @@ onBeforeUnmount(() => {
 
 .anm-start-round-intro,
 .anm-start-round-summary p,
-.anm-start-round-info p {
+.anm-start-round-info p,
+.anm-delete-procedure-summary p,
+.anm-delete-procedure-warning p {
   margin: 0;
 }
 
 .anm-start-round-summary,
-.anm-start-round-info {
+.anm-start-round-info,
+.anm-delete-procedure-summary,
+.anm-delete-procedure-warning {
   display: grid;
   gap: 8px;
 }
 
-.anm-start-round-info ul {
+.anm-start-round-info ul,
+.anm-delete-procedure-warning ul {
   margin: 0;
   padding-left: 18px;
   color: #4a607e;
   line-height: 1.5;
+}
+
+.anm-delete-procedure-intro {
+  border-color: #f1d1d1;
+  background: #fff6f6;
+  color: #7c2d2d;
+}
+
+.anm-delete-procedure-warning {
+  border-color: #efc0c0;
+  background: linear-gradient(180deg, #fff8f8 0%, #fff1f1 100%);
+}
+
+.anm-form-danger-btn {
+  border-color: #d96b6b;
+  background: #b42318;
+  color: #ffffff;
+}
+
+.anm-form-danger-btn:hover:not(:disabled) {
+  background: #941f15;
+  color: #ffffff;
 }
 
 @media (max-width: 900px) {

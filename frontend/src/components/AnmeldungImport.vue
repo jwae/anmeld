@@ -28,6 +28,30 @@ const successMessage = ref("");
 const importSummary = ref<any | null>(null);
 const isExpanded = ref(false);
 const showCsvImportOverlay = ref(false);
+const showSchildDiagnosticsOverlay = ref(false);
+const schildDiagnostics = ref<Array<{
+  snr: string;
+  message: string;
+  imported_rows: number;
+  updated_rows: number;
+  skipped_rows: number;
+  error_rows: number;
+  rows_read: number;
+  diagnostics?: {
+    school_name?: string;
+    school_snr?: string;
+    host?: string;
+    db_name?: string;
+    connection_established?: boolean;
+    current_section_label?: string;
+    current_section_id?: number;
+    selection_count?: number;
+    status_0_count?: number;
+    status_1_count?: number;
+    status_2_count?: number;
+    eligible_count?: number;
+  };
+}>>([]);
 
 async function loadSchools() {
   if (!props.verfahrenId) {
@@ -75,6 +99,8 @@ async function importiereAnmeldungenAusSchild3() {
       runde_id: props.rundeId,
     }, props.token);
     importSummary.value = response;
+    schildDiagnostics.value = Array.isArray(response?.schools) ? response.schools : [];
+    showSchildDiagnosticsOverlay.value = schildDiagnostics.value.length > 0;
     successMessage.value = "Anmeldungen aus Schild3 wurden importiert.";
     await loadSchools();
   } catch (error: any) {
@@ -82,6 +108,14 @@ async function importiereAnmeldungenAusSchild3() {
   } finally {
     importing.value = false;
   }
+}
+
+function closeSchildDiagnosticsOverlay() {
+  showSchildDiagnosticsOverlay.value = false;
+}
+
+function formatDiagnosticBoolean(value: unknown) {
+  return value ? "Ja" : "Nein";
 }
 
 async function handleWizardSuccess(result: any) {
@@ -109,6 +143,8 @@ watch(() => [props.verfahrenId, props.rundeId], () => {
   successMessage.value = "";
   errorMessage.value = "";
   showCsvImportOverlay.value = false;
+  showSchildDiagnosticsOverlay.value = false;
+  schildDiagnostics.value = [];
   loadSchools();
 }, { immediate: true });
 
@@ -193,6 +229,12 @@ onMounted(() => {
         <div><strong>Pool + Anmeldung:</strong> {{ importSummary.total_summary?.pool_anmeldung || 0 }}</div>
         <div><strong>Nur Anmeldung:</strong> {{ importSummary.total_summary?.nur_anmeldung || 0 }}</div>
       </div>
+
+      <div v-if="schildDiagnostics.length" class="diagnostic-actions">
+        <button class="btn-secondary" type="button" @click="showSchildDiagnosticsOverlay = true">
+          Diagnose anzeigen
+        </button>
+      </div>
     </div>
 
     <AnmeldungenImportOverlay
@@ -204,6 +246,59 @@ onMounted(() => {
       @close="showCsvImportOverlay = false"
       @success="handleWizardSuccess"
     />
+
+    <div
+      v-if="showSchildDiagnosticsOverlay"
+      class="diagnostic-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="schild3-diagnostics-title"
+      @click.self="closeSchildDiagnosticsOverlay"
+    >
+      <section class="diagnostic-overlay-card">
+        <div class="diagnostic-overlay-head">
+          <h3 id="schild3-diagnostics-title">Backend-Diagnose Schild3-Import</h3>
+        </div>
+        <div class="diagnostic-overlay-copy">
+          <p>Diese Werte kommen direkt aus dem Backend pro Schule und zeigen, was der Schild3-Import wirklich gesehen hat.</p>
+          <div class="diagnostic-list">
+            <article
+              v-for="entry in schildDiagnostics"
+              :key="`${entry.snr}-${entry.diagnostics?.current_section_id || 0}`"
+              class="diagnostic-item"
+            >
+              <div class="diagnostic-item-head">
+                <strong>{{ entry.diagnostics?.school_name || entry.snr || "-" }}</strong>
+                <span>{{ entry.diagnostics?.school_snr || entry.snr || "-" }}</span>
+              </div>
+              <div class="diagnostic-grid">
+                <div><strong>Verbindung:</strong> {{ formatDiagnosticBoolean(entry.diagnostics?.connection_established) }}</div>
+                <div><strong>Host:</strong> {{ entry.diagnostics?.host || "-" }}</div>
+                <div><strong>Schema:</strong> {{ entry.diagnostics?.db_name || "-" }}</div>
+                <div><strong>Abschnitt:</strong> {{ entry.diagnostics?.current_section_label || "-" }}</div>
+                <div><strong>Abschnitts-ID:</strong> {{ entry.diagnostics?.current_section_id || "-" }}</div>
+                <div><strong>Auswahlliste:</strong> {{ entry.diagnostics?.selection_count ?? "-" }}</div>
+                <div><strong>Status 0:</strong> {{ entry.diagnostics?.status_0_count ?? "-" }}</div>
+                <div><strong>Status 1:</strong> {{ entry.diagnostics?.status_1_count ?? "-" }}</div>
+                <div><strong>Status 2:</strong> {{ entry.diagnostics?.status_2_count ?? "-" }}</div>
+                <div><strong>Kandidaten:</strong> {{ entry.diagnostics?.eligible_count ?? "-" }}</div>
+                <div><strong>Gelesen:</strong> {{ entry.rows_read ?? "-" }}</div>
+                <div><strong>Importiert:</strong> {{ entry.imported_rows ?? "-" }}</div>
+                <div><strong>Aktualisiert:</strong> {{ entry.updated_rows ?? "-" }}</div>
+                <div><strong>Uebersprungen:</strong> {{ entry.skipped_rows ?? "-" }}</div>
+                <div><strong>Fehler:</strong> {{ entry.error_rows ?? "-" }}</div>
+              </div>
+              <p v-if="entry.message" class="diagnostic-message">{{ entry.message }}</p>
+            </article>
+          </div>
+        </div>
+        <div class="diagnostic-overlay-actions">
+          <button class="btn-secondary" type="button" @click="closeSchildDiagnosticsOverlay">
+            Schliessen
+          </button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -310,6 +405,11 @@ onMounted(() => {
   color: #19365b;
 }
 
+.diagnostic-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .table-wrap {
   overflow-x: auto;
   max-height: 640px;
@@ -317,6 +417,100 @@ onMounted(() => {
   border: 1px solid #e5edf6;
   border-radius: 16px;
   background: #ffffff;
+}
+
+.diagnostic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.diagnostic-overlay-card {
+  width: min(980px, 100%);
+  max-height: calc(100vh - 40px);
+  border-radius: 24px;
+  border: 1px solid rgba(219, 228, 240, 0.9);
+  background:
+    radial-gradient(circle at top right, rgba(143, 187, 233, 0.22), transparent 34%),
+    linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.2);
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.diagnostic-overlay-head h3 {
+  margin: 0;
+  color: #19365b;
+}
+
+.diagnostic-overlay-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.diagnostic-overlay-copy p {
+  margin: 0;
+  color: #4a607e;
+  line-height: 1.6;
+}
+
+.diagnostic-list {
+  display: grid;
+  gap: 14px;
+}
+
+.diagnostic-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #d8e4f3;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.diagnostic-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diagnostic-item-head strong {
+  color: #19365b;
+}
+
+.diagnostic-item-head span {
+  color: #5f7593;
+  font-size: 0.92rem;
+}
+
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px 14px;
+  font-size: 0.94rem;
+  color: #334e68;
+}
+
+.diagnostic-message {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef4fd;
+  color: #1f3f67;
+}
+
+.diagnostic-overlay-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
 .school-table-wrap {
@@ -393,6 +587,15 @@ onMounted(() => {
 @media (max-width: 900px) {
   .import-card-head {
     flex-direction: column;
+  }
+
+  .diagnostic-item-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .diagnostic-overlay-card {
+    padding: 20px;
   }
 }
 </style>

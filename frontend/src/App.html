@@ -36,7 +36,7 @@
         <div>
           <p class="eyebrow">Schritt 2</p>
           <h2>Login in die App</h2>
-          <p class="app-login-intro">Melde dich mit deinem Benutzerkonto an, um auf die freigegebenen Dashboards zuzugreifen.</p>
+          <p class="app-login-intro">Melde dich mit deinem Benutzerkonto an.</p>
         </div>
 
         <div class="login-status-chip" :class="{ 'login-status-chip-success': !!pendingLogin }">
@@ -78,13 +78,19 @@
             {{ loginLoading ? "Anmelden..." : "Anmelden" }}
           </button>
 
-          <button v-else class="btn-primary" @click="continueAfterLogin" :disabled="loginLoading" type="button">
+          <button
+            v-else-if="!isPendingAdmin"
+            class="btn-primary"
+            @click="continueAfterLogin"
+            :disabled="loginLoading"
+            type="button"
+          >
             Weiter zum Dashboard
           </button>
 
           <button
             v-if="pendingLogin && isPendingAdmin"
-            class="btn-secondary login-manage-users-btn"
+            class="btn-secondary login-manage-users-btn login-manage-users-btn-primary"
             type="button"
             @click="openAnmeldeverfahren"
           >
@@ -110,7 +116,12 @@
           <p class="feedback-title">Anmeldung erfolgreich</p>
           <p>
             Angemeldet als {{ pendingLoginUserLabel || "Benutzer" }}.
-            Wähle jetzt <strong>Weiter zum Dashboard</strong>.
+            <template v-if="isPendingAdmin">
+              Wähle jetzt <strong>Zum Anmeldeverfahren</strong>.
+            </template>
+            <template v-else>
+              Wähle jetzt <strong>Weiter zum Dashboard</strong>.
+            </template>
           </p>
         </div>
       </div>

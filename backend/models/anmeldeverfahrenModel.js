@@ -444,6 +444,13 @@ async function countBlockingDependencies(pool, verfahrenId) {
   return blockers;
 }
 
+async function deleteRowsByProcedureIfPossible(connection, tableName, verfahrenId) {
+  if (!(await tableExists(connection, tableName))) return;
+  const columns = await loadTableColumns(connection, tableName);
+  if (!columns.has("verfahren_id")) return;
+  await connection.query(`DELETE FROM ${tableName} WHERE verfahren_id = ?`, [verfahrenId]);
+}
+
 async function removeWithRounds(pool, verfahrenId) {
   const connection = await pool.getConnection();
   try {
@@ -452,6 +459,70 @@ async function removeWithRounds(pool, verfahrenId) {
     const [result] = await connection.query("DELETE FROM anm_verfahren WHERE id = ?", [verfahrenId]);
     await connection.commit();
     return result.affectedRows > 0;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function removeProcedureCompletely(pool, verfahrenId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [procedureRows] = await connection.query(
+      "SELECT id, status FROM anm_verfahren WHERE id = ? LIMIT 1 FOR UPDATE",
+      [verfahrenId],
+    );
+    if (!Array.isArray(procedureRows) || !procedureRows.length) {
+      const error = new Error("Anmeldeverfahren nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const currentStatus = String(procedureRows[0].status || "").trim();
+    if (currentStatus === ROUND_STATUS_IN_PROGRESS) {
+      const error = new Error("Ein Verfahren in Bearbeitung kann nicht geloescht werden.");
+      error.statusCode = 409;
+      throw error;
+    }
+    if (!["Vorbereitet", "Beendet"].includes(currentStatus)) {
+      const error = new Error("Das Verfahren darf in diesem Status nicht geloescht werden.");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const deletePlan = [
+      "anm_offener_fall",
+      "anm_zuweisung",
+      "anm_schueler_abgleich",
+      "anm_anmeldung",
+      "anm_schueler_anmeldung",
+      "anm_schueler_pool",
+      "anm_schueler",
+      "anm_kapazitaet",
+      "anm_abgleich_protokoll",
+      "anm_merkzettel",
+      "anm_verfahren_schulgruppe",
+      "anm_verfahren_schule",
+      "anm_runde",
+    ];
+
+    for (const tableName of deletePlan) {
+      await deleteRowsByProcedureIfPossible(connection, tableName, verfahrenId);
+    }
+
+    const [result] = await connection.query("DELETE FROM anm_verfahren WHERE id = ?", [verfahrenId]);
+    if (!result.affectedRows) {
+      const error = new Error("Anmeldeverfahren nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    await connection.commit();
+    return true;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -584,6 +655,7 @@ module.exports = {
   syncProcedureSchoolGroupsByRole,
   countBlockingDependencies,
   removeWithRounds,
+  removeProcedureCompletely,
   startProcedure,
   finishProcedure,
 };

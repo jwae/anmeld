@@ -20,6 +20,16 @@ const emit = defineEmits<{
   (e: "finish"): void;
 }>();
 
+function canDeleteProcedure(item: Anmeldeverfahren) {
+  return item.status === "Vorbereitet" || item.status === "Beendet";
+}
+
+function getDeleteTitle(item: Anmeldeverfahren) {
+  return canDeleteProcedure(item)
+    ? "Verfahren loeschen"
+    : "Ein Verfahren in Bearbeitung kann nicht geloescht werden.";
+}
+
 function formatTimestamp(value: string) {
   const trimmed = String(value || "").trim();
   return trimmed || "-";
@@ -93,9 +103,9 @@ function formatTimestamp(value: string) {
                 <button
                   class="btn-secondary anm-icon-btn anm-danger-btn"
                   type="button"
-                  :disabled="deletingId === item.id"
-                  title="Loeschen"
-                  aria-label="Loeschen"
+                  :disabled="deletingId === item.id || !canDeleteProcedure(item)"
+                  :title="getDeleteTitle(item)"
+                  :aria-label="getDeleteTitle(item)"
                   @click.stop="emit('delete', item)"
                 >
                   <i v-if="deletingId !== item.id" class="bi bi-trash" aria-hidden="true"></i>

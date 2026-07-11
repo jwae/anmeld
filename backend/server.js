@@ -320,6 +320,7 @@ app.post("/api/connection/test", async (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api", ensureDatabaseConfigured, authenticateToken);
 app.use("/api/anmeldeverfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api/verfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api", createAnmelderundenRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api/abgleich", createAbgleichRouter({ authenticateToken, requireAdmin, getPool }));
 app.use("/api/koordination", createKoordinationRouter({ authenticateToken, requireAdmin, getPool }));
