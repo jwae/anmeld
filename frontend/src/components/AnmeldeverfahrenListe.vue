@@ -278,11 +278,15 @@ function formatTimestamp(value: string) {
 
 .anm-table tbody tr {
   cursor: pointer;
-  transition: background-color 0.18s ease;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.anm-table tbody tr:hover td {
+  background: #dbeafe;
 }
 
 .anm-table tbody tr:hover {
-  background: #f8fbff;
+  box-shadow: inset 0 1px 0 #93c5fd, inset 0 -1px 0 #93c5fd;
 }
 
 .anm-table tbody tr.is-selected {

@@ -680,6 +680,7 @@ function toggleSchuleFilter(schuleName: string) {
                 v-for="row in schoolOverview"
                 :key="`${row.schulnummer}-${row.schule}`"
                 :class="{
+                  'overview-row-outside-procedure': isUnknownSchoolNumber(row.schulnummer),
                   'overview-row-has-capacity': Number(row.freie_plaetze || 0) > 0,
                   'overview-row-selected': schuleFilter === normalizeText(row.schule)
                 }"
@@ -1259,6 +1260,11 @@ function toggleSchuleFilter(schuleName: string) {
   background: rgba(22, 101, 52, 0.06);
 }
 
+.overview-table tbody tr.overview-row-outside-procedure td {
+  background: #fdecec;
+  color: #8f1d14;
+}
+
 .table-empty {
   text-align: center;
   color: #6b7f99;
@@ -1519,8 +1525,27 @@ function toggleSchuleFilter(schuleName: string) {
 .overview-table tbody tr {
   transition: background-color 0.15s ease;
 }
+
+.detail-table tbody tr {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.detail-table tbody tr:hover td {
+  background-color: #dbeafe;
+}
+
+.detail-table tbody tr:hover {
+  box-shadow: inset 0 1px 0 #93c5fd, inset 0 -1px 0 #93c5fd;
+}
+
 .overview-table tbody tr:hover td {
-  background-color: #f1f5f9;
+  background-color: #dbeafe;
+}
+.overview-table tbody tr.overview-row-outside-procedure:hover td {
+  background-color: #f9d7d7;
+}
+.overview-table tbody tr:hover {
+  box-shadow: inset 0 1px 0 #93c5fd, inset 0 -1px 0 #93c5fd;
 }
 .overview-table tbody tr.overview-row-selected td {
   background-color: #dbeaf8 !important;

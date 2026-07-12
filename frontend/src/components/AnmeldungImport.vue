@@ -382,6 +382,34 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.import-head-actions .btn-secondary {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #c8dbef;
+  background: #ffffff;
+  color: #1f466f;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.import-head-actions .btn-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
+}
+
+.import-head-actions .btn-secondary:disabled {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   border-radius: 999px;
   padding: 10px 16px;

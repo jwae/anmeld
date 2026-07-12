@@ -529,6 +529,8 @@ watch(
           <section class="koordination-info-card">
             <h5>Dienst</h5>
             <p>Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
+            <p>Openrouteservice (ORS) ist ein frei zugaenglicher, webbasierter Kartendienst, der komplexe Geodaten und Routenberechnungen anbietet. Er basiert auf den frei zugaenglichen Geodaten von OpenStreetMap (OSM) und wird vom HeiGIT (Heidelberg Institute for Geoinformation Technology) entwickelt.</p>
+            <p>Fuer die Nutzung ist ein kostenloser API-Key erforderlich. Die kostenfreie Nutzung ist auf ein taegliches Limit von 2.500 Routing-Anfragen pro Tag beschraenkt. Der API-Key wird im Backend der Anwendung eingetragen.</p>
             <p>
               <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
                 OpenRouteService Geocoding
@@ -727,9 +729,14 @@ watch(
   transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
+.school-table tbody tr:hover td,
+.student-table tbody tr:hover td {
+  background: #dbeafe;
+}
+
 .school-row:hover,
 .student-row:hover {
-  background: #f8fbff;
+  box-shadow: inset 0 1px 0 #93c5fd, inset 0 -1px 0 #93c5fd;
 }
 
 .school-row.is-active {
@@ -888,7 +895,7 @@ watch(
 .koordination-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -908,7 +915,7 @@ watch(
 
 .koordination-info-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 14px;
 }
 
