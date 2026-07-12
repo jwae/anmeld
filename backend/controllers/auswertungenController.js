@@ -1,6 +1,8 @@
 const { createAuswertungDownload } = require("../lib/auswertungenExportService");
 const { buildSchuelerRundenuebersichtReport } = require("../lib/schuelerRundenuebersichtService");
 const { buildOffeneAnmeldungenReport } = require("../lib/offeneAnmeldungenReportService");
+const { buildPoolSchuelerAktuelleRundeReport } = require("../lib/poolSchuelerAktuelleRundeReportService");
+const { buildSchuelerNachHerkunftsschuleReport } = require("../lib/schuelerNachHerkunftsschuleReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -27,7 +29,7 @@ const CARD_DEFINITIONS = [
     formats: ["pdf", "excel"],
       options: [
         { key: "alle-schueler", label: "Alle Schueler" },
-        { key: "nur-pool", label: "Nur Pool" },
+        { key: "nur-pool", label: "Pool" },
         { key: "nur-anmeldung", label: "Nur Anmeldung" },
         { key: "pool-plus-anmeldung", label: "Pool + Anmeldung" },
         { key: "neuaufnahme", label: "Neuaufnahme" },
@@ -170,6 +172,74 @@ function createAuswertungenController({ getPool }) {
           res,
           error?.statusCode || 500,
           error?.message || "Die Liste der offenen Anmeldestatus konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    poolSchuelerAktuelleRunde: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildPoolSchuelerAktuelleRundeReport(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: "Schueler der aktuellen Runde mit Herkunft Pool",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Liste der Pool-Schueler konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    schuelerNachHerkunftsschule: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildSchuelerNachHerkunftsschuleReport(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: "Schueler nach Herkunftsschule mit Zielschule",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Liste nach Herkunftsschule konnte nicht geladen werden.",
         );
       }
     },

@@ -97,6 +97,40 @@ export type OffeneAnmeldungenResponse = {
   rows: OffeneAnmeldungenRow[];
 };
 
+export type PoolSchuelerAktuelleRundeResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  runde: {
+    id: number;
+    bezeichnung: string;
+    runden_nummer: number;
+  };
+  generated_at: string;
+  total: number;
+  rows: OffeneAnmeldungenRow[];
+};
+
+export type SchuelerNachHerkunftsschuleResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  runde: {
+    id: number;
+    bezeichnung: string;
+    runden_nummer: number;
+  };
+  generated_at: string;
+  total: number;
+  rows: OffeneAnmeldungenRow[];
+};
+
 function buildAuthConfig(token?: string): AuthConfig {
   const trimmedToken = String(token || "").trim();
   if (!trimmedToken) return {};
@@ -178,6 +212,28 @@ const auswertungenService = {
 
   async getOffeneAnmeldungen(verfahrenId: number, rundeId: number, token?: string) {
     const response = await apiClient.get<OffeneAnmeldungenResponse>("/api/auswertungen/offene-anmeldungen", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getPoolSchuelerAktuelleRunde(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.get<PoolSchuelerAktuelleRundeResponse>("/api/auswertungen/pool-schueler-aktuelle-runde", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getSchuelerNachHerkunftsschule(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.get<SchuelerNachHerkunftsschuleResponse>("/api/auswertungen/schueler-nach-herkunftsschule", {
       params: {
         verfahren_id: verfahrenId,
         runde_id: rundeId,

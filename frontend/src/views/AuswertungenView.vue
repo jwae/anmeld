@@ -4,6 +4,8 @@ import auswertungenService, {
   type AuswertungFormat,
   type AuswertungsKachel,
   type OffeneAnmeldungenResponse,
+  type PoolSchuelerAktuelleRundeResponse,
+  type SchuelerNachHerkunftsschuleResponse,
   type SchuelerRundenuebersichtResponse,
 } from "../services/auswertungenService";
 
@@ -27,6 +29,8 @@ const actionLoadingKey = ref("");
 const previewOverlayOpen = ref(false);
 const previewLoading = ref(false);
 const previewErrorMessage = ref("");
+let errorMessageTimer: ReturnType<typeof setTimeout> | null = null;
+let successMessageTimer: ReturnType<typeof setTimeout> | null = null;
 
 type PreviewColumn = {
   key: string;
@@ -62,6 +66,24 @@ function actionKey(cardId: string, action: string) {
   return `${cardId}:${action}`;
 }
 
+function clearErrorMessageTimer() {
+  if (errorMessageTimer) {
+    clearTimeout(errorMessageTimer);
+    errorMessageTimer = null;
+  }
+}
+
+function clearSuccessMessageTimer() {
+  if (successMessageTimer) {
+    clearTimeout(successMessageTimer);
+    successMessageTimer = null;
+  }
+}
+
+function formatListNumber(index: number) {
+  return String(index + 1).padStart(2, "0");
+}
+
 function isExpanded(cardId: string) {
   return expandedCardIds.value.includes(cardId);
 }
@@ -92,8 +114,19 @@ function isOpenStatusOption(cardId: string, optionKey: string) {
   return cardId === "schuelerlisten" && optionKey === "warteliste";
 }
 
+function isPoolOriginOption(cardId: string, optionKey: string) {
+  return cardId === "schuelerlisten" && optionKey === "nur-pool";
+}
+
+function isSourceSchoolOption(cardId: string, optionKey: string) {
+  return cardId === "schuelerlisten" && optionKey === "nach-herkunftsschule";
+}
+
 function isPreviewOption(cardId: string, optionKey: string) {
-  return isRoundOverviewOption(cardId, optionKey) || isOpenStatusOption(cardId, optionKey);
+  return isRoundOverviewOption(cardId, optionKey)
+    || isOpenStatusOption(cardId, optionKey)
+    || isPoolOriginOption(cardId, optionKey)
+    || isSourceSchoolOption(cardId, optionKey);
 }
 
 function isImplementedDownload(cardId: string, optionKey: string) {
@@ -207,6 +240,59 @@ function createOpenStatusPreviewState(response: OffeneAnmeldungenResponse): Prev
   };
 }
 
+function createPoolOriginPreviewState(response: PoolSchuelerAktuelleRundeResponse): PreviewState {
+  const roundLabel = response.runde?.bezeichnung || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  return {
+    key: "schuelerlisten:nur-pool",
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: [
+      { key: "lfd_nr", label: "Lfd. Nr." },
+      { key: "schueler_id", label: "Schueler-ID" },
+      { key: "name_vorname", label: "Name, Vorname" },
+      { key: "geburtsdatum", label: "Geb.-Dat." },
+      { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
+      { key: "abgebende_schule_name", label: "Name abgebende Schule" },
+      { key: "anmeldestatus", label: "Anmeldestatus" },
+      { key: "schule", label: "Schule" },
+      { key: "bemerkung", label: "Bemerkung" },
+    ],
+    emptyMessage: 'Fuer die ausgewaehlte Runde gibt es keine Schuelerinnen und Schueler mit Herkunft "Pool".',
+    exportBereich: "schuelerlisten",
+    exportAuswertung: "nur-pool",
+  };
+}
+
+function createSourceSchoolPreviewState(response: SchuelerNachHerkunftsschuleResponse): PreviewState {
+  const roundLabel = response.runde?.bezeichnung || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  return {
+    key: "schuelerlisten:nach-herkunftsschule",
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: [
+      { key: "lfd_nr", label: "Lfd. Nr." },
+      { key: "abgebende_schule_nr", label: "Schulnummer" },
+      { key: "abgebende_schule_name", label: "Schulname" },
+      { key: "name_vorname", label: "Name, Vorname" },
+      { key: "geburtsdatum", label: "GebDat" },
+      { key: "schule", label: "Zielschule" },
+      { key: "anmeldestatus", label: "Anmeldestatus" },
+      { key: "bemerkung", label: "Bemerkung" },
+    ],
+    emptyMessage: "Fuer die ausgewaehlte Runde gibt es keine Schuelerdaten.",
+    exportBereich: "schuelerlisten",
+    exportAuswertung: "nach-herkunftsschule",
+  };
+}
+
 async function openPreview(card: AuswertungsKachel) {
   if (!props.verfahrenId || !props.rundeId) return;
   const selectedOption = String(selectedOptions.value[card.id] || "").trim();
@@ -224,9 +310,15 @@ async function openPreview(card: AuswertungsKachel) {
     if (isRoundOverviewOption(card.id, selectedOption)) {
       const response = await auswertungenService.getSchuelerRundenuebersicht(props.verfahrenId, props.token);
       previewData.value = createRoundOverviewPreviewState(response);
-    } else {
+    } else if (isOpenStatusOption(card.id, selectedOption)) {
       const response = await auswertungenService.getOffeneAnmeldungen(props.verfahrenId, props.rundeId, props.token);
       previewData.value = createOpenStatusPreviewState(response);
+    } else if (isPoolOriginOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getPoolSchuelerAktuelleRunde(props.verfahrenId, props.rundeId, props.token);
+      previewData.value = createPoolOriginPreviewState(response);
+    } else {
+      const response = await auswertungenService.getSchuelerNachHerkunftsschule(props.verfahrenId, props.rundeId, props.token);
+      previewData.value = createSourceSchoolPreviewState(response);
     }
   } catch (error: any) {
     previewData.value = null;
@@ -315,6 +407,30 @@ async function runPlaceholder(card: AuswertungsKachel, format: AuswertungFormat)
 }
 
 watch(
+  errorMessage,
+  (value) => {
+    clearErrorMessageTimer();
+    if (!value) return;
+    errorMessageTimer = setTimeout(() => {
+      errorMessage.value = "";
+      errorMessageTimer = null;
+    }, 6000);
+  },
+);
+
+watch(
+  successMessage,
+  (value) => {
+    clearSuccessMessageTimer();
+    if (!value) return;
+    successMessageTimer = setTimeout(() => {
+      successMessage.value = "";
+      successMessageTimer = null;
+    }, 6000);
+  },
+);
+
+watch(
   () => [props.verfahrenId, props.rundeId],
   () => {
     expandedCardIds.value = [];
@@ -361,7 +477,7 @@ watch(
 
     <section v-else class="auswertungen-grid">
       <article
-        v-for="card in cards"
+        v-for="(card, cardIndex) in cards"
         :key="card.id"
         class="auswertung-card"
         :class="{ 'is-expanded': isExpanded(card.id) }"
@@ -373,7 +489,10 @@ watch(
           @click="toggleCard(card.id)"
         >
           <div class="auswertung-card-copy">
-            <h3>{{ card.title }}</h3>
+            <h3>
+              <span class="auswertung-title-index">{{ formatListNumber(cardIndex) }}</span>
+              <span>{{ card.title }}</span>
+            </h3>
             <p>{{ card.description }}</p>
           </div>
           <span
@@ -387,10 +506,13 @@ watch(
           <fieldset class="auswertung-options">
             <legend>Auswahl</legend>
             <label
-              v-for="option in card.options"
+              v-for="(option, optionIndex) in card.options"
               :key="`${card.id}-${option.key}`"
               class="auswertung-option"
-              :class="{ 'is-highlighted': isPreviewOption(card.id, option.key) }"
+              :class="{
+                'is-highlighted': isPreviewOption(card.id, option.key),
+                'is-selected': selectedOptions[card.id] === option.key,
+              }"
             >
               <input
                 v-model="selectedOptions[card.id]"
@@ -398,7 +520,8 @@ watch(
                 :name="`auswertung-${card.id}`"
                 :value="option.key"
               />
-              <span>{{ option.label }}</span>
+              <span class="auswertung-option-index">{{ formatListNumber(optionIndex) }}</span>
+              <span class="auswertung-option-label">{{ option.label }}</span>
             </label>
           </fieldset>
 
@@ -596,9 +719,27 @@ watch(
 
 .auswertung-card-copy h3 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #17385f;
   font-size: 1.08rem;
   line-height: 1.25;
+}
+
+.auswertung-title-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #184f95 0%, #2e7ccf 100%);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  box-shadow: 0 10px 22px rgba(24, 79, 149, 0.18);
 }
 
 .auswertung-card-copy p {
@@ -629,9 +770,9 @@ watch(
 
 .auswertung-options {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid #dde6f2;
   border-radius: 16px;
   background: rgba(246, 250, 255, 0.9);
@@ -647,10 +788,17 @@ watch(
 }
 
 .auswertung-option {
+  position: relative;
   display: flex;
   gap: 10px;
-  align-items: start;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
   color: #214061;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .auswertung-option.is-highlighted {
@@ -658,8 +806,51 @@ watch(
   font-weight: 700;
 }
 
+.auswertung-option.is-selected {
+  border-color: #7fb1eb;
+  background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
+  box-shadow: 0 10px 22px rgba(24, 89, 168, 0.12);
+}
+
+.auswertung-option:hover {
+  border-color: #c6d9f0;
+  background: #ffffff;
+}
+
 .auswertung-option input {
-  margin-top: 2px;
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auswertung-option-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #cad9eb;
+  background: #fff;
+  color: #5d7594;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.auswertung-option.is-selected .auswertung-option-index {
+  border-color: #1559b7;
+  background: #1559b7;
+  color: #fff;
+}
+
+.auswertung-option-label {
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.auswertung-option.is-selected .auswertung-option-label {
+  color: #0c4e98;
 }
 
 .auswertung-actions {

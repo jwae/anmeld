@@ -13,6 +13,18 @@ const {
   buildOffeneAnmeldungenPdfLines,
   sanitizeFileName: sanitizeOpenStatusesFileName,
 } = require("./offeneAnmeldungenReportService");
+const {
+  buildPoolSchuelerAktuelleRundeReport,
+  buildPoolSchuelerAktuelleRundeCsv,
+  buildPoolSchuelerAktuelleRundePdfLines,
+  sanitizeFileName: sanitizePoolStudentsFileName,
+} = require("./poolSchuelerAktuelleRundeReportService");
+const {
+  buildSchuelerNachHerkunftsschuleReport,
+  buildSchuelerNachHerkunftsschuleCsv,
+  buildSchuelerNachHerkunftsschulePdfLines,
+  sanitizeFileName: sanitizeSourceSchoolFileName,
+} = require("./schuelerNachHerkunftsschuleReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -175,6 +187,66 @@ async function createAuswertungDownload({ pool, verfahrenId, rundeId, bereich, a
     const csvExport = buildOffeneAnmeldungenCsv(report);
     const pdfExport = buildOffeneAnmeldungenPdfLines(report);
     const baseName = sanitizeOpenStatusesFileName(`offene-anmeldungen-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`);
+
+    if (format === "pdf") {
+      return {
+        buffer: createSimplePdf(pdfExport.lines, {
+          landscape: true,
+          fontSize: 8,
+          lineHeight: 11,
+          marginLeft: 24,
+          marginTop: 28,
+          marginBottom: 18,
+        }),
+        contentType: "application/pdf",
+        fileName: `${baseName}.pdf`,
+      };
+    }
+
+    if (format === "excel") {
+      return {
+        buffer: Buffer.from(buildCsv(csvExport.rows), "utf8"),
+        contentType: "text/csv; charset=utf-8",
+        fileName: `${baseName}.csv`,
+      };
+    }
+  }
+
+  if (bereich === "schuelerlisten" && auswertung === "nur-pool") {
+    const report = await buildPoolSchuelerAktuelleRundeReport(pool, verfahrenId, rundeId);
+    const csvExport = buildPoolSchuelerAktuelleRundeCsv(report);
+    const pdfExport = buildPoolSchuelerAktuelleRundePdfLines(report);
+    const baseName = sanitizePoolStudentsFileName(`pool-schueler-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`);
+
+    if (format === "pdf") {
+      return {
+        buffer: createSimplePdf(pdfExport.lines, {
+          landscape: true,
+          fontSize: 8,
+          lineHeight: 11,
+          marginLeft: 24,
+          marginTop: 28,
+          marginBottom: 18,
+        }),
+        contentType: "application/pdf",
+        fileName: `${baseName}.pdf`,
+      };
+    }
+
+    if (format === "excel") {
+      return {
+        buffer: Buffer.from(buildCsv(csvExport.rows), "utf8"),
+        contentType: "text/csv; charset=utf-8",
+        fileName: `${baseName}.csv`,
+      };
+    }
+  }
+
+  if (bereich === "schuelerlisten" && auswertung === "nach-herkunftsschule") {
+    const report = await buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId);
+    const csvExport = buildSchuelerNachHerkunftsschuleCsv(report);
+    const pdfExport = buildSchuelerNachHerkunftsschulePdfLines(report);
+    const baseName = sanitizeSourceSchoolFileName(`schueler-nach-herkunftsschule-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`);
 
     if (format === "pdf") {
       return {
