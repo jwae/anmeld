@@ -74,7 +74,7 @@ async function handleDeleteAll() {
     />
 
     <AnmeldungImport
-      v-if="verfahrenstyp === 'SEK1'"
+      v-if="verfahrenstyp === 'GS' || verfahrenstyp === 'SEK1'"
       :key="`anmeldungen-${verfahrenId ?? 'kein-verfahren'}-${rundeId ?? 'keine-runde'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"

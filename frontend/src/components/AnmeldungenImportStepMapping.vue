@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 defineProps<{ fields: Array<{ key: string; label: string; description: string; required: boolean; readOnly?: boolean; systemValue?: string }>; columns: string[]; mapping: Record<string, string>; globalSchulNr: string }>();
 defineEmits<{ (event: "change", payload: { key: string; value: string }): void; }>();
 </script>
@@ -8,7 +8,7 @@ defineEmits<{ (event: "change", payload: { key: string; value: string }): void; 
       <article v-for="field in fields" :key="field.key" class="mapping-card">
         <div class="mapping-copy">
           <p class="mapping-title">{{ field.label }}<span v-if="field.required" class="mapping-badge is-required">Pflicht</span><span v-else-if="field.readOnly" class="mapping-badge">Automatisch</span></p>
-          <p>{{ field.key === 'schul_nr' && globalSchulNr ? 'Globaler Schulwert vorhanden, CSV-Feld optional.' : field.description }}</p>
+          <p>{{ field.key === 'anmeldeschule_snr' && globalSchulNr ? 'Globaler Schulwert vorhanden, CSV-Feld optional.' : field.description }}</p>
         </div>
         <template v-if="field.readOnly"><div class="mapping-readonly">{{ field.systemValue || "Automatisch gesetzt" }}</div></template>
         <template v-else><select :value="mapping[field.key] || ''" @change="$emit('change', { key: field.key, value: ($event.target as HTMLSelectElement).value })"><option value="">Nicht zuordnen</option><option v-for="column in columns" :key="column" :value="column">{{ column }}</option></select></template>

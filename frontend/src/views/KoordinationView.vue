@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import koordinationService from "../services/koordinationService";
 
@@ -272,7 +272,7 @@ async function handleAssign() {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
         row_ids: selectedStudentRowIds.value,
-        schul_nr: selectedSchool.value.snr,
+        zugewiesene_schule_snr: selectedSchool.value.snr,
       },
       props.token,
     );

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 import CsvImportStepUpload from "./CsvImportStepUpload.vue";
@@ -114,7 +114,7 @@ const delimiterLabel = computed(() => {
 
 const validationDisplayFields = computed(() => (
   schemaFields.value.filter((field) => (
-    field.key !== "quell_schueler_nr"
+    field.key !== "herkunftsschueler_nr"
     && (field.readOnly || !!String(mapping.value[field.key] || "").trim())
   ))
 ));
@@ -220,7 +220,7 @@ async function parseSelectedFile(file: File | null | undefined) {
 function buildAutoMapping(columns: string[]) {
   const byKey = new Map(columns.map((column) => [normalizeMappingKey(column), column]));
   const aliasByField: Record<string, string[]> = {
-    source_school_snr: ["snr", "schulnummer", "schul_nr", "quell_snr"],
+    source_school_snr: ["snr", "schulnummer", "anmeldeschule_snr", "herkunftsschule_snr"],
     schueler_id: ["schueler_id", "schueler_nr", "id", "import_id"],
     vorname: ["vorname"],
     nachname: ["nachname", "name"],

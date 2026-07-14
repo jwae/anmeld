@@ -1,4 +1,4 @@
-const verfahrenModel = require("./anmeldeverfahrenModel");
+﻿const verfahrenModel = require("./anmeldeverfahrenModel");
 
 const STATUS_VALUES = ["Vorbereitet", "In Bearbeitung", "Beendet"];
 
@@ -331,9 +331,13 @@ async function startRound(pool, targetRoundId) {
     const copyColumns = [
       "schueler_id",
       "schueler_nr",
-      "quell_snr",
-      "quell_schueler_nr",
-      "schul_nr",
+      "herkunftsschule_snr",
+      "herkunftsschueler_nr",
+      "anmeldeschule_snr",
+      "zugewiesene_schule_snr",
+      "zugewiesen_am",
+      "zugewiesen_von",
+      "zugewiesen_bemerkung",
       "herkunft",
       "abgleich_status",
       "anmeldestatus",
@@ -365,9 +369,9 @@ async function startRound(pool, targetRoundId) {
     if (copyColumns.length) {
       const insertColumns = ["verfahren_id", "runde_id", ...copyColumns];
       const selectColumns = ["?", "?", ...copyColumns.map((column) => `s.${column}`)];
-      if (schuelerColumns.has("erwartete_snr") && schuelerColumns.has("schul_nr")) {
+      if (schuelerColumns.has("erwartete_snr") && schuelerColumns.has("anmeldeschule_snr")) {
         insertColumns.push("erwartete_snr");
-        selectColumns.push("s.schul_nr");
+        selectColumns.push("s.anmeldeschule_snr");
       }
       insertColumns.push("created_at", "updated_at");
       selectColumns.push("NOW()", "NOW()");
@@ -416,3 +420,4 @@ module.exports = {
   startRound,
   remove,
 };
+

@@ -1,4 +1,4 @@
-const tableColumnCache = new Map();
+﻿const tableColumnCache = new Map();
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -240,7 +240,7 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
       COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') AS nachname,
       DATE_FORMAT(COALESCE(s.geburtsdatum, sp.geburtsdatum, sa.geburtsdatum), '%Y-%m-%d') AS geburtsdatum,
       COALESCE(NULLIF(TRIM(s.schueler_id), ''), NULLIF(TRIM(sa.schueler_schul_id), ''), NULLIF(TRIM(sp.id), ''), '') AS schueler_ident,
-      COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''), '') AS aktuelle_snr,
+      COALESCE(${buildAssignedSchoolExpr("s", schuelerColumns)}, NULLIF(TRIM(sa.snr), ''), '') AS aktuelle_snr,
       COALESCE(NULLIF(TRIM(curr.name), ''), '') AS aktuelle_schule,
       COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''), '') AS erwartete_snr,
       COALESCE(NULLIF(TRIM(expected.name), ''), '') AS erwartete_schule,
@@ -270,7 +270,7 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
     LEFT JOIN anm_kat_fallstatus fs
       ON fs.id = f.fallstatus_id
     LEFT JOIN anm_schulen curr
-      ON curr.snr = COALESCE(NULLIF(TRIM(s.schul_nr), ''), NULLIF(TRIM(sa.snr), ''))
+      ON curr.snr = COALESCE(${buildAssignedSchoolExpr("s", schuelerColumns)}, NULLIF(TRIM(sa.snr), ''))
     LEFT JOIN anm_schulen expected
       ON expected.snr = COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''))
     LEFT JOIN anm_schulen assign
@@ -322,9 +322,7 @@ async function loadSchoolRows(pool, verfahrenId, rundeId) {
       : "";
   const schoolLatitudeColumn = schoolColumns.has("latitude") ? "s.latitude" : "NULL";
   const schoolLongitudeColumn = schoolColumns.has("longitude") ? "s.longitude" : "NULL";
-  const studentSchoolColumn = studentColumns.has("schul_nr")
-    ? "st.schul_nr"
-    : (studentColumns.has("snr") ? "st.snr" : "''");
+  const studentSchoolColumn = buildAssignedSchoolExpr("st", studentColumns);
   const studentStatusExpr = studentColumns.has("anmeldestatus")
     ? "LOWER(TRIM(COALESCE(st.anmeldestatus, '')))"
     : "''";
@@ -637,9 +635,7 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) return { rows: [], distanceMode: "" };
 
-  const schoolColumn = columns.has("schul_nr")
-    ? "s.schul_nr"
-    : (columns.has("snr") ? "s.snr" : "''");
+  const schoolColumn = buildAssignedSchoolExpr("s", columns);
   const studentIdColumn = columns.has("schueler_id")
     ? "s.schueler_id"
     : (columns.has("schueler_nr") ? "s.schueler_nr" : "''");
@@ -649,9 +645,9 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const statusExpr = columns.has("anmeldestatus")
     ? "LOWER(TRIM(COALESCE(s.anmeldestatus, '')))"
     : "''";
-  const coordinatedSchoolColumn = columns.has("schul_nr")
-    ? "NULLIF(TRIM(s.schul_nr), '')"
-    : "NULL";
+  const coordinatedSchoolColumn = columns.has("zugewiesene_schule_snr")
+    ? "NULLIF(TRIM(s.zugewiesene_schule_snr), '')"
+    : (columns.has("koordinierte_snr") ? "NULLIF(TRIM(s.koordinierte_snr), '')" : "NULL");
 
   const filters = [`${statusExpr} <> 'neuaufnahme'`];
   const params = [];
@@ -754,6 +750,20 @@ function buildCoordinatorName(req) {
     || normalizeText(req.user?.username)
     || normalizeText(req.user?.email)
     || "System";
+}
+
+function buildAssignedSchoolExpr(alias, columns) {
+  const assignedColumn = columns.has("zugewiesene_schule_snr")
+    ? `NULLIF(TRIM(${alias}.zugewiesene_schule_snr), '')`
+    : "NULL";
+  const manualFallbackColumn = columns.has("koordinierte_snr")
+    ? `NULLIF(TRIM(${alias}.koordinierte_snr), '')`
+    : "NULL";
+  const registrationColumn = columns.has("anmeldeschule_snr")
+    ? `NULLIF(TRIM(${alias}.anmeldeschule_snr), '')`
+    : (columns.has("snr") ? `NULLIF(TRIM(${alias}.snr), '')` : "NULL");
+
+  return `COALESCE(${assignedColumn}, ${manualFallbackColumn}, ${registrationColumn})`;
 }
 
 function createKoordinationController({ getPool }) {
@@ -915,17 +925,17 @@ function createKoordinationController({ getPool }) {
               .filter((value) => Number.isInteger(value) && value > 0),
           ),
         );
-        const schulNr = normalizeText(req.body?.schul_nr || req.body?.koordinierte_snr);
+        const schulNr = normalizeText(req.body?.zugewiesene_schule_snr || req.body?.koordinierte_snr || req.body?.anmeldeschule_snr);
 
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
         if (!rowIds.length) return sendError(res, 400, "row_ids ist erforderlich.");
-        if (!schulNr) return sendError(res, 400, "schul_nr ist erforderlich.");
+        if (!schulNr) return sendError(res, 400, "zugewiesene_schule_snr ist erforderlich.");
 
         const pool = getPool();
         const studentColumns = await loadTableColumns(pool, "anm_schueler");
-        if (!studentColumns.has("schul_nr")) {
-          return sendError(res, 400, "Das Feld schul_nr ist in anm_schueler nicht vorhanden.");
+        if (!studentColumns.has("zugewiesene_schule_snr")) {
+          return sendError(res, 400, "Das Feld zugewiesene_schule_snr ist in anm_schueler nicht vorhanden.");
         }
 
         const schoolBySnr = await loadSchoolMapBySnr(pool);
@@ -959,9 +969,20 @@ function createKoordinationController({ getPool }) {
           return sendError(res, 404, "Die ausgewaehlten Schueler wurden nicht gefunden.");
         }
 
-        const assignments = ["schul_nr = ?"];
+        const assignments = ["zugewiesene_schule_snr = ?"];
         const updateParams = [schulNr];
 
+        if (studentColumns.has("zugewiesen_am")) {
+          assignments.push("zugewiesen_am = NOW()");
+        }
+        if (studentColumns.has("zugewiesen_von")) {
+          assignments.push("zugewiesen_von = ?");
+          updateParams.push(buildCoordinatorName(req));
+        }
+        if (studentColumns.has("zugewiesen_bemerkung") && req.body?.zugewiesen_bemerkung !== undefined) {
+          assignments.push("zugewiesen_bemerkung = ?");
+          updateParams.push(normalizeText(req.body?.zugewiesen_bemerkung) || null);
+        }
         if (studentColumns.has("koordiniert_am")) {
           assignments.push("koordiniert_am = NOW()");
         }
@@ -1004,3 +1025,4 @@ function createKoordinationController({ getPool }) {
 }
 
 module.exports = createKoordinationController;
+

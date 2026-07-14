@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 type Row = {
   row_number: number;
   selected: boolean;
@@ -35,14 +35,14 @@ function statusInlineClass(value: string) {
   return "status-inline-new-blue";
 }
 function schulNrInlineClass(row: Row) {
-  return isEmptyPreviousFieldValue(row, "schul_nr") ? "status-inline-new-blue" : "status-inline-new-red";
+  return isEmptyPreviousFieldValue(row, "anmeldeschule_snr") ? "status-inline-new-blue" : "status-inline-new-red";
 }
 function previousSchulNrLabel(row: Row) {
-  return isEmptyPreviousFieldValue(row, "schul_nr") ? "Ohne" : previousFieldValue(row, "schul_nr");
+  return isEmptyPreviousFieldValue(row, "anmeldeschule_snr") ? "Ohne" : previousFieldValue(row, "anmeldeschule_snr");
 }
 function fieldTitle(row: Row, field: string) {
   if (!hasFieldChanged(row, field)) return "";
-  const previousValue = field === "schul_nr" ? previousSchulNrLabel(row) : previousFieldValue(row, field);
+  const previousValue = field === "anmeldeschule_snr" ? previousSchulNrLabel(row) : previousFieldValue(row, field);
   const nextValue = fieldValue(row, field);
   return `Vorher: ${previousValue} | Neu: ${nextValue}`;
 }
@@ -52,18 +52,18 @@ function fieldTitle(row: Row, field: string) {
     <div class="validation-toolbar"><button class="validation-toggle-button" type="button" :disabled="busy" @click="$emit('toggle-all')">Auswahl umschalten</button></div>
     <div class="table-wrap">
       <table class="wizard-table">
-        <thead><tr><th>Import</th><th>Zeile</th><th>ID</th><th>schul_nr</th><th>Anmeldestatus</th><th>Vorname</th><th>Nachname</th><th>Strasse</th><th>PLZ</th><th>Ort</th><th>Status</th><th>Hinweise</th></tr></thead>
+        <thead><tr><th>Import</th><th>Zeile</th><th>ID</th><th>anmeldeschule_snr</th><th>Anmeldestatus</th><th>Vorname</th><th>Nachname</th><th>Strasse</th><th>PLZ</th><th>Ort</th><th>Status</th><th>Hinweise</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="row.row_number" :class="`status-${row.status}`">
             <td><input :checked="row.selected" type="checkbox" :disabled="busy || row.status === 'fehler'" @change="$emit('toggle-row', row.row_number, ($event.target as HTMLInputElement).checked)" /></td>
             <td>{{ row.row_number }}</td>
             <td>{{ fieldValue(row, 'schueler_id') }}</td>
-            <td :title="fieldTitle(row, 'schul_nr')">
-              <template v-if="hasFieldChanged(row, 'schul_nr')">
+            <td :title="fieldTitle(row, 'anmeldeschule_snr')">
+              <template v-if="hasFieldChanged(row, 'anmeldeschule_snr')">
                 <span>{{ previousSchulNrLabel(row) }} -> </span>
-                <span class="status-inline-new" :class="schulNrInlineClass(row)">{{ fieldValue(row, 'schul_nr') }}</span>
+                <span class="status-inline-new" :class="schulNrInlineClass(row)">{{ fieldValue(row, 'anmeldeschule_snr') }}</span>
               </template>
-              <template v-else>{{ fieldValue(row, 'schul_nr') }}</template>
+              <template v-else>{{ fieldValue(row, 'anmeldeschule_snr') }}</template>
             </td>
             <td :title="fieldTitle(row, 'anmeldestatus')">
               <template v-if="hasFieldChanged(row, 'anmeldestatus')">

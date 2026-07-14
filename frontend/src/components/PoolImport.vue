@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import CsvImportOverlay from "./CsvImportOverlay.vue";
@@ -15,8 +15,8 @@ type PoolSchuelerRow = {
   foerder_label?: string | null;
   zieldifferent: string;
   ef: string;
-  quell_snr: string;
-  quell_schueler_nr?: string;
+  herkunftsschule_snr: string;
+  herkunftsschueler_nr?: string;
   herkunft?: string;
   abgleich_status: string;
   anmeldestatus: string;
@@ -38,7 +38,7 @@ type PoolSortKey =
   | "foerderbedarf"
   | "zieldifferent"
   | "ef"
-  | "quell_snr"
+  | "herkunftsschule_snr"
   | "herkunft"
   | "abgleich_status"
   | "anmeldestatus"
@@ -71,7 +71,7 @@ const duplicateConflicts = ref<Array<{
   schueler_id: string;
   nachname: string;
   vorname: string;
-  schul_nr: string;
+  anmeldeschule_snr: string;
   schulname: string;
 }>>([]);
 const showSchildDiagnosticsOverlay = ref(false);
@@ -151,7 +151,7 @@ const filteredPoolSchuelerRows = computed(() => {
   return poolSchuelerRows.value.filter((row) => {
     const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
     const schoolId = normalizeText(row.schueler_schul_id).toLowerCase();
-    const sourceSchoolNo = normalizeText(row.quell_snr).toLowerCase();
+    const sourceSchoolNo = normalizeText(row.herkunftsschule_snr).toLowerCase();
     const schoolName = normalizeText(row.schule).toLowerCase();
     if (
       searchText
@@ -333,14 +333,14 @@ function foerderbedarfHoverText(row: PoolSchuelerRow) {
 }
 
 function sourceDisplayText(row: PoolSchuelerRow, maxSchoolLength = 15) {
-  const sourceNo = normalizeText(row.quell_snr);
+  const sourceNo = normalizeText(row.herkunftsschule_snr);
   const schoolName = normalizeText(row.schule);
   if (sourceNo && schoolName) return `${sourceNo} / ${truncateText(schoolName, maxSchoolLength)}`;
   return sourceNo || truncateText(schoolName, maxSchoolLength) || "-";
 }
 
 function sourceDisplayTitle(row: PoolSchuelerRow) {
-  const sourceNo = normalizeText(row.quell_snr);
+  const sourceNo = normalizeText(row.herkunftsschule_snr);
   const schoolName = normalizeText(row.schule);
   if (sourceNo && schoolName) return `${sourceNo} / ${schoolName}`;
   return sourceNo || schoolName || "-";
@@ -452,15 +452,15 @@ function applyEditPoolRow(row: PoolSchuelerRow) {
   editPoolForm.value = {
     id: row.schueler_id,
     schueler_id: row.schueler_schul_id,
-    quell_schueler_nr: row.quell_schueler_nr || row.schueler_schul_id,
+    herkunftsschueler_nr: row.herkunftsschueler_nr || row.schueler_schul_id,
     vorname: row.vorname || "",
     nachname: row.nachname || "",
     geburtsdatum: row.geburtsdatum || "",
     foerderbedarf: isPositiveFlag(row.foerderbedarf) ? "1" : "0",
     zieldifferent: isPositiveFlag(row.zieldifferent) ? "1" : "0",
     ef: isPositiveFlag(row.ef) ? "1" : "0",
-    quell_snr: row.quell_snr || "",
-    schul_nr: row.schulnummer || "",
+    herkunftsschule_snr: row.herkunftsschule_snr || "",
+    anmeldeschule_snr: row.schulnummer || "",
     herkunft: row.herkunft || "",
     abgleich_status: row.abgleich_status || "",
     anmeldestatus: row.anmeldestatus || "",
@@ -728,7 +728,7 @@ onUnmounted(() => {
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('foerderbedarf')">LE{{ poolSortMarker('foerderbedarf') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('zieldifferent')">ZD{{ poolSortMarker('zieldifferent') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('ef')">EF{{ poolSortMarker('ef') }}</button></th>
-              <th v-if="!isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('quell_snr')">Quell-SNR / Schule{{ poolSortMarker('quell_snr') }}</button></th>
+              <th v-if="!isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('herkunftsschule_snr')">Quell-SNR / Schule{{ poolSortMarker('herkunftsschule_snr') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('herkunft')">Herkunft{{ poolSortMarker('herkunft') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('abgleich_status')">Abgleichstatus{{ poolSortMarker('abgleich_status') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('anmeldestatus')">Anmeldestatus{{ poolSortMarker('anmeldestatus') }}</button></th>
@@ -898,7 +898,7 @@ onUnmounted(() => {
           </label>
           <label>
             <span>Quell-Schueler-Nr</span>
-            <input v-model="editPoolForm.quell_schueler_nr" type="text" />
+            <input v-model="editPoolForm.herkunftsschueler_nr" type="text" />
           </label>
           <label>
             <span>Vorname</span>
@@ -914,11 +914,11 @@ onUnmounted(() => {
           </label>
           <label>
             <span>Quell-SNR</span>
-            <input v-model="editPoolForm.quell_snr" type="text" />
+            <input v-model="editPoolForm.herkunftsschule_snr" type="text" />
           </label>
           <label>
             <span>Schul-Nr</span>
-            <input v-model="editPoolForm.schul_nr" type="text" />
+            <input v-model="editPoolForm.anmeldeschule_snr" type="text" />
           </label>
           <label>
             <span>Schulname</span>
@@ -1019,7 +1019,7 @@ onUnmounted(() => {
           <strong>{{ [pendingDeletePoolRow?.nachname, pendingDeletePoolRow?.vorname].filter(Boolean).join(", ") || "-" }}</strong>
           <span>
             ID {{ pendingDeletePoolRow?.schueler_schul_id || "-" }}
-            <template v-if="pendingDeletePoolRow?.quell_snr"> | Quell-SNR {{ pendingDeletePoolRow?.quell_snr }}</template>
+            <template v-if="pendingDeletePoolRow?.herkunftsschule_snr"> | Quell-SNR {{ pendingDeletePoolRow?.herkunftsschule_snr }}</template>
           </span>
         </div>
 
@@ -1051,10 +1051,10 @@ onUnmounted(() => {
           <div class="pool-import-updates-list">
             <div
               v-for="(entry, index) in duplicateConflicts"
-              :key="`${entry.schueler_id}-${entry.schul_nr}-${entry.nachname}-${entry.vorname}`"
+              :key="`${entry.schueler_id}-${entry.anmeldeschule_snr}-${entry.nachname}-${entry.vorname}`"
               class="pool-import-updates-item"
             >
-              {{ index + 1 }}. {{ entry.schueler_id }} | {{ entry.nachname }} | {{ entry.vorname }} | {{ entry.schul_nr }} | {{ entry.schulname || "-" }}
+              {{ index + 1 }}. {{ entry.schueler_id }} | {{ entry.nachname }} | {{ entry.vorname }} | {{ entry.anmeldeschule_snr }} | {{ entry.schulname || "-" }}
             </div>
           </div>
         </div>

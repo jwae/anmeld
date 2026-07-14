@@ -1,4 +1,4 @@
-const tableColumnCache = new Map();
+﻿const tableColumnCache = new Map();
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -153,7 +153,7 @@ async function updateAbgleichSchuelerRow(pool, rowId, payload) {
   add("herkunft", normalizeText(payload?.herkunft) || null);
   add("abgleich_status", normalizeText(payload?.abgleich_status) || null);
   add("anmeldestatus", normalizeText(payload?.anmeldestatus) || null);
-  add("schul_nr", normalizeText(payload?.schulnummer || payload?.schul_nr) || null);
+  add("anmeldeschule_snr", normalizeText(payload?.schulnummer || payload?.anmeldeschule_snr) || null);
   add("strasse", normalizeText(payload?.strasse) || null);
   add("plz", normalizeText(payload?.plz) || null);
   add("ort", normalizeText(payload?.ort) || null);
@@ -181,6 +181,20 @@ function createAddressLabel(row) {
     normalizeText(row?.strasse),
     [normalizeText(row?.plz), normalizeText(row?.ort)].filter(Boolean).join(" "),
   ].filter(Boolean).join(", ");
+}
+
+function buildAssignedSchoolExpr(alias, columns) {
+  const assignedColumn = columns.has("zugewiesene_schule_snr")
+    ? `NULLIF(TRIM(${alias}.zugewiesene_schule_snr), '')`
+    : "NULL";
+  const manualFallbackColumn = columns.has("koordinierte_snr")
+    ? `NULLIF(TRIM(${alias}.koordinierte_snr), '')`
+    : "NULL";
+  const registrationColumn = columns.has("anmeldeschule_snr")
+    ? `NULLIF(TRIM(${alias}.anmeldeschule_snr), '')`
+    : (columns.has("snr") ? `NULLIF(TRIM(${alias}.snr), '')` : "NULL");
+
+  return `COALESCE(${assignedColumn}, ${manualFallbackColumn}, ${registrationColumn})`;
 }
 
 function buildOrsSearchParams(row) {
@@ -500,9 +514,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     ? await loadTableColumns(pool, "anm_kat_foerderbedarf")
     : new Set();
 
-  const schoolColumn = columns.has("schul_nr")
-    ? "s.schul_nr"
-    : (columns.has("snr") ? "s.snr" : "''");
+  const schoolColumn = buildAssignedSchoolExpr("s", columns);
   const studentIdColumn = columns.has("schueler_id")
     ? "s.schueler_id"
     : (columns.has("schueler_nr") ? "s.schueler_nr" : "''");
@@ -543,7 +555,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ${foerderLabelExpr} AS foerder_label,
       COALESCE(s.zieldifferent, 0) AS zieldifferent,
       COALESCE(s.herkunft, '') AS herkunft,
-      ${columns.has("quell_snr") ? "NULLIF(TRIM(s.quell_snr), '')" : "''"} AS quell_snr,
+      ${columns.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "''"} AS herkunftsschule_snr,
       COALESCE(src.name, '') AS quell_schule,
       COALESCE(sch.name, sref.name, '') AS schule,
       COALESCE(sch.ort, sref.ort, sref.city, '') AS ort,
@@ -556,7 +568,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ${columns.has("bemerkung") ? "COALESCE(s.bemerkung, '')" : "''"} AS bemerkung
     FROM anm_schueler s
     LEFT JOIN anm_schulen src
-      ON src.snr = ${columns.has("quell_snr") ? "NULLIF(TRIM(s.quell_snr), '')" : "NULL"}
+      ON src.snr = ${columns.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "NULL"}
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
     LEFT JOIN school sref
@@ -578,7 +590,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     foerder_label: normalizeText(row?.foerder_label),
     zieldifferent: normalizeText(row?.zieldifferent),
     herkunft: normalizeText(row?.herkunft),
-    quell_snr: normalizeText(row?.quell_snr),
+    herkunftsschule_snr: normalizeText(row?.herkunftsschule_snr),
     quell_schule: normalizeText(row?.quell_schule),
     schule: normalizeText(row?.schule),
     ort: normalizeText(row?.ort),
@@ -702,9 +714,11 @@ async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
     params.push(rundeId);
   }
 
-  const schoolColumn = columns.has("schul_nr")
-    ? "schul_nr"
-    : (columns.has("snr") ? "snr" : "");
+  const schoolColumn = columns.has("zugewiesene_schule_snr")
+    ? "COALESCE(NULLIF(TRIM(zugewiesene_schule_snr), ''), NULLIF(TRIM(anmeldeschule_snr), ''))"
+    : (columns.has("koordinierte_snr")
+      ? "COALESCE(NULLIF(TRIM(koordinierte_snr), ''), NULLIF(TRIM(anmeldeschule_snr), ''))"
+      : (columns.has("anmeldeschule_snr") ? "anmeldeschule_snr" : (columns.has("snr") ? "snr" : "")));
   const anmeldestatusExpr = columns.has("anmeldestatus")
     ? "LOWER(TRIM(COALESCE(anmeldestatus, '')))"
     : "''";
@@ -775,9 +789,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     params.push(rundeId);
   }
 
-  const schoolColumn = columns.has("schul_nr")
-    ? "s.schul_nr"
-    : (columns.has("snr") ? "s.snr" : "''");
+  const schoolColumn = buildAssignedSchoolExpr("s", columns);
   const statusExpr = columns.has("anmeldestatus")
     ? "LOWER(TRIM(COALESCE(s.anmeldestatus, '')))"
     : "''";
@@ -1169,3 +1181,4 @@ function createAbgleichController({ getPool }) {
 }
 
 module.exports = createAbgleichController;
+

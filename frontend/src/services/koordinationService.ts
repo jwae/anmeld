@@ -1,4 +1,4 @@
-import apiClient from "./apiClient";
+﻿import apiClient from "./apiClient";
 
 function buildAuthConfig(token?: string) {
   const trimmedToken = String(token || "").trim();
@@ -73,7 +73,7 @@ export default {
       verfahren_id: number;
       runde_id: number;
       row_ids: number[];
-      schul_nr: string;
+      zugewiesene_schule_snr: string;
     },
     token?: string,
   ) {

@@ -1,4 +1,4 @@
-const anmeldeverfahrenModel = require("../models/anmeldeverfahrenModel");
+﻿const anmeldeverfahrenModel = require("../models/anmeldeverfahrenModel");
 const anmelderundenModel = require("../models/anmelderundenModel");
 
 function normalizeText(value) {
@@ -65,12 +65,15 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
   const studentIdColumn = studentColumns.has("schueler_id")
     ? "s.schueler_id"
     : (studentColumns.has("schueler_nr") ? "s.schueler_nr" : "''");
-  const sourceSchoolColumn = studentColumns.has("quell_snr")
-    ? "s.quell_snr"
+  const sourceSchoolColumn = studentColumns.has("herkunftsschule_snr")
+    ? "s.herkunftsschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
-  const targetSchoolColumn = studentColumns.has("schul_nr")
-    ? "s.schul_nr"
+  const targetSchoolColumn = studentColumns.has("anmeldeschule_snr")
+    ? "s.anmeldeschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
+  const assignedSchoolColumn = studentColumns.has("zugewiesene_schule_snr")
+    ? "s.zugewiesene_schule_snr"
+    : (studentColumns.has("koordinierte_snr") ? "s.koordinierte_snr" : "NULL");
 
   const filters = [];
   const params = [];
@@ -92,9 +95,10 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
       COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
       COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
-      COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS quell_snr,
+      COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS herkunftsschule_snr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS quell_schule_name,
-      COALESCE(NULLIF(TRIM(${targetSchoolColumn}), ''), '') AS schul_nr,
+      COALESCE(NULLIF(TRIM(${targetSchoolColumn}), ''), '') AS anmeldeschule_snr,
+      COALESCE(NULLIF(TRIM(${assignedSchoolColumn}), ''), '') AS zugewiesene_schule_snr,
       COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schul_name,
       COALESCE(NULLIF(TRIM(s.anmeldestatus), ''), '') AS anmeldestatus,
       COALESCE(s.runde_id, 0) AS runde_id,
@@ -105,7 +109,7 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     LEFT JOIN anm_schulen src
       ON src.snr = NULLIF(TRIM(${sourceSchoolColumn}), '')
     LEFT JOIN anm_schulen dst
-      ON dst.snr = NULLIF(TRIM(${targetSchoolColumn}), '')
+      ON dst.snr = COALESCE(NULLIF(TRIM(${assignedSchoolColumn}), ''), NULLIF(TRIM(${targetSchoolColumn}), ''))
     WHERE ${filters.join(" AND ")}
     ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(${studentIdColumn}, '') ASC, COALESCE(s.id, 0) ASC
     `,
@@ -123,7 +127,7 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
       nachname: normalizeText(row?.nachname),
       vorname: normalizeText(row?.vorname),
       geburtsdatum: row?.geburtsdatum || "",
-      abgebende_schule_nr: normalizeText(row?.quell_snr),
+      abgebende_schule_nr: normalizeText(row?.herkunftsschule_snr),
       abgebende_schule_name: normalizeText(row?.quell_schule_name),
       round_values: {
         1: { status: "-", schule: "-" },
@@ -136,12 +140,16 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     if (!entry.nachname) entry.nachname = normalizeText(row?.nachname);
     if (!entry.vorname) entry.vorname = normalizeText(row?.vorname);
     if (!entry.geburtsdatum) entry.geburtsdatum = row?.geburtsdatum || "";
-    if (!entry.abgebende_schule_nr) entry.abgebende_schule_nr = normalizeText(row?.quell_snr);
+    if (!entry.abgebende_schule_nr) entry.abgebende_schule_nr = normalizeText(row?.herkunftsschule_snr);
     if (!entry.abgebende_schule_name) entry.abgebende_schule_name = normalizeText(row?.quell_schule_name);
     if (!entry.first_row_id) entry.first_row_id = Number(row?.row_id || 0);
 
     if (currentRoundNumber >= 1 && currentRoundNumber <= 3) {
-      entry.round_values[currentRoundNumber] = buildRoundValues(row?.anmeldestatus, row?.schul_name, row?.schul_nr);
+      entry.round_values[currentRoundNumber] = buildRoundValues(
+        row?.anmeldestatus,
+        row?.schul_name,
+        row?.zugewiesene_schule_snr || row?.anmeldeschule_snr,
+      );
     }
 
     grouped.set(studentKey, entry);
@@ -259,3 +267,4 @@ module.exports = {
   buildSchuelerRundenuebersichtPdfLines,
   sanitizeFileName,
 };
+

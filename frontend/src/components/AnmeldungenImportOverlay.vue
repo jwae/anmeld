@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 import { parseCsvText, readCsvFileText, normalizeMappingKey, type ParsedCsvRow } from "../utils/csv";
@@ -70,7 +70,7 @@ const canProceed = computed(() => {
   if (currentStep.value === 1) return csvRows.value.length > 0;
   if (currentStep.value === 2) return csvRows.value.length > 0;
   if (currentStep.value === 3) {
-    return Boolean(mapping.value.schueler_id && mapping.value.anmeldestatus && (mapping.value.schul_nr || globalSchulNr.value));
+    return Boolean(mapping.value.schueler_id && mapping.value.anmeldestatus && (mapping.value.anmeldeschule_snr || globalSchulNr.value));
   }
   if (currentStep.value === 4) return selectedImportRows.value.length > 0;
   return true;
@@ -159,7 +159,7 @@ function buildAutoMapping(columns: string[]) {
   const byKey = new Map(columns.map((column) => [normalizeMappingKey(column), column]));
   const aliases: Record<string, string[]> = {
     schueler_id: ["schueler_id", "schueler_schul_id", "id"],
-    schul_nr: ["schul_nr", "snr", "schulnummer"],
+    anmeldeschule_snr: ["anmeldeschule_snr", "snr", "schulnummer"],
     anmeldestatus: ["anmeldestatus", "status", "anmeldestatus_code"],
     vorname: ["vorname"],
     nachname: ["nachname", "name"],
@@ -224,7 +224,7 @@ async function runValidation() {
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
-        global_schul_nr: globalSchulNr.value,
+        global_anmeldeschule_snr: globalSchulNr.value,
         csv_columns: csvColumns.value,
         csv_rows: csvRows.value.map((row) => ({
           row_number: row.rowNumber,

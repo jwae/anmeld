@@ -1,4 +1,4 @@
-const anmeldeverfahrenModel = require("../models/anmeldeverfahrenModel");
+﻿const anmeldeverfahrenModel = require("../models/anmeldeverfahrenModel");
 const anmelderundenModel = require("../models/anmelderundenModel");
 
 function normalizeText(value) {
@@ -77,12 +77,15 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
   const studentIdColumn = studentColumns.has("schueler_id")
     ? "s.schueler_id"
     : (studentColumns.has("schueler_nr") ? "s.schueler_nr" : "''");
-  const sourceSchoolColumn = studentColumns.has("quell_snr")
-    ? "s.quell_snr"
+  const sourceSchoolColumn = studentColumns.has("herkunftsschule_snr")
+    ? "s.herkunftsschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
-  const targetSchoolColumn = studentColumns.has("schul_nr")
-    ? "s.schul_nr"
+  const targetSchoolColumn = studentColumns.has("anmeldeschule_snr")
+    ? "s.anmeldeschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
+  const assignedSchoolColumn = studentColumns.has("zugewiesene_schule_snr")
+    ? "s.zugewiesene_schule_snr"
+    : (studentColumns.has("koordinierte_snr") ? "s.koordinierte_snr" : "NULL");
   const noteColumn = studentColumns.has("bemerkung")
     ? "COALESCE(NULLIF(TRIM(s.bemerkung), ''), '')"
     : "''";
@@ -97,14 +100,14 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
       COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS abgebende_schule_nr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS abgebende_schule_name,
       COALESCE(NULLIF(TRIM(s.anmeldestatus), ''), '') AS anmeldestatus,
-      COALESCE(NULLIF(TRIM(${targetSchoolColumn}), ''), '') AS schule_nr,
+      COALESCE(NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), ''), '') AS schule_nr,
       COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schule_name,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
     LEFT JOIN anm_schulen src
       ON src.snr = NULLIF(TRIM(${sourceSchoolColumn}), '')
     LEFT JOIN anm_schulen dst
-      ON dst.snr = NULLIF(TRIM(${targetSchoolColumn}), '')
+      ON dst.snr = NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), '')
     WHERE s.verfahren_id = ?
       AND s.runde_id = ?
     `,
@@ -220,3 +223,4 @@ module.exports = {
   buildOffeneAnmeldungenPdfLines,
   sanitizeFileName,
 };
+

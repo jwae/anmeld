@@ -421,8 +421,13 @@ function openDeleteProcedureOverlay(item: Anmeldeverfahren) {
   showDeleteProcedureOverlay.value = true;
 }
 
-function closeDeleteProcedureOverlay(force = false) {
-  if (deletingVerfahrenId.value && !force) return;
+function closeDeleteProcedureOverlay() {
+  if (deletingVerfahrenId.value) return;
+  showDeleteProcedureOverlay.value = false;
+  pendingDeleteProcedure.value = null;
+}
+
+function resetDeleteProcedureOverlay() {
   showDeleteProcedureOverlay.value = false;
   pendingDeleteProcedure.value = null;
 }
@@ -435,7 +440,7 @@ async function confirmDeleteVerfahren() {
   deletingVerfahrenId.value = item.id;
   try {
     const response = await anmeldeverfahrenService.remove(item.id, props.token);
-    closeDeleteProcedureOverlay(true);
+    resetDeleteProcedureOverlay();
     if (deletingSelectedProcedure) {
       resetProcedureSelectionContext();
       await loadVerfahren(null, { allowAutoSelect: false });

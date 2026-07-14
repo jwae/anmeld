@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import abgleichService from "../services/abgleichService";
 import type { Anmeldeverfahrenstyp } from "../types";
@@ -13,7 +13,7 @@ type SchuelerRow = {
   foerder_label?: string | null;
   zieldifferent: number | string;
   herkunft?: string;
-  quell_snr?: string;
+  herkunftsschule_snr?: string;
   quell_schule?: string;
   schule: string;
   schulnummer: string;
@@ -224,14 +224,14 @@ function truncateText(value: string, maxLength = 15) {
 }
 
 function sourceDisplayText(row: SchuelerRow, maxSchoolLength = 15) {
-  const sourceNo = normalizeText(row.quell_snr);
+  const sourceNo = normalizeText(row.herkunftsschule_snr);
   const schoolName = normalizeText(row.quell_schule);
   if (sourceNo && schoolName) return `${sourceNo} / ${truncateText(schoolName, maxSchoolLength)}`;
   return sourceNo || truncateText(schoolName, maxSchoolLength) || "-";
 }
 
 function sourceDisplayTitle(row: SchuelerRow) {
-  const sourceNo = normalizeText(row.quell_snr);
+  const sourceNo = normalizeText(row.herkunftsschule_snr);
   const schoolName = normalizeText(row.quell_schule);
   if (sourceNo && schoolName) return `${sourceNo} / ${schoolName}`;
   return sourceNo || schoolName || "-";
