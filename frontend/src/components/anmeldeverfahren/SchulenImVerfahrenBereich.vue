@@ -293,7 +293,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
     <section v-if="verfahrenstyp === 'SEK1'" class="anm-card anm-schools-card">
       <div class="anm-card-head">
         <div>
-          <p class="anm-roadmap-eyebrow">Schritt 1</p>
+          
           <h3 class="anm-section-heading">
             <button
               type="button"
@@ -309,7 +309,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Abgebende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe fuer das Verfahren aus.</p>
+          <p>Waehle eine Schulgruppe mit abgebenden Schulen im Verfahren aus.</p>
         </div>
       </div>
 
@@ -412,7 +412,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
     <section class="anm-card anm-schools-card">
       <div class="anm-card-head">
         <div>
-          <p class="anm-roadmap-eyebrow">Schritt 1a</p>
+          
           <h3 class="anm-section-heading">
             <button
               type="button"
@@ -428,7 +428,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Aufnehmende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe fuer das Verfahren aus.</p>
+          <p>Waehle eine Schulgruppe mit aufnehmenden Schulen im Verfahren aus.</p>
         </div>
       </div>
 

@@ -90,6 +90,7 @@ const editForm = ref<Record<string, string>>({});
 
 const search = ref("");
 const schuleFilter = ref("alle");
+const abgebendeSchuleFilter = ref("alle");
 const anmeldestatusFilter = ref("alle");
 const foerderbedarfFilter = ref("alle");
 const zieldifferentFilter = ref("alle");
@@ -332,6 +333,7 @@ const foerderbedarfOptions = [
 ];
 const anmeldestatusEditOptions = ["Neuaufnahme", "Warteliste", "Zugeordnet", "Abgelehnt", "Ohne"];
 const herkunftOptions = computed(() => uniqueOptions((row) => displayHerkunft(row)));
+const abgebendeSchuleOptions = computed(() => uniqueOptions((row) => sourceDisplayTitle(row)));
 const herkunftEditOptions = computed(() => Array.from(new Set([
   "Pool",
   "Anmeldung",
@@ -353,6 +355,7 @@ const filteredRows = computed(() => {
         if (rowSchule !== schuleFilter.value) return false;
       }
     }
+    if (abgebendeSchuleFilter.value !== "alle" && sourceDisplayTitle(row) !== abgebendeSchuleFilter.value) return false;
     if (
       anmeldestatusFilter.value !== "alle"
       && normalizeStatusFilterValue(row.anmeldestatus) !== normalizeStatusFilterValue(anmeldestatusFilter.value)
@@ -557,12 +560,11 @@ function toggleSchuleFilter(schuleName: string) {
       <div>
         <p class="abgleich-eyebrow">Abgleich</p>
         <h2>Abgleich auf Basis der Schuelerdaten</h2>
-        <p class="abgleich-intro">
-          Die Ansicht arbeitet mit den Schuelereintraegen des aktuellen Verfahrens und der aktuellen Runde und zeigt Zusammenfassung, Schulen und Detaildaten in einer Seite.
-        </p>
+        
       </div>
-      <button class="btn-secondary" type="button" @click="loadData" :disabled="loading">
-        {{ loading ? "Aktualisiere..." : "Aktualisieren" }}
+      <button class="btn-secondary btn-refresh" type="button" @click="loadData" :disabled="loading">
+        <span class="btn-refresh-icon" aria-hidden="true">{{ loading ? "..." : "↻" }}</span>
+        <span>{{ loading ? "Aktualisiere..." : "Aktualisieren" }}</span>
       </button>
     </div>
 
@@ -585,7 +587,7 @@ function toggleSchuleFilter(schuleName: string) {
       <section class="summary-card">
         <div class="section-head">
           <div>
-            <p class="section-eyebrow">1</p>
+            
             <h3>Zusammenfassung</h3>
           </div>
           <span class="summary-context">{{ context.verfahren }} | {{ context.runde }} | Datenquelle: anm_schueler</span>
@@ -602,54 +604,11 @@ function toggleSchuleFilter(schuleName: string) {
         </div>
       </section>
 
-      <section class="filter-card">
-        <label class="filter-field search-field">
-          <span>Schuelername</span>
-          <input v-model="search" type="search" placeholder="Nachname oder Vorname" />
-        </label>
-        <label class="filter-field filter-field-school">
-          <span>Schule</span>
-          <select v-model="schuleFilter">
-            <option value="alle">Alle</option>
-            <option v-for="option in schuleOptions" :key="option" :value="option">{{ option }}</option>
-          </select>
-        </label>
-        <label class="filter-field filter-field-status">
-          <span>Anmeldestatus</span>
-          <select v-model="anmeldestatusFilter">
-            <option value="alle">Alle</option>
-            <option v-for="option in anmeldestatusOptions" :key="option" :value="option">{{ option }}</option>
-          </select>
-        </label>
-        <label class="filter-field filter-field-compact">
-          <span>Foerderbedarf</span>
-          <select v-model="foerderbedarfFilter">
-            <option value="alle">Alle</option>
-            <option v-for="option in foerderbedarfOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-          </select>
-        </label>
-        <label class="filter-field filter-field-compact">
-          <span>Zieldifferent</span>
-          <select v-model="zieldifferentFilter">
-            <option value="alle">Alle</option>
-            <option value="ja">Ja</option>
-            <option value="nein">Nein</option>
-          </select>
-        </label>
-        <label class="filter-field filter-field-compact">
-          <span>Herkunft</span>
-          <select v-model="herkunftFilter">
-            <option value="alle">Alle</option>
-            <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
-          </select>
-        </label>
-      </section>
-
       <section class="table-card">
         <div class="section-head">
           <div>
-            <p class="section-eyebrow">2</p>
-            <h3>Uebersicht Anmeldungen</h3>
+            
+            <h3>Schulen mit Anmeldungen</h3>
           </div>
           <span class="table-count">{{ schoolOverview.length }} Schulen | Datenquelle: anm_schueler</span>
         </div>
@@ -716,10 +675,60 @@ function toggleSchuleFilter(schuleName: string) {
         </div>
       </section>
 
+      <section class="filter-card">
+        <label class="filter-field search-field">
+          <span>Schuelername</span>
+          <input v-model="search" type="search" placeholder="Nachname oder Vorname" />
+        </label>
+        <label v-if="isSek1Procedure" class="filter-field filter-field-school">
+          <span>Abgebende Schule</span>
+          <select v-model="abgebendeSchuleFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in abgebendeSchuleOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+        </label>
+        <label class="filter-field filter-field-school">
+          <span>Aufn.-Schule</span>
+          <select v-model="schuleFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in schuleOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+        </label>
+        <label class="filter-field filter-field-status">
+          <span>Anmeldestatus</span>
+          <select v-model="anmeldestatusFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in anmeldestatusOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+        </label>
+        <label class="filter-field filter-field-compact">
+          <span>Foerderbedarf</span>
+          <select v-model="foerderbedarfFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in foerderbedarfOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+          </select>
+        </label>
+        <label class="filter-field filter-field-compact">
+          <span>Zieldifferent</span>
+          <select v-model="zieldifferentFilter">
+            <option value="alle">Alle</option>
+            <option value="ja">Ja</option>
+            <option value="nein">Nein</option>
+          </select>
+        </label>
+        <label class="filter-field filter-field-compact">
+          <span>Herkunft</span>
+          <select v-model="herkunftFilter">
+            <option value="alle">Alle</option>
+            <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+        </label>
+      </section>
+
       <section class="table-card">
         <div class="section-head">
           <div>
-            <p class="section-eyebrow">3</p>
+            
             <h3>Schuelerliste im Anmeldeverfahren</h3>
           </div>
           <div class="section-head-actions">
@@ -1278,6 +1287,54 @@ function toggleSchuleFilter(schuleName: string) {
   border: 0;
   background: #eef4fd;
   color: #17385f;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  border: 1px solid #c9daf1;
+  background: linear-gradient(180deg, #f8fbff 0%, #e7f0fb 100%);
+  color: #1459a8;
+  box-shadow: 0 10px 22px rgba(20, 89, 168, 0.12);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #9cbce3;
+  background: linear-gradient(180deg, #ffffff 0%, #dfeafb 100%);
+  box-shadow: 0 14px 28px rgba(20, 89, 168, 0.16);
+}
+
+.btn-refresh:focus-visible {
+  outline: 3px solid rgba(20, 89, 168, 0.18);
+  outline-offset: 2px;
+}
+
+.btn-refresh:disabled {
+  cursor: wait;
+  opacity: 0.78;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(20, 89, 168, 0.1);
+  font-size: 13px;
+  line-height: 1;
 }
 
 .btn-primary {

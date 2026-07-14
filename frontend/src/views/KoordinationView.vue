@@ -408,7 +408,8 @@ watch(
               {{ students.length }} Eintraege
               <template v-if="selectedSchool">
                 | {{ selectedSchool.name }}
-                <template v-if="distanceMode === 'ors'">| Entfernung per ORS</template>
+                <template v-if="distanceMode === 'ors-foot-walking'">| Entfernung per ORS-Fussweg</template>
+                <template v-else-if="distanceMode === 'ors-driving-car'">| Entfernung per ORS-Strasse</template>
                 <template v-else-if="distanceMode === 'luftlinie'">| Entfernung per Luftlinie</template>
               </template>
             </span>
@@ -524,13 +525,14 @@ watch(
             <h5>Berechnung</h5>
             <p>Fehlende Adressen werden ueber <code>strasse</code>, <code>plz</code> und <code>ort</code> geocodiert.</p>
             <p>Aus dem Treffer werden <code>Latitude</code> und <code>Longitude</code> fuer die Distanzberechnung zur gewaehlten Schule gespeichert.</p>
+            <p>Wenn moeglich, berechnet die Anwendung anschliessend zuerst den Fussweg ueber OpenRouteService. Falls dafuer keine Route geliefert werden kann, wird auf die Strassenroute umgestellt; nur danach wird auf Luftlinie zurueckgefallen.</p>
             <p>Wenn eine Adresse unvollstaendig ist oder kein Treffer gefunden wird, bleibt die Entfernung fuer diesen Datensatz leer.</p>
           </section>
           <section class="koordination-info-card">
             <h5>Dienst</h5>
-            <p>Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
+            <p>Die Anwendung nutzt das Geocoding und Routing von OpenRouteService.</p>
             <p>Openrouteservice (ORS) ist ein frei zugaenglicher, webbasierter Kartendienst, der komplexe Geodaten und Routenberechnungen anbietet. Er basiert auf den frei zugaenglichen Geodaten von OpenStreetMap (OSM) und wird vom HeiGIT (Heidelberg Institute for Geoinformation Technology) entwickelt.</p>
-            <p>Fuer die Nutzung ist ein kostenloser API-Key erforderlich. Die kostenfreie Nutzung ist auf ein taegliches Limit von 2.500 Routing-Anfragen pro Tag beschraenkt. Der API-Key wird im Backend der Anwendung eingetragen.</p>
+            <p>Fuer die Nutzung ist ein kostenloser API-Key erforderlich. Die kostenfreie Nutzung ist auf ein taegliches Limit von 2.500 Routing-Anfragen pro Tag beschraenkt. Der API-Key wird im Backend der Anwendung eingetragen. In der Koordination werden zuerst <code>foot-walking</code> und danach bei Bedarf <code>driving-car</code> verwendet.</p>
             <p>
               <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
                 OpenRouteService Geocoding

@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
           Kapazitäten der aufnehmenden Schulen verwalten
         </h2>
         <p class="kapazitaeten-intro">
-          Verwalte Schulen, Jahrgänge und Kapazitäten für das aktuelle Anmeldeverfahren. Schulen ohne Eintrag werden weiterhin angezeigt.
+          Erfasse die Kapazitäten der aufnehmenden Schulen.
         </p>
       </div>
 

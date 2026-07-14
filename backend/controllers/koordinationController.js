@@ -444,8 +444,8 @@ async function fetchOrsDistancesKm(selectedSchool, students) {
   ];
   const destinations = routableStudents.map((_student, index) => index + 1);
 
-  try {
-    const response = await fetchImpl("https://api.openrouteservice.org/v2/matrix/driving-car", {
+  async function requestDistanceMatrix(profile, mode) {
+    const response = await fetchImpl(`https://api.openrouteservice.org/v2/matrix/${profile}`, {
       method: "POST",
       headers: {
         Authorization: apiKey,
@@ -471,7 +471,17 @@ async function fetchOrsDistancesKm(selectedSchool, students) {
     routableStudents.forEach((student, index) => {
       distances.set(student.row_id, formatDistanceKm(firstRow[index]));
     });
-    return { distances, mode: "ors" };
+    return { distances, mode };
+  }
+
+  try {
+    const walkingResult = await requestDistanceMatrix("foot-walking", "ors-foot-walking");
+    if (walkingResult.mode) return walkingResult;
+
+    const drivingResult = await requestDistanceMatrix("driving-car", "ors-driving-car");
+    if (drivingResult.mode) return drivingResult;
+
+    return { distances: new Map(), mode: "" };
   } catch (_error) {
     return { distances: new Map(), mode: "" };
   }
