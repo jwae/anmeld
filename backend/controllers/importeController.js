@@ -1,6 +1,7 @@
 ﻿const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
+const { assertWritableContext, assertStudentWritable } = require("../lib/anmeldeWriteGuard");
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
@@ -3186,6 +3187,7 @@ async function importAnmeldungenForSchool(connection, payload) {
     error.statusCode = 400;
     throw error;
   }
+  await assertWritableContext(connection, verfahrenId, rundeId);
   if (!snr) {
     const error = new Error("snr ist erforderlich.");
     error.statusCode = 400;
@@ -3494,6 +3496,7 @@ function createImporteController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await assertWritableContext(connection, verfahrenId, rundeId);
         await assertProcedureType(connection, verfahrenId, ["GS", "SEK1"], "Der Pool-Import ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
 
         const validation = getPreview(anmSchuelerImportSessions, req.body?.validation_token);
@@ -3623,6 +3626,7 @@ function createImporteController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await assertWritableContext(connection, verfahrenId, rundeId);
         await assertProcedureType(connection, verfahrenId, ["GS", "SEK1"], "Der CSV-Anmeldungsimport ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
         const validation = getPreview(anmSchuelerAnmeldungenImportSessions, req.body?.validation_token);
         if (!validation) return sendError(res, 409, "Die Validierung ist abgelaufen oder nicht mehr vorhanden.");
@@ -3887,6 +3891,7 @@ function createImporteController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await assertWritableContext(connection, verfahrenId, rundeId);
         await assertProcedureType(connection, verfahrenId, ["GS", "SEK1"], "Der Pool-Import ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
 
         const preview = getPreview(poolPreviewSessions, req.body?.preview_token);
@@ -3940,6 +3945,7 @@ function createImporteController({ getPool }) {
       try {
         const rowId = Number(req.params?.id || 0);
         if (!rowId) return sendError(res, 400, "id ist erforderlich.");
+        await assertStudentWritable(getPool(), rowId);
         await updatePoolSchuelerRow(getPool(), rowId, req.body || {});
         return res.json({ message: "Datensatz wurde gespeichert." });
       } catch (error) {
@@ -3952,6 +3958,7 @@ function createImporteController({ getPool }) {
       try {
         const rowId = Number(req.params?.id || 0);
         if (!rowId) return sendError(res, 400, "id ist erforderlich.");
+        await assertStudentWritable(getPool(), rowId);
         await deletePoolSchuelerRow(getPool(), rowId);
         return res.json({ message: "Datensatz wurde geloescht." });
       } catch (error) {
@@ -3966,9 +3973,9 @@ function createImporteController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
-
         console.log(`[Pool-Schild-Import] Starte Import fuer Verfahren ${verfahrenId}, Runde ${rundeId}`);
         const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
         await assertProcedureType(pool, verfahrenId, ["SEK1"], "Der JG4-Schild-Import ist nur fuer SEK1-Verfahren verfuegbar.");
         const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, "Quellschulen");
         console.log(`[Pool-Schild-Import] ${schoolBySnr.size} Quellschulen fuer das Verfahren gefunden`);
@@ -4519,6 +4526,7 @@ function createImporteController({ getPool }) {
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
 
         const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
         await assertProcedureType(pool, verfahrenId, ["GS", "SEK1"], "Der Schild3-Anmeldungsimport ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
         const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
         const statusByCode = await loadCatalogByCode(pool, "anm_kat_anmeldestatus");
@@ -4717,6 +4725,14 @@ function createImporteController({ getPool }) {
       const pool = getPool();
       const connection = await pool.getConnection();
       try {
+        const [lockedRows] = await connection.query(
+          `SELECT
+             (SELECT COUNT(*) FROM anm_verfahren WHERE status = 'Beendet') AS beendete_verfahren,
+             (SELECT COUNT(*) FROM anm_runde WHERE status = 'Beendet') AS beendete_runden`,
+        );
+        if (Number(lockedRows?.[0]?.beendete_verfahren || 0) > 0 || Number(lockedRows?.[0]?.beendete_runden || 0) > 0) {
+          return sendError(res, 409, "Die globale Testloeschung ist nicht moeglich, solange schreibgeschuetzte Verfahren oder Runden vorhanden sind.");
+        }
         await connection.beginTransaction();
 
         const tableDeletionOrder = [

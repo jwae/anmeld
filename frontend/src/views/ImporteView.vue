@@ -15,6 +15,7 @@ const props = defineProps<{
     verfahren: string;
     runde: string;
   };
+  isReadonly?: boolean;
 }>();
 
 const loading = ref(false);
@@ -23,6 +24,7 @@ const successMessage = ref("");
 const refreshVersion = ref(0);
 
 async function handleDeleteAll() {
+  if (props.isReadonly) return;
   const firstConfirm = confirm("Moechten Sie wirklich alle Schuelerdaten aus der Tabelle 'anm_schueler' loeschen?");
   if (!firstConfirm) return;
 
@@ -51,6 +53,7 @@ async function handleDeleteAll() {
       :key="`kapazitaeten-${verfahrenId ?? 'kein-verfahren'}-${refreshVersion}`"
       :token="token"
       :verfahren-id="verfahrenId"
+      :is-readonly="isReadonly"
     />
 
     <PoolImport
@@ -60,6 +63,7 @@ async function handleDeleteAll() {
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
       :verfahrenstyp="verfahrenstyp"
+      :is-readonly="isReadonly"
       title="KiTa Schuelerpool importieren (CSV, EWO-Datei)"
     />
 
@@ -70,6 +74,7 @@ async function handleDeleteAll() {
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
       :verfahrenstyp="verfahrenstyp"
+      :is-readonly="isReadonly"
       title="GS Schuelerpool importieren (CSV, EWO-Datei)"
     />
 
@@ -80,6 +85,7 @@ async function handleDeleteAll() {
       :verfahren-id="verfahrenId"
       :runde-id="rundeId"
       :verfahrenstyp="verfahrenstyp"
+      :is-readonly="isReadonly"
     />
 
     <section class="importe-danger-zone">
@@ -92,7 +98,7 @@ async function handleDeleteAll() {
       <button
         class="btn-danger"
         type="button"
-        :disabled="loading"
+        :disabled="loading || isReadonly"
         @click="handleDeleteAll"
       >
         {{ loading ? "Loesche..." : "Alle Schuelerdaten loeschen" }}

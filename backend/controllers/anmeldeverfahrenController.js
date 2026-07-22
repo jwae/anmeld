@@ -129,6 +129,15 @@ function createAnmeldeverfahrenController({ getPool }) {
         const validationError = validateProcedurePayload(payload, { allowNonPreparedCreate: true });
         if (validationError) return sendError(res, 400, validationError);
 
+        if (existing.status === "In Bearbeitung") {
+          const changedLockedField = payload.schuljahr !== existing.schuljahr
+            || payload.verfahrenstyp !== existing.verfahrenstyp
+            || payload.sichtbar !== existing.sichtbar;
+          if (changedLockedField) {
+            return sendError(res, 409, "Bei aktiven Verfahren kann nur die Bezeichnung geaendert werden.");
+          }
+        }
+
         const row = await model.update(getPool(), id, payload);
         if (!row) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
 
@@ -139,6 +148,27 @@ function createAnmeldeverfahrenController({ getPool }) {
       } catch (error) {
         console.error(error);
         sendError(res, 500, "Anmeldeverfahren konnte nicht aktualisiert werden.");
+      }
+    },
+
+    updateVisibility: async (req, res) => {
+      try {
+        const id = Number(req.params.id || 0);
+        if (!id) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        const existing = await model.findById(getPool(), id);
+        if (!existing) return sendError(res, 404, "Anmeldeverfahren nicht gefunden.");
+        if (!["Vorbereitet", "Beendet"].includes(existing.status)) {
+          return sendError(res, 409, "Die Sichtbarkeit kann nur bei vorbereiteten oder beendeten Verfahren geaendert werden.");
+        }
+        const sichtbar = toBoolean(req.body?.sichtbar, existing.sichtbar);
+        const row = await model.updateVisibility(getPool(), id, sichtbar);
+        res.json({
+          message: sichtbar ? "Verfahren wurde eingeblendet." : "Verfahren wurde ausgeblendet.",
+          row,
+        });
+      } catch (error) {
+        console.error(error);
+        sendError(res, error?.statusCode || 500, error?.message || "Die Sichtbarkeit konnte nicht geaendert werden.");
       }
     },
 

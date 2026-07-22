@@ -303,6 +303,21 @@ async function update(pool, id, payload) {
   return findById(pool, id);
 }
 
+async function updateVisibility(pool, id, sichtbar) {
+  const schema = await loadSchemaConfig(pool);
+  if (!schema.visibleColumn) {
+    const error = new Error("Die Sichtbarkeit wird vom aktuellen Datenbankschema nicht unterstuetzt.");
+    error.statusCode = 409;
+    throw error;
+  }
+  const [result] = await pool.query(
+    `UPDATE anm_verfahren SET ${schema.visibleColumn} = ?, updated_at = NOW() WHERE id = ?`,
+    [sichtbar ? 1 : 0, id],
+  );
+  if (!result.affectedRows) return null;
+  return findById(pool, id);
+}
+
 async function listProcedureSchoolGroups(pool, verfahrenId) {
   const [rows] = await pool.query(
     `SELECT
@@ -483,13 +498,8 @@ async function removeProcedureCompletely(pool, verfahrenId) {
     }
 
     const currentStatus = String(procedureRows[0].status || "").trim();
-    if (currentStatus === ROUND_STATUS_IN_PROGRESS) {
-      const error = new Error("Ein Verfahren in Bearbeitung kann nicht geloescht werden.");
-      error.statusCode = 409;
-      throw error;
-    }
-    if (!["Vorbereitet", "Beendet"].includes(currentStatus)) {
-      const error = new Error("Das Verfahren darf in diesem Status nicht geloescht werden.");
+    if (currentStatus !== "Beendet") {
+      const error = new Error("Nur beendete Verfahren koennen geloescht werden.");
       error.statusCode = 409;
       throw error;
     }
@@ -622,9 +632,18 @@ async function finishProcedure(pool, verfahrenId) {
       error.statusCode = 409;
       throw error;
     }
+    if (currentStatus !== ROUND_STATUS_IN_PROGRESS) {
+      const error = new Error("Nur ein Verfahren in Bearbeitung kann beendet werden.");
+      error.statusCode = 409;
+      throw error;
+    }
 
     await connection.query(
       "UPDATE anm_verfahren SET status = 'Beendet', updated_at = NOW() WHERE id = ?",
+      [verfahrenId],
+    );
+    await connection.query(
+      "UPDATE anm_runde SET status = 'Beendet', updated_at = NOW() WHERE verfahren_id = ? AND status = 'In Bearbeitung'",
       [verfahrenId],
     );
 
@@ -651,6 +670,7 @@ module.exports = {
   create,
   hasDuplicateSchoolYear,
   update,
+  updateVisibility,
   listProcedureSchoolGroups,
   syncProcedureSchoolGroupsByRole,
   countBlockingDependencies,

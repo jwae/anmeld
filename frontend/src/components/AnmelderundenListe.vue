@@ -148,7 +148,7 @@ const selectedRound = computed<Anmelderunde | null>(
                 <button
                   class="btn-secondary anm-icon-btn anm-danger-btn"
                   type="button"
-                  :disabled="deletingId === item.id || procedureLocked || item.ist_arbeitsrunde || item.status === 'Beendet'"
+                  :disabled="deletingId === item.id || procedureLocked || item.status !== 'Vorbereitet'"
                   title="Loeschen"
                   aria-label="Loeschen"
                   @click.stop="emit('delete', item)"

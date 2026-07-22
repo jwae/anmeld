@@ -59,6 +59,7 @@ export default {
     fallId: number,
     payload: {
       verfahren_id: number;
+      runde_id: number;
       fallstatus_id: number;
       bemerkung: string;
     },

@@ -21,13 +21,13 @@ const emit = defineEmits<{
 }>();
 
 function canDeleteProcedure(item: Anmeldeverfahren) {
-  return item.status === "Vorbereitet" || item.status === "Beendet";
+  return item.status === "Beendet";
 }
 
 function getDeleteTitle(item: Anmeldeverfahren) {
   return canDeleteProcedure(item)
     ? "Verfahren loeschen"
-    : "Ein Verfahren in Bearbeitung kann nicht geloescht werden.";
+    : "Nur beendete Verfahren koennen geloescht werden.";
 }
 
 function formatTimestamp(value: string) {
@@ -77,7 +77,7 @@ function formatTimestamp(value: string) {
           <tr
             v-for="item in items"
             :key="item.id"
-            :class="{ 'is-selected': item.id === selectedId }"
+            :class="{ 'is-selected': item.id === selectedId, 'is-hidden': !item.sichtbar }"
             @click="emit('select', item.id)"
           >
             <td class="anm-cell-primary">{{ item.schuljahr }}</td>
@@ -86,7 +86,7 @@ function formatTimestamp(value: string) {
             </td>
             <td class="anm-cell-primary">{{ item.verfahrenstyp }}</td>
             <td><span class="anm-status-pill" :data-status="item.status">{{ item.status }}</span></td>
-            <td>{{ item.sichtbar ? "Ja" : "Nein" }}</td>
+            <td><span v-if="!item.sichtbar" class="anm-hidden-pill">Ausgeblendet</span><span v-else>Ja</span></td>
             <td>{{ item.arbeitsrunde_nummer ? `Runde ${item.arbeitsrunde_nummer}` : "-" }}</td>
             <td class="anm-cell-muted">{{ formatTimestamp(item.updated_at) }}</td>
             <td class="anm-cell-actions">
@@ -323,6 +323,20 @@ function formatTimestamp(value: string) {
 .anm-status-pill[data-status="Beendet"] {
   background: #eef1f4;
   color: #5b6775;
+}
+
+.anm-hidden-pill {
+  display: inline-flex;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #7a5510;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.anm-table tbody tr.is-hidden:not(.is-selected) {
+  opacity: 0.72;
 }
 
 .anm-actions {

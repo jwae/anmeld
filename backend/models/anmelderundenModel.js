@@ -236,10 +236,22 @@ async function setWorkingRound(pool, roundId) {
       error.statusCode = 409;
       throw error;
     }
+    if (String(round.verfahren_status || "").trim() !== "In Bearbeitung") {
+      const error = new Error("Eine Arbeitsrunde kann nur in einem laufenden Verfahren gesetzt werden.");
+      error.statusCode = 409;
+      throw error;
+    }
     if (!["In Bearbeitung", "Beendet"].includes(String(round.status || "").trim())) {
       const error = new Error("Nur Runden im Status 'In Bearbeitung' oder 'Beendet' koennen als Arbeitsrunde gesetzt werden.");
       error.statusCode = 409;
       throw error;
+    }
+
+    if (String(round.status || "").trim() === "Beendet") {
+      await connection.query(
+        "UPDATE anm_runde SET status = 'In Bearbeitung', updated_at = NOW() WHERE id = ?",
+        [round.id],
+      );
     }
 
     await verfahrenModel.setWorkingRound(connection, Number(round.verfahren_id), Number(round.id), schema);
@@ -289,7 +301,12 @@ async function startRound(pool, targetRoundId) {
        FOR UPDATE`,
       [targetRound.verfahren_id],
     );
-    const currentRound = (roundRows || []).find((row) => String(row.status || "").trim() === "In Bearbeitung");
+    const currentWorkingRoundId = await verfahrenModel.findWorkingRoundId(
+      connection,
+      Number(targetRound.verfahren_id),
+      schema,
+    );
+    const currentRound = (roundRows || []).find((row) => Number(row.id) === Number(currentWorkingRoundId));
     if (!currentRound) {
       const error = new Error("Es gibt keine aktuelle Runde in Bearbeitung.");
       error.statusCode = 409;

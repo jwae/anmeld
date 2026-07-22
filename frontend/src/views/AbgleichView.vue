@@ -67,6 +67,7 @@ const props = defineProps<{
     verfahren: string;
     runde: string;
   };
+  isReadonly?: boolean;
 }>();
 
 const loading = ref(false);
@@ -259,6 +260,7 @@ function caseIconTitle(row: SchuelerRow) {
 }
 
 function openEditDialog(row: SchuelerRow) {
+  if (props.isReadonly) return;
   selectedEditRow.value = row;
   editForm.value = {
     schueler_schul_id: normalizeText(row.schueler_schul_id),
@@ -290,6 +292,7 @@ function closeEditDialog(force: boolean | Event = false) {
 }
 
 async function saveEditDialog() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId || !selectedEditRow.value) return;
 
   try {
@@ -476,6 +479,7 @@ function resetCaseDialog() {
 }
 
 function openCaseDialog(row: SchuelerRow) {
+  if (props.isReadonly) return;
   selectedCaseRow.value = row;
   caseFallgrundId.value = Number(fallgrundOptions.value[0]?.id || 0);
   caseBemerkung.value = "";
@@ -485,6 +489,7 @@ function openCaseDialog(row: SchuelerRow) {
 }
 
 async function submitOpenCase() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId || !selectedCaseRow.value) return;
   if (!Number(caseFallgrundId.value || 0)) {
     errorMessage.value = "Bitte einen Fallgrund auswaehlen.";
@@ -513,6 +518,7 @@ async function submitOpenCase() {
 }
 
 async function handleUpdateGeocoding() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId) {
     errorMessage.value = "Bitte zuerst ein Verfahren und eine Runde auswaehlen.";
     return;
@@ -736,7 +742,7 @@ function toggleSchuleFilter(schuleName: string) {
             <button
               class="btn-secondary"
               type="button"
-              :disabled="loading || geocoding || !verfahrenId || !rundeId"
+              :disabled="isReadonly || loading || geocoding || !verfahrenId || !rundeId"
               @click="handleUpdateGeocoding"
             >
               {{ geocoding ? "Entfernungen werden aktualisiert..." : "Entfernungen aktualisieren" }}
@@ -779,6 +785,7 @@ function toggleSchuleFilter(schuleName: string) {
                     class="case-icon-btn case-icon-btn-edit"
                     title="Schuelerdatensatz bearbeiten"
                     aria-label="Schuelerdatensatz bearbeiten"
+                    :disabled="isReadonly"
                     @click="openEditDialog(row)"
                   >
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
@@ -790,6 +797,7 @@ function toggleSchuleFilter(schuleName: string) {
                     :class="caseIconButtonClass(row)"
                     :title="caseIconTitle(row)"
                     :aria-label="caseIconTitle(row)"
+                    :disabled="isReadonly"
                     @click="openCaseDialog(row)"
                   >
                     <i class="bi bi-chat-square-text" aria-hidden="true"></i>
@@ -877,7 +885,7 @@ function toggleSchuleFilter(schuleName: string) {
 
           <div class="case-dialog-actions">
             <button type="button" class="btn-secondary" @click="resetCaseDialog">Abbrechen</button>
-            <button type="button" class="btn-primary" :disabled="caseDialogSaving" @click="submitOpenCase">
+            <button type="button" class="btn-primary" :disabled="caseDialogSaving || isReadonly" @click="submitOpenCase">
               {{ caseDialogSaving ? "Speichere..." : "Fall anlegen" }}
             </button>
           </div>
@@ -976,7 +984,7 @@ function toggleSchuleFilter(schuleName: string) {
 
           <div class="case-dialog-actions">
             <button type="button" class="btn-secondary" :disabled="editDialogSaving" @click="closeEditDialog">Abbrechen</button>
-            <button type="button" class="btn-primary" :disabled="editDialogSaving" @click="saveEditDialog">
+            <button type="button" class="btn-primary" :disabled="editDialogSaving || isReadonly" @click="saveEditDialog">
               {{ editDialogSaving ? "Speichere..." : "Speichern" }}
             </button>
           </div>

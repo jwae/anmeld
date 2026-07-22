@@ -75,6 +75,15 @@ export const anmeldeverfahrenService = {
     return resp.data;
   },
 
+  async updateVisibility(id: number, sichtbar: boolean, token?: string) {
+    const resp = await apiClient.patch<{ row: Anmeldeverfahren; message: string }>(
+      `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/sichtbarkeit`,
+      { sichtbar },
+      buildAuthConfig(token),
+    );
+    return resp.data;
+  },
+
   async start(id: number, token?: string) {
     const resp = await apiClient.post<{ row: Anmeldeverfahren; message: string }>(
       `/api/anmeldeverfahren/${encodeURIComponent(String(id))}/start`,

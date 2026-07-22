@@ -43,6 +43,7 @@ const props = defineProps<{
     verfahren: string;
     runde: string;
   };
+  isReadonly?: boolean;
 }>();
 
 const loading = ref(false);
@@ -236,6 +237,7 @@ async function loadData() {
 }
 
 async function saveRow(row: OpenCaseRow) {
+  if (props.isReadonly) return;
   if (!props.verfahrenId) return;
   const state = currentEditState(row.fall_id);
   if (!Number(state.fallstatus_id || 0)) {
@@ -251,6 +253,7 @@ async function saveRow(row: OpenCaseRow) {
       row.fall_id,
       {
         verfahren_id: props.verfahrenId,
+        runde_id: row.runde_id,
         fallstatus_id: Number(state.fallstatus_id || 0),
         bemerkung: state.bemerkung || "",
       },
@@ -403,7 +406,7 @@ watch(
                     <section class="open-case-detail-card open-case-editor">
                       <label>
                         <span>Status</span>
-                        <select v-model="currentEditState(row.fall_id).fallstatus_id">
+                        <select v-model="currentEditState(row.fall_id).fallstatus_id" :disabled="isReadonly">
                           <option v-for="option in fallstatusCatalog" :key="option.id" :value="option.id">{{ option.bezeichnung }}</option>
                         </select>
                       </label>
@@ -413,13 +416,14 @@ watch(
                           v-model="currentEditState(row.fall_id).bemerkung"
                           rows="5"
                           placeholder="Bearbeitungsnotiz oder Klaerung eintragen"
+                          :disabled="isReadonly"
                         />
                       </label>
                       <div class="open-case-editor-actions">
                         <button
                           type="button"
                           class="btn-secondary"
-                          :disabled="savingById[row.fall_id] || !hasChanges(row)"
+                          :disabled="isReadonly || savingById[row.fall_id] || !hasChanges(row)"
                           @click="saveRow(row)"
                         >
                           {{ savingById[row.fall_id] ? "Speichere..." : "Speichern" }}

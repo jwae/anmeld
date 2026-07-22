@@ -7,6 +7,7 @@ import kapazitaetService from '../services/kapazitaetService';
 const props = defineProps<{
   verfahrenId: number | null;
   token?: string;
+  isReadonly?: boolean;
 }>();
 
 const schools = ref<any[]>([]);
@@ -126,6 +127,7 @@ function showImportSuccessOverlay(message: string) {
 }
 
 function openKapazitaetenImportPicker() {
+  if (props.isReadonly) return;
   kapazitaetenImportInput.value?.click();
 }
 
@@ -194,6 +196,7 @@ async function handleKapazitaetenImportFileSelected(event: Event) {
 }
 
 async function confirmKapazitaetenImport() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId) {
     errorMessage.value = 'Bitte zuerst ein Anmeldeverfahren auswaehlen.';
     return;
@@ -229,6 +232,7 @@ async function confirmKapazitaetenImport() {
 }
 
 function openAddForm(row?: any) {
+  if (props.isReadonly) return;
   currentKapazitaet.value = {
     id: null,
     verfahren_id: props.verfahrenId,
@@ -244,6 +248,7 @@ function openAddForm(row?: any) {
 }
 
 function openEditForm(row: any) {
+  if (props.isReadonly) return;
   currentKapazitaet.value = {
     ...row,
     verfahren_id: props.verfahrenId,
@@ -257,6 +262,7 @@ function closeForm() {
 }
 
 async function saveKapazitaet(data: any) {
+  if (props.isReadonly) return;
   try {
     if (!props.verfahrenId) {
       errorMessage.value = 'Bitte zuerst ein Anmeldeverfahren auswählen.';
@@ -279,6 +285,7 @@ async function saveKapazitaet(data: any) {
 }
 
 async function deleteKapazitaet(id: number) {
+  if (props.isReadonly) return;
   if (!window.confirm('Soll diese Kapazität wirklich gelöscht werden?')) {
     return;
   }
@@ -365,6 +372,7 @@ onBeforeUnmount(() => {
         :rows="mergedRows"
         :loading="loading"
         :verfahren-id="verfahrenId"
+        :is-readonly="isReadonly"
         @add="openAddForm"
         @edit="openEditForm"
         @delete="deleteKapazitaet"

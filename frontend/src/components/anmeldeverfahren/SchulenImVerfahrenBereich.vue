@@ -12,6 +12,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId?: number | null;
   verfahrenstyp?: Anmeldeverfahrenstyp | null;
+  isReadonly?: boolean;
 }>();
 
 type BeteiligteSchulenSortKey = "snr" | "name" | "ort" | "schulform";
@@ -216,6 +217,7 @@ function getBeteiligteSchulenSortIndicator(sortKey: BeteiligteSchulenSortKey) {
 }
 
 async function submitSchulgruppeFuerVerfahren() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId) {
     errorMessage.value = "Bitte zuerst ein Anmeldeverfahren auswaehlen.";
     successMessage.value = "";
@@ -244,6 +246,7 @@ async function submitSchulgruppeFuerVerfahren() {
 }
 
 async function submitAbgebendeSchulgruppeFuerVerfahren() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId) {
     errorMessage.value = "Bitte zuerst ein Anmeldeverfahren auswaehlen.";
     successMessage.value = "";
@@ -330,7 +333,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
           <div class="anm-form-row anm-form-row-with-action">
             <label class="anm-field">
               <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
-              <select v-model="selectedAbgebendeSchulgruppeId" class="anm-select" :disabled="savingBeteiligteSchulen">
+              <select v-model="selectedAbgebendeSchulgruppeId" class="anm-select" :disabled="isReadonly || savingBeteiligteSchulen">
                 <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
@@ -344,7 +347,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             <button
               class="btn-primary anm-inline-submit-btn"
               type="button"
-              :disabled="savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedAbgebendeSchulgruppe"
+              :disabled="isReadonly || savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedAbgebendeSchulgruppe"
               @click="submitAbgebendeSchulgruppeFuerVerfahren"
             >
               {{ savingBeteiligteSchulen ? "Uebernehme..." : "Schulgruppe uebernehmen" }}
@@ -449,7 +452,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
           <div class="anm-form-row anm-form-row-with-action">
             <label class="anm-field">
               <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
-              <select v-model="selectedSchulgruppeId" class="anm-select" :disabled="savingBeteiligteSchulen">
+              <select v-model="selectedSchulgruppeId" class="anm-select" :disabled="isReadonly || savingBeteiligteSchulen">
                 <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
@@ -463,7 +466,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             <button
               class="btn-primary anm-inline-submit-btn"
               type="button"
-              :disabled="savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedSchulgruppe"
+              :disabled="isReadonly || savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedSchulgruppe"
               @click="submitSchulgruppeFuerVerfahren"
             >
               {{ savingBeteiligteSchulen ? "Uebernehme..." : "Schulgruppe uebernehmen" }}

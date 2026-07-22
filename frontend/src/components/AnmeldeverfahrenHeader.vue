@@ -31,6 +31,8 @@ withDefaults(defineProps<{
   activeMenu: CredentialsMenu;
   hasMenuSelectionContext?: boolean;
   hasSelectionAttentionContext?: boolean;
+  verfahrenStatus?: string | null;
+  isReviewMode?: boolean;
   user?: any;
   userLabel?: string;
   connectedHost?: string;
@@ -39,6 +41,8 @@ withDefaults(defineProps<{
 }>(), {
   hasMenuSelectionContext: false,
   hasSelectionAttentionContext: false,
+  verfahrenStatus: null,
+  isReviewMode: false,
   user: null,
   userLabel: "",
   connectedHost: "",

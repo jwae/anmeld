@@ -49,10 +49,8 @@ function areDatesEqual(left, right) {
   return normalizeDate(left) === normalizeDate(right);
 }
 
-function canRenameOnly(existing, payload) {
-  return Number(existing?.runden_nummer || 0) === Number(payload?.runden_nummer || 0)
-    && areDatesEqual(existing?.startdatum, payload?.startdatum)
-    && areDatesEqual(existing?.enddatum, payload?.enddatum);
+function onlyAllowedActiveRoundFieldsChanged(existing, payload) {
+  return Number(existing?.runden_nummer || 0) === Number(payload?.runden_nummer || 0);
 }
 
 function createAnmelderundenController({ getPool }) {
@@ -126,12 +124,11 @@ function createAnmelderundenController({ getPool }) {
         payload.status = existing.status;
         const validationError = validateRoundPayload(payload, { allowAnyStatus: true });
         if (validationError) return sendError(res, 400, validationError);
-        const renameOnlyEdit = canRenameOnly(existing, payload);
-        if (existing.status === "Beendet" && !renameOnlyEdit) {
-          return sendError(res, 409, "Bei beendeten Runden kann nur die Bezeichnung geaendert werden.");
+        if (verfahren.status === "Beendet" || existing.status === "Beendet") {
+          return sendError(res, 409, "Beendete Runden sind schreibgeschuetzt.");
         }
-        if (verfahren.status === "Beendet" && !renameOnlyEdit) {
-          return sendError(res, 409, "Bei beendeten Verfahren kann in Runden nur die Bezeichnung geaendert werden.");
+        if (existing.status === "In Bearbeitung" && !onlyAllowedActiveRoundFieldsChanged(existing, payload)) {
+          return sendError(res, 409, "Bei aktiven Runden koennen nur Bezeichnung und Zeitraum geaendert werden.");
         }
 
         const duplicate = await model.hasDuplicateRoundNumber(
@@ -162,8 +159,8 @@ function createAnmelderundenController({ getPool }) {
 
         const existing = await model.findById(getPool(), id);
         if (!existing) return sendError(res, 404, "Anmelderunde nicht gefunden.");
-        if (existing.status === "Beendet") {
-          return sendError(res, 409, "Beendete Runden sind schreibgeschuetzt und koennen nicht geloescht werden.");
+        if (existing.status !== "Vorbereitet") {
+          return sendError(res, 409, "Nur vorbereitete Runden koennen geloescht werden.");
         }
         if (existing.ist_arbeitsrunde) {
           return sendError(res, 409, "Die aktuelle Arbeitsrunde kann nicht geloescht werden.");

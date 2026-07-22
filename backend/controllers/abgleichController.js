@@ -1,5 +1,7 @@
 ﻿const tableColumnCache = new Map();
 
+const { assertWritableContext } = require("../lib/anmeldeWriteGuard");
+
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
   if (details) payload.details = details;
@@ -974,6 +976,7 @@ function createAbgleichController({ getPool }) {
         if (!fallgrundId) return sendError(res, 400, "fallgrund_id ist erforderlich.");
 
         const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
         const offenerFallColumns = await loadTableColumns(pool, "anm_offener_fall");
         const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
         if (!offenerFallColumns.has("schueler_id")) {
@@ -1057,6 +1060,7 @@ function createAbgleichController({ getPool }) {
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
 
         const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
         const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
         const [rows] = await pool.query(
           `
@@ -1098,6 +1102,7 @@ function createAbgleichController({ getPool }) {
 
         const context = await loadProcedureAndRound(connection, verfahrenId, rundeId);
         if (!context) return sendError(res, 404, "Verfahren oder Runde nicht gefunden.");
+        await assertWritableContext(connection, verfahrenId, rundeId);
 
         const { columns, rows } = await loadStudentsForGeocoding(connection, verfahrenId, rundeId);
         if (!rows.length) {

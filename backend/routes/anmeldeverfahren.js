@@ -13,6 +13,7 @@ function createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool
   router.post("/", controller.create);
   router.post("/:id/start", controller.start);
   router.post("/:id/finish", controller.finish);
+  router.patch("/:id/sichtbarkeit", controller.updateVisibility);
   router.put("/:id/schulgruppen/quellschulen", controller.syncSourceSchoolGroups);
   router.put("/:id/schulgruppen/zielschulen", controller.syncTargetSchoolGroups);
   router.put("/:id", controller.update);

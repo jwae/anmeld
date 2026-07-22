@@ -13,6 +13,7 @@ const emit = defineEmits<{
   (e: "update-selection", payload: {
     verfahrenId: number | null;
     verfahrenstyp: Anmeldeverfahrenstyp | null;
+    verfahrenStatus: AnmeldeStatus | null;
     rundeId: number | null;
     rundeStatus: AnmeldeStatus | null;
   }): void;
@@ -25,6 +26,7 @@ function handleBereichContextUpdate(payload: { verfahren: string; runde: string 
 function handleBereichSelectionUpdate(payload: {
   verfahrenId: number | null;
   verfahrenstyp: Anmeldeverfahrenstyp | null;
+  verfahrenStatus: AnmeldeStatus | null;
   rundeId: number | null;
   rundeStatus: AnmeldeStatus | null;
 }) {

@@ -18,6 +18,7 @@ const props = defineProps<{
   verfahrenId: number | null;
   rundeId: number | null;
   verfahrenstyp?: Anmeldeverfahrenstyp | null;
+  isReadonly?: boolean;
 }>();
 
 const schools = ref<SchoolRow[]>([]);
@@ -77,6 +78,7 @@ async function toggleExpanded() {
 }
 
 function openCsvImportOverlay() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId || importing.value) return;
   errorMessage.value = "";
   successMessage.value = "";
@@ -84,6 +86,7 @@ function openCsvImportOverlay() {
 }
 
 async function importiereAnmeldungenAusSchild3() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId) {
     errorMessage.value = "Bitte zuerst Verfahren und Runde auswaehlen.";
     return;
@@ -171,10 +174,10 @@ onMounted(() => {
         <p>CSV-Datei fuer die aktuelle Runde pruefen, Statuswerte zuordnen und gueltige Anmeldungen in anm_schueler uebernehmen.</p>
       </div>
       <div class="import-head-actions">
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
+        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
           Import (CSV)
         </button>
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
+        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3
         </button>
       </div>

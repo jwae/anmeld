@@ -11,6 +11,8 @@ defineProps<{
     sichtbar: boolean;
   };
   saving?: boolean;
+  mode?: "full" | "limited" | "readonly";
+  visibilityEditable?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -42,7 +44,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
           <input
             :value="modelValue.schuljahr"
             placeholder="2026_27"
-            :disabled="saving"
+            :disabled="saving || mode !== 'full'"
             @input="emit('update:modelValue', { ...modelValue, schuljahr: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
@@ -52,7 +54,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
           <input
             :value="modelValue.bezeichnung"
             placeholder="Anmeldeverfahren 2026/27"
-            :disabled="saving"
+            :disabled="saving || mode === 'readonly'"
             @input="emit('update:modelValue', { ...modelValue, bezeichnung: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
@@ -61,7 +63,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
           <span class="field-label">Verfahrenstyp</span>
           <select
             :value="modelValue.verfahrenstyp"
-            :disabled="saving"
+            :disabled="saving || mode !== 'full'"
             @change="emit('update:modelValue', { ...modelValue, verfahrenstyp: String(($event.target as HTMLSelectElement).value || 'GS') as Anmeldeverfahrenstyp })"
           >
             <option v-for="option in verfahrenstypOptions" :key="option.value" :value="option.value">
@@ -84,7 +86,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
           <input
             type="checkbox"
             :checked="modelValue.sichtbar"
-            :disabled="saving"
+            :disabled="saving || visibilityEditable === false"
             @change="emit('update:modelValue', { ...modelValue, sichtbar: ($event.target as HTMLInputElement).checked })"
           />
           <span>Verfahren sichtbar anzeigen</span>
@@ -92,7 +94,7 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
       </div>
     </details>
 
-    <div class="anm-actions">
+    <div v-if="mode !== 'readonly' || visibilityEditable" class="anm-actions">
       <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">
         Reset
       </button>

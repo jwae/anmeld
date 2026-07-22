@@ -1,5 +1,7 @@
 ﻿const tableColumnCache = new Map();
 
+const { assertWritableContext, loadContext } = require("../lib/anmeldeWriteGuard");
+
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
   if (details) payload.details = details;
@@ -218,7 +220,7 @@ async function loadFallstatusOptions(pool) {
   })).filter((row) => row.id > 0);
 }
 
-async function loadOffeneFaelleRows(pool, verfahrenId) {
+async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
   const offeneFallColumns = await loadTableColumns(pool, "anm_offener_fall");
   const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
   if (!offeneFallColumns.size) return [];
@@ -276,9 +278,10 @@ async function loadOffeneFaelleRows(pool, verfahrenId) {
     LEFT JOIN anm_schulen assign
       ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
+      AND COALESCE(sa.runde_id, s.runde_id, 0) = ?
     ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') ASC
     `,
-    [verfahrenId],
+    [verfahrenId, rundeId],
   );
 
   return (rows || []).map((row) => ({
@@ -787,6 +790,7 @@ function createKoordinationController({ getPool }) {
 
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await loadContext(connection, verfahrenId, rundeId);
 
         const schools = await loadSchoolRows(connection, verfahrenId, rundeId);
         const selectedSchool = selectedSnr
@@ -833,6 +837,8 @@ function createKoordinationController({ getPool }) {
           });
         }
 
+        await assertWritableContext(connection, verfahrenId, rundeId);
+
         const result = await geocodeKoordinationStudents(connection, verfahrenId, rundeId, rowIds);
         return res.json({
           success: true,
@@ -852,10 +858,13 @@ function createKoordinationController({ getPool }) {
     offeneFaelle: async (req, res) => {
       try {
         const verfahrenId = Number(req.query.verfahren_id || 0);
+        const rundeId = Number(req.query.runde_id || 0);
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
 
         const pool = getPool();
-        const rows = await loadOffeneFaelleRows(pool, verfahrenId);
+        await loadContext(pool, verfahrenId, rundeId);
+        const rows = await loadOffeneFaelleRows(pool, verfahrenId, rundeId);
         const fallstatusOptions = await loadFallstatusOptions(pool);
         return res.json({ rows, fallstatusOptions });
       } catch (error) {
@@ -868,14 +877,17 @@ function createKoordinationController({ getPool }) {
       try {
         const fallId = Number(req.params.id || 0);
         const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
         const fallstatusId = Number(req.body?.fallstatus_id || 0);
         const bemerkung = normalizeText(req.body?.bemerkung);
 
         if (!fallId) return sendError(res, 400, "id ist erforderlich.");
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
         if (!fallstatusId) return sendError(res, 400, "fallstatus_id ist erforderlich.");
 
         const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
         const [statusRows] = await pool.query(
           `
           SELECT id, COALESCE(bezeichnung, code) AS bezeichnung
@@ -920,7 +932,7 @@ function createKoordinationController({ getPool }) {
         });
       } catch (error) {
         console.error("offener fall update failed:", error);
-        return sendError(res, 500, "Der offene Fall konnte nicht gespeichert werden.");
+        return sendError(res, error?.statusCode || 500, error?.message || "Der offene Fall konnte nicht gespeichert werden.");
       }
     },
 
@@ -939,6 +951,7 @@ function createKoordinationController({ getPool }) {
 
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await assertWritableContext(getPool(), verfahrenId, rundeId);
         if (!rowIds.length) return sendError(res, 400, "row_ids ist erforderlich.");
         if (!schulNr) return sendError(res, 400, "zugewiesene_schule_snr ist erforderlich.");
 
@@ -1028,7 +1041,7 @@ function createKoordinationController({ getPool }) {
         });
       } catch (error) {
         console.error("koordination assignment failed:", error);
-        return sendError(res, 500, "Die Zuordnung konnte nicht gespeichert werden.");
+        return sendError(res, error?.statusCode || 500, error?.message || "Die Zuordnung konnte nicht gespeichert werden.");
       }
     },
   };

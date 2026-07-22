@@ -3,6 +3,7 @@ const props = defineProps<{
   rows: any[];
   loading: boolean;
   verfahrenId: number | null;
+  isReadonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -33,7 +34,7 @@ function formatAvailableSeats(row: any) {
       <p class="anm-roadmap-eyebrow">Uebersicht</p>
       <div class="kapazitaeten-list-actions">
         <button type="button" class="btn-secondary" @click="emit('refresh')">Aktualisieren</button>
-        <button type="button" class="btn-primary" :disabled="!verfahrenId" @click="emit('import')">Kapazitaeten importieren</button>
+        <button type="button" class="btn-primary" :disabled="!verfahrenId || isReadonly" @click="emit('import')">Kapazitaeten importieren</button>
       </div>
     </div>
     <div class="anm-card-head">
@@ -93,6 +94,7 @@ function formatAvailableSeats(row: any) {
                   class="btn-secondary"
                   aria-label="Kapazitaet bearbeiten"
                   title="Bearbeiten"
+                  :disabled="isReadonly"
                   @click="emit('edit', row)"
                 >
                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
@@ -103,6 +105,7 @@ function formatAvailableSeats(row: any) {
                   class="btn-secondary"
                   aria-label="Kapazitaet loeschen"
                   title="Loeschen"
+                  :disabled="isReadonly"
                   @click="emit('delete', Number(row.id))"
                 >
                   <i class="bi bi-trash" aria-hidden="true"></i>
@@ -113,6 +116,7 @@ function formatAvailableSeats(row: any) {
                   class="btn-secondary"
                   aria-label="Kapazitaet anlegen"
                   title="Kapazitaet anlegen"
+                  :disabled="isReadonly"
                   @click="emit('add', row)"
                 >
                   <i class="bi bi-pencil-square" aria-hidden="true"></i>

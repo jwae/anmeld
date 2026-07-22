@@ -332,6 +332,7 @@ function handleBack() {
             :mapping="mapping"
             :global-schul-nr="globalSchulNr"
             @change="mapping[$event.key] = $event.value"
+            @update:global-schul-nr="globalSchulNr = $event"
           />
         </section>
 

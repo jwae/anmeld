@@ -1,5 +1,6 @@
 const KapazitaetenModel = require('../models/kapazitaetenModel');
 const crypto = require('crypto');
+const { assertWritableContext } = require('../lib/anmeldeWriteGuard');
 
 function normalizeNumber(value, fallback = 0) {
   if (value === undefined || value === null || value === '') {
@@ -330,6 +331,7 @@ class KapazitaetenController {
         return res.status(400).json({ error: validationError });
       }
 
+      await assertWritableContext(this.model.pool, payload.verfahren_id);
       const isDuplicate = await this.model.checkDuplicate(payload.verfahren_id, payload.snr, payload.jahrgang);
       if (isDuplicate) {
         return res.status(409).json({ error: 'A capacity already exists for this school and grade' });
@@ -340,7 +342,7 @@ class KapazitaetenController {
       res.status(201).json(newRecord);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Failed to create capacity' });
+      res.status(err?.statusCode || 500).json({ error: err?.message || 'Failed to create capacity' });
     }
   }
 
@@ -352,6 +354,7 @@ class KapazitaetenController {
         return res.status(404).json({ error: 'Capacity not found' });
       }
 
+      await assertWritableContext(this.model.pool, Number(existingRecord.verfahren_id));
       const payload = normalizeCapacityPayload(req.body);
       const validationError = validateCapacityPayload({
         ...payload,
@@ -367,18 +370,22 @@ class KapazitaetenController {
       res.json(updatedRecord);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Failed to update capacity' });
+      res.status(err?.statusCode || 500).json({ error: err?.message || 'Failed to update capacity' });
     }
   }
 
   async deleteKapazitaet(req, res) {
     try {
-      const affected = await this.model.delete(Number(req.params.id));
+      const capacityId = Number(req.params.id);
+      const existingRecord = await this.model.findById(capacityId);
+      if (!existingRecord) return res.status(404).json({ error: 'Capacity not found' });
+      await assertWritableContext(this.model.pool, Number(existingRecord.verfahren_id));
+      const affected = await this.model.delete(capacityId);
       if (affected === 0) return res.status(404).json({ error: 'Capacity not found' });
       res.json({ success: true, message: 'Capacity deleted' });
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: 'Failed to delete capacity' });
+      res.status(err?.statusCode || 500).json({ error: err?.message || 'Failed to delete capacity' });
     }
   }
 
@@ -437,6 +444,7 @@ class KapazitaetenController {
       const verfahrenId = Number(req.params.id || 0);
       if (!verfahrenId) return res.status(400).json({ error: 'Ungueltige Verfahrens-ID.' });
 
+      await assertWritableContext(connection, verfahrenId);
       const previewToken = String(req.body?.preview_token || '').trim();
       const preview = getCapacityImportPreview(previewToken);
       if (!preview || Number(preview.verfahren_id || 0) !== verfahrenId) {

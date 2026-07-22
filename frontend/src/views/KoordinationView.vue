@@ -41,6 +41,7 @@ const props = defineProps<{
     verfahren: string;
     runde: string;
   };
+  isReadonly?: boolean;
 }>();
 
 const loading = ref(false);
@@ -140,6 +141,7 @@ function getVisibleStudentsMissingCoordinates() {
 }
 
 async function geocodeVisibleStudentsInBackground(loadToken: number) {
+  if (props.isReadonly) return;
   if (autoGeocoding.value) return;
   if (!props.verfahrenId || !props.rundeId) return;
 
@@ -258,6 +260,7 @@ function toggleSelectAllStudents() {
 }
 
 async function handleAssign() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId) return;
   if (!isActiveRound.value) return;
   if (!selectedSchool.value || !selectedStudentCount.value) return;
@@ -429,7 +432,7 @@ watch(
             <button
               class="btn-primary"
               type="button"
-              :disabled="assigning || !isActiveRound || !selectedSchool || !selectedStudentCount"
+              :disabled="isReadonly || assigning || !isActiveRound || !selectedSchool || !selectedStudentCount"
               @click="handleAssign"
             >
               {{ assignButtonLabel }}

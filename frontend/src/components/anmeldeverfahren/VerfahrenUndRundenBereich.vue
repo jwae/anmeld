@@ -19,6 +19,7 @@ const emit = defineEmits<{
   (e: "update-selection", payload: {
     verfahrenId: number | null;
     verfahrenstyp: Anmeldeverfahrenstyp | null;
+    verfahrenStatus: AnmeldeStatus | null;
     rundeId: number | null;
     rundeStatus: AnmeldeStatus | null;
   }): void;
@@ -99,18 +100,28 @@ const activeRunde = computed<Anmelderunde | null>(
   () => runden.value.find((item) => item.id === activeRundenId.value) || null,
 );
 
+const workingRunde = computed<Anmelderunde | null>(
+  () => runden.value.find((item) => item.ist_arbeitsrunde) || null,
+);
+
 const focusedRunde = computed<Anmelderunde | null>(
   () => runden.value.find((item) => item.id === focusedRundenId.value) || activeRunde.value || null,
 );
 
 const selectedProcedureLocked = computed<boolean>(() => selectedVerfahren.value?.status === "Beendet");
-const canOnlyEditRoundLabel = computed<boolean>(() => (
-  !!rundenForm.value.id
-  && (
-    selectedProcedureLocked.value
-    || runden.value.some((item) => item.id === rundenForm.value.id && item.status === "Beendet")
-  )
+const procedureFormMode = computed<"full" | "limited" | "readonly">(() => {
+  if (!verfahrenForm.value.id || verfahrenForm.value.status === "Vorbereitet") return "full";
+  return verfahrenForm.value.status === "In Bearbeitung" ? "limited" : "readonly";
+});
+const procedureVisibilityEditable = computed<boolean>(() => (
+  verfahrenForm.value.status === "Vorbereitet" || verfahrenForm.value.status === "Beendet"
 ));
+const roundFormMode = computed<"full" | "limited" | "readonly">(() => {
+  const round = runden.value.find((item) => item.id === rundenForm.value.id) || null;
+  if (!round) return "full";
+  if (selectedProcedureLocked.value || round.status === "Beendet") return "readonly";
+  return round.status === "In Bearbeitung" ? "limited" : "full";
+});
 
 const currentVerfahrenTitle = computed<string>(() => (
   selectedVerfahren.value
@@ -121,11 +132,11 @@ const currentVerfahrenTitle = computed<string>(() => (
 const currentRundenTitle = computed<string>(() => (
   activeRunde.value
     ? `Runde ${activeRunde.value.runden_nummer} ${activeRunde.value.bezeichnung}`
-    : "Keine Arbeitsrunde gesetzt"
+    : "Keine Runde ausgewaehlt"
 ));
 
 const currentInProgressRound = computed<Anmelderunde | null>(
-  () => runden.value.find((item) => item.status === "In Bearbeitung") || null,
+  () => workingRunde.value,
 );
 
 const nextSuggestedRoundNumber = computed<number | null>(() => (
@@ -192,6 +203,7 @@ function emitContext() {
   emit("update-selection", {
     verfahrenId: selectedVerfahrenId.value,
     verfahrenstyp: selectedVerfahren.value?.verfahrenstyp || null,
+    verfahrenStatus: selectedVerfahren.value?.status || null,
     rundeId: activeRundenId.value,
     rundeStatus: activeRunde.value?.status || null,
   });
@@ -241,7 +253,7 @@ function resetProcedureSelectionContext() {
 }
 
 function canDeleteProcedure(item: Anmeldeverfahren | null | undefined) {
-  return item?.status === "Vorbereitet" || item?.status === "Beendet";
+  return item?.status === "Beendet";
 }
 
 async function loadVerfahren(preferredSelectionId?: number | null, options: { allowAutoSelect?: boolean } = {}) {
@@ -284,17 +296,18 @@ async function loadRunden(verfahrenId?: number | null, preferredFocusedRoundId?:
   try {
     const rows = await anmelderundenService.listByVerfahren(effectiveId, props.token);
     runden.value = rows;
-    const activeRound = rows.find((item) => item.ist_arbeitsrunde)
+    const sortedRows = [...rows].sort((left, right) => left.runden_nummer - right.runden_nummer || left.id - right.id);
+    const preferredRound = preferredFocusedRoundId
+      ? rows.find((item) => item.id === preferredFocusedRoundId) || null
+      : null;
+    const procedure = verfahren.value.find((item) => item.id === effectiveId) || null;
+    const selectedRound = preferredRound
       || rows.find((item) => item.id === activeRundenId.value)
+      || (procedure?.status === "In Bearbeitung" ? rows.find((item) => item.ist_arbeitsrunde) || null : null)
+      || sortedRows[0]
       || null;
-    activeRundenId.value = activeRound?.id ?? null;
-    if (preferredFocusedRoundId && rows.some((item) => item.id === preferredFocusedRoundId)) {
-      focusedRundenId.value = preferredFocusedRoundId;
-    } else if (rows.some((item) => item.id === focusedRundenId.value)) {
-      focusedRundenId.value = focusedRundenId.value;
-    } else {
-      focusedRundenId.value = activeRound?.id ?? rows[0]?.id ?? null;
-    }
+    activeRundenId.value = selectedRound?.id ?? null;
+    focusedRundenId.value = selectedRound?.id ?? null;
     emitContext();
   } catch (error) {
     showError(error, "Anmelderunden konnten nicht geladen werden.");
@@ -307,6 +320,14 @@ function resetVerfahrenForm() {
   verfahrenForm.value = createEmptyVerfahrenForm();
 }
 
+function resetVerfahrenFormToSelection() {
+  if (verfahrenForm.value.id && selectedVerfahren.value) {
+    openEditProcedureOverlay(selectedVerfahren.value);
+    return;
+  }
+  resetVerfahrenForm();
+}
+
 function resetRundenForm() {
   const nextRoundNumber = nextSuggestedRoundNumber.value;
   rundenForm.value = {
@@ -314,6 +335,15 @@ function resetRundenForm() {
     runden_nummer: nextRoundNumber,
     bezeichnung: nextRoundNumber ? `Runde ${nextRoundNumber}` : "",
   };
+}
+
+function resetRundenFormToSelection() {
+  const round = runden.value.find((item) => item.id === rundenForm.value.id) || null;
+  if (round) {
+    openEditRoundOverlay(round);
+    return;
+  }
+  resetRundenForm();
 }
 
 function openCreateProcedureOverlay() {
@@ -366,6 +396,8 @@ async function selectVerfahren(id: number) {
 
 function selectRunde(id: number) {
   focusedRundenId.value = id;
+  activeRundenId.value = id;
+  emitContext();
 }
 
 async function submitVerfahren() {
@@ -398,7 +430,9 @@ async function submitVerfahren() {
       sichtbar: verfahrenForm.value.sichtbar,
     };
 
-    const response = verfahrenForm.value.id
+    const response = verfahrenForm.value.id && verfahrenForm.value.status === "Beendet"
+      ? await anmeldeverfahrenService.updateVisibility(verfahrenForm.value.id, verfahrenForm.value.sichtbar, props.token)
+      : verfahrenForm.value.id
       ? await anmeldeverfahrenService.update(verfahrenForm.value.id, payload, props.token)
       : await anmeldeverfahrenService.create(payload, props.token);
 
@@ -414,7 +448,7 @@ async function submitVerfahren() {
 
 function openDeleteProcedureOverlay(item: Anmeldeverfahren) {
   if (!canDeleteProcedure(item)) {
-    showError(null, "Ein Verfahren in Bearbeitung kann nicht geloescht werden.");
+    showError(null, "Nur beendete Verfahren koennen geloescht werden.");
     return;
   }
   pendingDeleteProcedure.value = item;
@@ -637,7 +671,7 @@ onBeforeUnmount(() => {
       <div class="anm-toolbar-head">
         <label class="anm-toggle-row">
           <input v-model="showHiddenVerfahren" type="checkbox" @change="loadVerfahren(selectedVerfahrenId)" />
-          <span>Ausgeblendete Verfahren anzeigen</span>
+          <span>{{ showHiddenVerfahren ? "Ausgeblendete Verfahren ausblenden" : "Ausgeblendete Verfahren anzeigen" }}</span>
         </label>
       </div>
 
@@ -662,7 +696,7 @@ onBeforeUnmount(() => {
         :deleting-id="deletingVerfahrenId"
         :can-create="true"
         :can-start="selectedVerfahren?.status === 'Vorbereitet'"
-        :can-finish="!!selectedVerfahrenId && !selectedProcedureLocked"
+        :can-finish="selectedVerfahren?.status === 'In Bearbeitung'"
         @select="selectVerfahren"
         @edit="openEditProcedureOverlay"
         @delete="openDeleteProcedureOverlay"
@@ -714,8 +748,10 @@ onBeforeUnmount(() => {
         <AnmeldeverfahrenForm
           v-model="verfahrenForm"
           :saving="savingVerfahren"
+          :mode="procedureFormMode"
+          :visibility-editable="procedureVisibilityEditable"
           @submit="submitVerfahren"
-          @reset="resetVerfahrenForm"
+          @reset="resetVerfahrenFormToSelection"
         />
       </section>
     </div>
@@ -745,10 +781,10 @@ onBeforeUnmount(() => {
           v-model="rundenForm"
           :verfahren="selectedVerfahren"
           :available-round-numbers="assignableRoundNumbers"
-          :rename-only="canOnlyEditRoundLabel"
+          :mode="roundFormMode"
           :saving="savingRunden"
           @submit="submitRunde"
-          @reset="resetRundenForm"
+          @reset="resetRundenFormToSelection"
         />
       </section>
     </div>

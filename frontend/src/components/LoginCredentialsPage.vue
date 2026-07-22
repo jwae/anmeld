@@ -30,8 +30,12 @@ const currentContext = ref<{ verfahren: string; runde: string }>({
 });
 const selectedVerfahrenId = ref<number | null>(null);
 const selectedVerfahrenstyp = ref<Anmeldeverfahrenstyp | null>(null);
+const selectedVerfahrenStatus = ref<AnmeldeStatus | null>(null);
 const selectedRundenId = ref<number | null>(null);
 const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
+const isReviewMode = computed<boolean>(() => (
+  selectedVerfahrenStatus.value === "Beendet" || selectedRundenStatus.value !== "In Bearbeitung"
+));
 const hasMountedVerfahrenView = ref(routeState.path === APP_PATHS.anmVerfahren);
 const hasMenuSelectionContext = computed<boolean>(
   () => selectedRundenId.value !== null,
@@ -66,11 +70,13 @@ function handleContextUpdate(payload: { verfahren: string; runde: string }) {
 function handleSelectionUpdate(payload: {
   verfahrenId: number | null;
   verfahrenstyp: Anmeldeverfahrenstyp | null;
+  verfahrenStatus: AnmeldeStatus | null;
   rundeId: number | null;
   rundeStatus: AnmeldeStatus | null;
 }) {
   selectedVerfahrenId.value = payload?.verfahrenId ?? null;
   selectedVerfahrenstyp.value = payload?.verfahrenstyp ?? null;
+  selectedVerfahrenStatus.value = payload?.verfahrenStatus ?? null;
   selectedRundenId.value = payload?.rundeId ?? null;
   selectedRundenStatus.value = payload?.rundeStatus ?? null;
 }

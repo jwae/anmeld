@@ -51,6 +51,7 @@ const props = defineProps<{
   rundeId: number | null;
   verfahrenstyp?: Anmeldeverfahrenstyp | null;
   title?: string;
+  isReadonly?: boolean;
 }>();
 
 const loading = ref(false);
@@ -365,6 +366,7 @@ function poolSortMarker(key: PoolSortKey) {
 }
 
 function openCsvImportOverlay() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId || loading.value) return;
   errorMessage.value = "";
   successMessage.value = "";
@@ -386,6 +388,7 @@ async function handleCsvImportSuccess(result: any) {
 }
 
 async function importJg4ausSchild() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId) {
     errorMessage.value = "Bitte zuerst ein Anmeldeverfahren und eine Runde auswaehlen.";
     return;
@@ -424,6 +427,7 @@ async function importJg4ausSchild() {
 }
 
 function openSchildImportOverlay() {
+  if (props.isReadonly) return;
   if (!props.verfahrenId || !props.rundeId || loading.value) return;
   showSchildImportOverlay.value = true;
 }
@@ -442,6 +446,7 @@ function closeSchildDiagnosticsOverlay() {
 }
 
 function handleEditPoolRow(row: PoolSchuelerRow) {
+  if (props.isReadonly) return;
   errorMessage.value = "";
   successMessage.value = "";
   applyEditPoolRow(row);
@@ -494,6 +499,7 @@ function openAdjacentPoolRow(direction: -1 | 1) {
 }
 
 function handleDeletePoolRow(row: PoolSchuelerRow) {
+  if (props.isReadonly) return;
   pendingDeletePoolRow.value = row;
   showDeletePoolOverlay.value = true;
 }
@@ -510,6 +516,7 @@ function hideDeletePoolOverlay() {
 }
 
 async function confirmDeletePoolRow() {
+  if (props.isReadonly) return;
   const row = pendingDeletePoolRow.value;
   if (!row) return;
   const rowId = Number(row.schueler_id || 0);
@@ -545,6 +552,7 @@ function closeEditPoolOverlay() {
 }
 
 async function saveEditPoolRow() {
+  if (props.isReadonly) return;
   const rowId = Number(editPoolForm.value.id || 0);
   if (!rowId) {
     errorMessage.value = "Der Datensatz konnte nicht gespeichert werden: ID fehlt.";
@@ -567,6 +575,7 @@ async function saveEditPoolRow() {
 }
 
 async function confirmSchildImport() {
+  if (props.isReadonly) return;
   showSchildImportOverlay.value = false;
   await importJg4ausSchild();
 }
@@ -621,10 +630,10 @@ onUnmounted(() => {
         </p>
       </div>
       <div class="import-head-actions">
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
+        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
           Import (CSV, EWO)
         </button>
-        <button class="btn-secondary" type="button" :disabled="!verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
+        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
           Import Pooldaten aus Schild3
         </button>
       </div>
@@ -788,6 +797,7 @@ onUnmounted(() => {
                   type="button"
                   title="Datensatz bearbeiten"
                   aria-label="Datensatz bearbeiten"
+                  :disabled="isReadonly"
                   @click="handleEditPoolRow(row)"
                 >
                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
@@ -797,6 +807,7 @@ onUnmounted(() => {
                   type="button"
                   title="Datensatz loeschen"
                   aria-label="Datensatz loeschen"
+                  :disabled="isReadonly"
                   @click="handleDeletePoolRow(row)"
                 >
                   <i class="bi bi-trash" aria-hidden="true"></i>
@@ -849,7 +860,7 @@ onUnmounted(() => {
           <button class="btn-secondary" type="button" :disabled="loading" @click="closeSchildImportOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary" type="button" :disabled="loading" @click="confirmSchildImport">
+          <button class="btn-primary" type="button" :disabled="loading || isReadonly" @click="confirmSchildImport">
             Weiter
           </button>
         </div>
@@ -991,7 +1002,7 @@ onUnmounted(() => {
           <button class="btn-secondary" type="button" :disabled="savingEditPool" @click="closeEditPoolOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary" type="button" :disabled="savingEditPool" @click="saveEditPoolRow">
+          <button class="btn-primary" type="button" :disabled="savingEditPool || isReadonly" @click="saveEditPoolRow">
             {{ savingEditPool ? "Speichere..." : "Speichern" }}
           </button>
         </div>
@@ -1027,7 +1038,7 @@ onUnmounted(() => {
           <button class="btn-secondary" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary pool-delete-confirm-button" type="button" :disabled="deletingPoolRow" @click="confirmDeletePoolRow">
+          <button class="btn-primary pool-delete-confirm-button" type="button" :disabled="deletingPoolRow || isReadonly" @click="confirmDeletePoolRow">
             {{ deletingPoolRow ? "Loesche..." : "Loeschen" }}
           </button>
         </div>

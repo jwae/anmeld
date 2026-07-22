@@ -4,7 +4,7 @@ import type { Anmeldeverfahren } from "../types";
 defineProps<{
   verfahren: Anmeldeverfahren | null;
   availableRoundNumbers?: number[];
-  renameOnly?: boolean;
+  mode?: "full" | "limited" | "readonly";
   modelValue: {
     id: number | null;
     runden_nummer: number | null;
@@ -39,7 +39,7 @@ const emit = defineEmits<{
           <span class="field-label">Rundennummer</span>
           <select
             :value="modelValue.runden_nummer ?? ''"
-            :disabled="saving || !verfahren || renameOnly"
+            :disabled="saving || !verfahren || mode !== 'full'"
             @change="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLSelectElement).value || 0) || null })"
           >
             <option value="" disabled>Bitte waehlen</option>
@@ -54,7 +54,7 @@ const emit = defineEmits<{
           <input
             :value="modelValue.bezeichnung"
             placeholder="Runde 2"
-            :disabled="saving || !verfahren"
+            :disabled="saving || !verfahren || mode === 'readonly'"
             @input="emit('update:modelValue', { ...modelValue, bezeichnung: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
@@ -64,7 +64,7 @@ const emit = defineEmits<{
           <input
             type="date"
             :value="modelValue.startdatum"
-            :disabled="saving || !verfahren || renameOnly"
+            :disabled="saving || !verfahren || mode === 'readonly'"
             @input="emit('update:modelValue', { ...modelValue, startdatum: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
@@ -74,13 +74,16 @@ const emit = defineEmits<{
           <input
             type="date"
             :value="modelValue.enddatum"
-            :disabled="saving || !verfahren || renameOnly"
+            :disabled="saving || !verfahren || mode === 'readonly'"
             @input="emit('update:modelValue', { ...modelValue, enddatum: String(($event.target as HTMLInputElement).value || '') })"
           />
         </label>
       </div>
-      <p v-if="renameOnly" class="anm-inline-hint">
-        Fuer diese Runde kann aktuell nur die Bezeichnung geaendert werden.
+      <p v-if="mode === 'limited'" class="anm-inline-hint">
+        Bei einer aktiven Runde koennen Bezeichnung und Zeitraum geaendert werden.
+      </p>
+      <p v-else-if="mode === 'readonly'" class="anm-inline-hint">
+        Diese Runde wird schreibgeschuetzt angezeigt.
       </p>
     </details>
 
@@ -94,7 +97,7 @@ const emit = defineEmits<{
       </div>
     </details>
 
-    <div class="anm-actions">
+    <div v-if="mode !== 'readonly'" class="anm-actions">
       <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">
         Reset
       </button>
