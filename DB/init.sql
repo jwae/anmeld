@@ -83,7 +83,6 @@ CREATE TABLE `anm_verfahren` (
   `status` varchar(50) NOT NULL DEFAULT 'geplant',
   `verfahrenstyp` enum('GS','SEK1') NOT NULL DEFAULT 'SEK1',
   `sichtbar` tinyint(1) NOT NULL DEFAULT 1,
-  `arbeitsrunde_id` bigint(20) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),

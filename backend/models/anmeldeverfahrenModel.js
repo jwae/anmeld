@@ -30,14 +30,10 @@ function findFirstColumn(columns, candidates) {
 
 async function loadSchemaConfig(pool) {
   const procedureColumns = await loadTableColumns(pool, "anm_verfahren");
-  const roundColumns = await loadTableColumns(pool, "anm_runde");
 
   return {
     procedureColumns,
-    roundColumns,
     visibleColumn: findFirstColumn(procedureColumns, ["sichtbar"]),
-    workingRoundIdColumn: findFirstColumn(procedureColumns, ["arbeitsrunde_id", "arbeits_runde_id", "working_round_id"]),
-    roundWorkingFlagColumn: findFirstColumn(roundColumns, ["ist_arbeitsrunde", "arbeitsrunde", "is_arbeitsrunde"]),
   };
 }
 
@@ -92,16 +88,8 @@ async function buildProcedureSelect(pool, options = {}) {
     schema.visibleColumn
       ? `COALESCE(${procedureAlias}.${schema.visibleColumn}, 1) AS sichtbar`
       : "1 AS sichtbar",
-    schema.workingRoundIdColumn
-      ? `${procedureAlias}.${schema.workingRoundIdColumn} AS arbeitsrunde_id`
-      : schema.roundWorkingFlagColumn
-        ? `(SELECT r.id FROM anm_runde r WHERE r.verfahren_id = ${procedureAlias}.id AND COALESCE(r.${schema.roundWorkingFlagColumn}, 0) = 1 ORDER BY r.runden_nummer ASC, r.id ASC LIMIT 1) AS arbeitsrunde_id`
-        : "NULL AS arbeitsrunde_id",
-    schema.workingRoundIdColumn
-      ? `(SELECT r.runden_nummer FROM anm_runde r WHERE r.id = ${procedureAlias}.${schema.workingRoundIdColumn} LIMIT 1) AS arbeitsrunde_nummer`
-      : schema.roundWorkingFlagColumn
-        ? `(SELECT r.runden_nummer FROM anm_runde r WHERE r.verfahren_id = ${procedureAlias}.id AND COALESCE(r.${schema.roundWorkingFlagColumn}, 0) = 1 ORDER BY r.runden_nummer ASC, r.id ASC LIMIT 1) AS arbeitsrunde_nummer`
-        : "NULL AS arbeitsrunde_nummer",
+    `(SELECT r.id FROM anm_runde r WHERE r.verfahren_id = ${procedureAlias}.id AND r.status = 'In Bearbeitung' ORDER BY r.runden_nummer ASC, r.id ASC LIMIT 1) AS arbeitsrunde_id`,
+    `(SELECT r.runden_nummer FROM anm_runde r WHERE r.verfahren_id = ${procedureAlias}.id AND r.status = 'In Bearbeitung' ORDER BY r.runden_nummer ASC, r.id ASC LIMIT 1) AS arbeitsrunde_nummer`,
     `DATE_FORMAT(${procedureAlias}.created_at, '%Y-%m-%d %H:%i:%s') AS created_at`,
     `DATE_FORMAT(${procedureAlias}.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at`,
   ];
@@ -143,60 +131,17 @@ async function findById(pool, id) {
   return mapProcedureRow(rows[0]);
 }
 
-async function findWorkingRoundId(connection, verfahrenId, schema) {
-  if (schema.workingRoundIdColumn) {
-    const [rows] = await connection.query(
-      `SELECT ${schema.workingRoundIdColumn} AS arbeitsrunde_id FROM anm_verfahren WHERE id = ? LIMIT 1`,
-      [verfahrenId],
-    );
-    const value = rows?.[0]?.arbeitsrunde_id;
-    return value === null || value === undefined ? null : Number(value);
-  }
-
-  if (schema.roundWorkingFlagColumn) {
-    const [rows] = await connection.query(
-      `SELECT id FROM anm_runde WHERE verfahren_id = ? AND COALESCE(${schema.roundWorkingFlagColumn}, 0) = 1 ORDER BY runden_nummer ASC, id ASC LIMIT 1`,
-      [verfahrenId],
-    );
-    return rows?.length ? Number(rows[0].id) : null;
-  }
-
-  return null;
-}
-
-async function setWorkingRound(connection, verfahrenId, rundenId, schema) {
-  if (schema.workingRoundIdColumn) {
-    await connection.query(
-      `UPDATE anm_verfahren SET ${schema.workingRoundIdColumn} = ?, updated_at = NOW() WHERE id = ?`,
-      [rundenId, verfahrenId],
-    );
-  }
-
-  if (schema.roundWorkingFlagColumn) {
-    await connection.query(
-      `UPDATE anm_runde
-       SET ${schema.roundWorkingFlagColumn} = CASE WHEN id = ? THEN 1 ELSE 0 END,
-           updated_at = NOW()
-       WHERE verfahren_id = ?`,
-      [rundenId, verfahrenId],
-    );
-  }
-}
-
-async function clearWorkingRound(connection, verfahrenId, schema) {
-  if (schema.workingRoundIdColumn) {
-    await connection.query(
-      `UPDATE anm_verfahren SET ${schema.workingRoundIdColumn} = NULL, updated_at = NOW() WHERE id = ?`,
-      [verfahrenId],
-    );
-  }
-
-  if (schema.roundWorkingFlagColumn) {
-    await connection.query(
-      `UPDATE anm_runde SET ${schema.roundWorkingFlagColumn} = 0, updated_at = NOW() WHERE verfahren_id = ?`,
-      [verfahrenId],
-    );
-  }
+async function findWorkingRoundId(connection, verfahrenId) {
+  const [rows] = await connection.query(
+    `SELECT id
+     FROM anm_runde
+     WHERE verfahren_id = ?
+       AND status = ?
+     ORDER BY runden_nummer ASC, id ASC
+     LIMIT 1`,
+    [verfahrenId, ROUND_STATUS_IN_PROGRESS],
+  );
+  return rows?.length ? Number(rows[0].id) : null;
 }
 
 async function create(pool, payload) {
@@ -214,11 +159,6 @@ async function create(pool, payload) {
       fields.push(schema.visibleColumn);
       values.push(payload.sichtbar ? 1 : 0);
     }
-    if (schema.workingRoundIdColumn) {
-      fields.push(schema.workingRoundIdColumn);
-      values.push(null);
-    }
-
     const placeholders = fields.map(() => "?").join(", ");
     const [result] = await connection.query(
       `INSERT INTO anm_verfahren (${fields.join(", ")}) VALUES (${placeholders})`,
@@ -226,7 +166,6 @@ async function create(pool, payload) {
     );
 
     const roundFields = ["verfahren_id", "runden_nummer", "bezeichnung", "startdatum", "enddatum", "status"];
-    if (schema.roundWorkingFlagColumn) roundFields.push(schema.roundWorkingFlagColumn);
 
     for (let roundNumber = 1; roundNumber <= 3; roundNumber += 1) {
       const roundValues = [
@@ -237,7 +176,6 @@ async function create(pool, payload) {
         null,
         "Vorbereitet",
       ];
-      if (schema.roundWorkingFlagColumn) roundValues.push(0);
       const roundPlaceholders = roundFields.map(() => "?").join(", ");
       await connection.query(
         `INSERT INTO anm_runde (${roundFields.join(", ")}) VALUES (${roundPlaceholders})`,
@@ -544,7 +482,6 @@ async function removeProcedureCompletely(pool, verfahrenId) {
 async function startProcedure(pool, verfahrenId) {
   const connection = await pool.getConnection();
   try {
-    const schema = await loadSchemaConfig(connection);
     await connection.beginTransaction();
 
     const [procedureRows] = await connection.query(
@@ -599,7 +536,6 @@ async function startProcedure(pool, verfahrenId) {
       "UPDATE anm_runde SET status = ?, updated_at = NOW() WHERE id = ?",
       [ROUND_STATUS_IN_PROGRESS, roundOne.id],
     );
-    await setWorkingRound(connection, verfahrenId, Number(roundOne.id), schema);
 
     await connection.commit();
     return findById(pool, verfahrenId);
@@ -663,8 +599,6 @@ module.exports = {
   SCHOOL_GROUP_ROLE_VALUES,
   loadSchemaConfig,
   findWorkingRoundId,
-  setWorkingRound,
-  clearWorkingRound,
   listAll,
   findById,
   create,

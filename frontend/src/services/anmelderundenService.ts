@@ -58,15 +58,6 @@ export const anmelderundenService = {
     return resp.data;
   },
 
-  async setWorkingRound(id: number, token?: string) {
-    const resp = await apiClient.post<{ row: Anmelderunde; message: string }>(
-      `/api/anmelderunden/${encodeURIComponent(String(id))}/set-working`,
-      {},
-      buildAuthConfig(token),
-    );
-    return resp.data;
-  },
-
   async startRound(id: number, token?: string) {
     const resp = await apiClient.post<NextRoundTransitionResponse>(
       `/api/anmelderunden/${encodeURIComponent(String(id))}/start`,

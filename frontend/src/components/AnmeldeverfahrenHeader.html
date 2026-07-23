@@ -15,9 +15,13 @@
             <span class="anmeldeverfahren-header-context-badge-label">Runde:</span>
               <strong>{{ formatCompactRoundLabel(currentContext.runde) }}</strong>
             </span>
-            <span v-if="verfahrenStatus" class="anmeldeverfahren-header-context-badge" :data-status="verfahrenStatus">
+            <span
+              v-if="verfahrenStatus"
+              class="anmeldeverfahren-header-context-badge"
+              :data-status="isReviewMode ? 'Review' : verfahrenStatus"
+            >
               <span class="anmeldeverfahren-header-context-badge-label">Status:</span>
-              <strong>{{ verfahrenStatus }}</strong>
+              <strong>{{ isReviewMode ? "Review" : verfahrenStatus }}</strong>
             </span>
           </div>
           <p v-if="isReviewMode && verfahrenStatus" class="anmeldeverfahren-review-hint">

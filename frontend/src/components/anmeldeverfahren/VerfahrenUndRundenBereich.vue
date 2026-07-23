@@ -101,7 +101,7 @@ const activeRunde = computed<Anmelderunde | null>(
 );
 
 const workingRunde = computed<Anmelderunde | null>(
-  () => runden.value.find((item) => item.ist_arbeitsrunde) || null,
+  () => runden.value.find((item) => item.status === "In Bearbeitung") || null,
 );
 
 const focusedRunde = computed<Anmelderunde | null>(
@@ -235,13 +235,9 @@ function showSuccess(message: string) {
   }, 4000);
 }
 
-function applyLocalWorkingRound(rundenId: number | null) {
+function selectRoundContext(rundenId: number | null) {
   activeRundenId.value = rundenId;
   focusedRundenId.value = rundenId;
-  runden.value = runden.value.map((item) => ({
-    ...item,
-    ist_arbeitsrunde: rundenId !== null && item.id === rundenId,
-  }));
 }
 
 function resetProcedureSelectionContext() {
@@ -300,10 +296,8 @@ async function loadRunden(verfahrenId?: number | null, preferredFocusedRoundId?:
     const preferredRound = preferredFocusedRoundId
       ? rows.find((item) => item.id === preferredFocusedRoundId) || null
       : null;
-    const procedure = verfahren.value.find((item) => item.id === effectiveId) || null;
     const selectedRound = preferredRound
       || rows.find((item) => item.id === activeRundenId.value)
-      || (procedure?.status === "In Bearbeitung" ? rows.find((item) => item.ist_arbeitsrunde) || null : null)
       || sortedRows[0]
       || null;
     activeRundenId.value = selectedRound?.id ?? null;
@@ -579,10 +573,11 @@ async function startProcedure() {
     await loadVerfahren(response.row?.id || selectedVerfahren.value.id);
     const roundOne = runden.value.find((item) => item.runden_nummer === 1) || null;
     if (roundOne) {
-      applyLocalWorkingRound(roundOne.id);
+      selectRoundContext(roundOne.id);
       runden.value = runden.value.map((item) => ({
         ...item,
         status: item.id === roundOne.id ? "In Bearbeitung" : item.status,
+        ist_arbeitsrunde: item.id === roundOne.id,
       }));
       emitContext();
     }
@@ -605,18 +600,8 @@ async function finishProcedure() {
   }
 }
 
-async function setWorkingRound(item: Anmelderunde) {
-  try {
-    const response = await anmelderundenService.setWorkingRound(item.id, props.token);
-    applyLocalWorkingRound(response.row?.id ?? item.id);
-    emitContext();
-    await loadVerfahren(selectedVerfahrenId.value);
-    applyLocalWorkingRound(response.row?.id ?? item.id);
-    emitContext();
-    showSuccess(response.message);
-  } catch (error) {
-    showError(error, "Die Arbeitsrunde konnte nicht gesetzt werden.");
-  }
+function selectWorkingRound(id: number) {
+  selectRunde(id);
 }
 
 function openStartRoundOverlay(item: Anmelderunde) {
@@ -635,7 +620,7 @@ async function startRound() {
   try {
     const response = await anmelderundenService.startRound(item.id, props.token);
     closeStartRoundOverlay();
-    applyLocalWorkingRound(response.next_round?.id ?? item.id);
+    selectRoundContext(response.next_round?.id ?? item.id);
     if (response.current_round?.id && response.next_round?.id) {
       runden.value = runden.value.map((entry) => {
         if (entry.id === response.current_round.id) return { ...entry, status: "Beendet", ist_arbeitsrunde: false };
@@ -645,7 +630,7 @@ async function startRound() {
     }
     emitContext();
     await loadVerfahren(selectedVerfahrenId.value);
-    applyLocalWorkingRound(response.next_round?.id ?? item.id);
+    selectRoundContext(response.next_round?.id ?? item.id);
     emitContext();
     showSuccess(response.message);
   } catch (error) {
@@ -718,7 +703,7 @@ onBeforeUnmount(() => {
         @select="selectRunde"
         @edit="openEditRoundOverlay"
         @delete="deleteRunde"
-        @set-working="setWorkingRound"
+        @select-working="selectWorkingRound"
         @start-round="openStartRoundOverlay"
         @create-round="openCreateRoundOverlay"
       />
@@ -821,7 +806,7 @@ onBeforeUnmount(() => {
             <li>{{ startRoundTargetLabel }} wechselt in den Status <strong>In Bearbeitung</strong>.</li>
             <li>{{ startRoundTargetLabel }} wird zur neuen Arbeitsrunde und damit zum aktuellen Arbeitskontext.</li>
             <li>Die Schuelerdaten der laufenden Runde werden in die neue Runde uebernommen.</li>
-            <li>Abgeschlossene Runden koennen wieder aktiviert werden.</li>
+            <li>Abgeschlossene Runden bleiben weiterhin zur Ansicht verfuegbar.</li>
           </ul>
         </div>
 

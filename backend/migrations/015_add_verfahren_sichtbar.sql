@@ -1,3 +1,2 @@
 ALTER TABLE anm_verfahren
-  ADD COLUMN IF NOT EXISTS sichtbar TINYINT(1) NOT NULL DEFAULT 1 AFTER verfahrenstyp,
-  ADD COLUMN IF NOT EXISTS arbeitsrunde_id BIGINT NULL AFTER sichtbar;
+  ADD COLUMN IF NOT EXISTS sichtbar TINYINT(1) NOT NULL DEFAULT 1 AFTER verfahrenstyp;

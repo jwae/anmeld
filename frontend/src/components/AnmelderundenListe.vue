@@ -18,7 +18,7 @@ const emit = defineEmits<{
   (e: "select", id: number): void;
   (e: "edit", item: Anmelderunde): void;
   (e: "delete", item: Anmelderunde): void;
-  (e: "set-working", item: Anmelderunde): void;
+  (e: "select-working", id: number): void;
   (e: "start-round", item: Anmelderunde): void;
   (e: "create-round"): void;
 }>();
@@ -27,8 +27,16 @@ function formatDate(value: string | null) {
   return String(value || "").trim() || "-";
 }
 
+function isReviewRound(item: Anmelderunde) {
+  return props.verfahren?.status === "Beendet" || item.status === "Beendet";
+}
+
 const workingRound = computed<Anmelderunde | null>(
-  () => props.items.find((item) => item.ist_arbeitsrunde) || null,
+  () => (
+    props.verfahren?.status === "Beendet"
+      ? null
+      : props.items.find((item) => item.status === "In Bearbeitung") || null
+  ),
 );
 
 const selectedRound = computed<Anmelderunde | null>(
@@ -53,7 +61,10 @@ const selectedRound = computed<Anmelderunde | null>(
     </div>
 
     <div v-if="verfahren" class="anm-round-guidance">
-      <p v-if="workingRound">
+      <p v-if="verfahren.status === 'Beendet'">
+        Das Verfahren ist beendet. Die Runden stehen ausschliesslich im Review-Modus zur Verfuegung.
+      </p>
+      <p v-else-if="workingRound">
         Arbeitsrunde: <strong>Runde {{ workingRound.runden_nummer }}</strong> ist aktuell fachlich aktiv.
       </p>
       <p v-else>
@@ -95,29 +106,48 @@ const selectedRound = computed<Anmelderunde | null>(
           <tr
             v-for="item in items"
             :key="item.id"
-            :class="{ 'is-selected': item.id === selectedId }"
-            @click="emit('select', item.id)"
+            :class="{
+              'is-selected': item.id === selectedId,
+              'is-review-row': isReviewRound(item),
+              'is-review-selected': isReviewRound(item) && item.id === selectedId,
+            }"
+            @click="!isReviewRound(item) && emit('select', item.id)"
           >
             <td class="anm-cell-title">
               <strong>Runde {{ item.runden_nummer }}</strong>
               <span>{{ item.bezeichnung }}</span>
             </td>
             <td class="anm-cell-date">{{ formatDate(item.startdatum) }} bis {{ formatDate(item.enddatum) }}</td>
-            <td><span class="anm-status-pill" :data-status="item.status">{{ item.status }}</span></td>
-            <td>{{ item.ist_arbeitsrunde ? "Ja" : "Nein" }}</td>
+            <td>
+              <span
+                class="anm-status-pill"
+                :data-status="item.status"
+              >
+                {{ item.status }}
+              </span>
+            </td>
+            <td>{{ verfahren?.status !== "Beendet" && item.status === "In Bearbeitung" ? "Ja" : "Nein" }}</td>
             <td class="anm-cell-actions">
               <div class="anm-action-stack">
                 <button
-                  v-if="!item.ist_arbeitsrunde && (item.status === 'In Bearbeitung' || item.status === 'Beendet')"
+                  v-if="verfahren?.status !== 'Beendet' && item.status === 'In Bearbeitung' && item.id !== selectedId"
                   class="btn-secondary anm-inline-btn anm-inline-btn-primary"
                   type="button"
-                  :disabled="procedureLocked"
-                  @click.stop="emit('set-working', item)"
+                  @click.stop="emit('select-working', item.id)"
                 >
-                  Als Arbeitsrunde aktivieren
+                  Zur Arbeitsrunde wechseln
+                </button>
+                <button
+                  v-if="isReviewRound(item) && item.status !== 'Vorbereitet'"
+                  class="btn-secondary anm-inline-btn"
+                  type="button"
+                  title="Review-Modus – nur Lesen. Änderungen an den ausgewählten Fachdaten sind nicht möglich."
+                  @click.stop="emit('select', item.id)"
+                >
+                  Review
                 </button>
                 <span
-                  v-else-if="!item.ist_arbeitsrunde && item.status === 'Vorbereitet'"
+                  v-else-if="item.status === 'Vorbereitet'"
                   class="anm-muted-action"
                 >
                   Vorbereitete Runde erst starten
@@ -131,7 +161,10 @@ const selectedRound = computed<Anmelderunde | null>(
                 >
                   Runde starten
                 </button>
-                <span v-if="item.ist_arbeitsrunde && item.id !== nextRoundId" class="anm-muted-action">-</span>
+                <span
+                  v-if="verfahren?.status !== 'Beendet' && item.status === 'In Bearbeitung' && item.id === selectedId"
+                  class="anm-muted-action"
+                >-</span>
               </div>
             </td>
             <td class="anm-cell-actions">
@@ -343,6 +376,35 @@ const selectedRound = computed<Anmelderunde | null>(
 .anm-table tbody tr.is-selected {
   background: #eef6ff;
   box-shadow: inset 4px 0 0 #7da8d8;
+}
+
+.anm-table tbody tr.is-review-row {
+  cursor: default;
+}
+
+.anm-table tbody tr.is-review-row:not(.is-review-selected):hover {
+  box-shadow: none;
+}
+
+.anm-table tbody tr.is-review-row:not(.is-review-selected):hover td {
+  background: #ffffff;
+}
+
+.anm-table tbody tr.is-review-selected,
+.anm-table tbody tr.is-review-selected:hover {
+  box-shadow:
+    inset 5px 0 0 #d59a24,
+    inset 0 1px 0 #e7c675,
+    inset 0 -1px 0 #e7c675;
+}
+
+.anm-table tbody tr.is-review-selected td,
+.anm-table tbody tr.is-review-selected:hover td {
+  background: #fff7dd;
+}
+
+.anm-table tbody tr.is-review-selected .anm-cell-title strong {
+  color: #7a5310;
 }
 
 .anm-table tbody tr:last-child td {

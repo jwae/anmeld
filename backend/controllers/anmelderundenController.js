@@ -193,22 +193,6 @@ function createAnmelderundenController({ getPool }) {
       }
     },
 
-    setWorkingRound: async (req, res) => {
-      try {
-        const id = Number(req.params.id || 0);
-        if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
-
-        const row = await model.setWorkingRound(getPool(), id);
-        res.json({
-          message: `Runde ${row.runden_nummer} ist jetzt die Arbeitsrunde.`,
-          row,
-        });
-      } catch (error) {
-        console.error(error);
-        sendError(res, error?.statusCode || 500, error?.message || "Die Arbeitsrunde konnte nicht gesetzt werden.");
-      }
-    },
-
     startRound: async (req, res) => {
       try {
         const id = Number(req.params.id || 0);

@@ -9,7 +9,6 @@ function createAnmelderundenRouter({ authenticateToken, requireAdmin, getPool })
 
   router.get("/anmeldeverfahren/:verfahrenId/runden", controller.listByVerfahren);
   router.post("/anmeldeverfahren/:verfahrenId/runden", controller.create);
-  router.post("/anmelderunden/:id/set-working", controller.setWorkingRound);
   router.post("/anmelderunden/:id/start", controller.startRound);
   router.put("/anmelderunden/:id", controller.update);
   router.delete("/anmelderunden/:id", controller.remove);
