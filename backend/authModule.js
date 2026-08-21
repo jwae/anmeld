@@ -3530,12 +3530,199 @@ function createAuthModule(poolProvider) {
     if (Number(error?.errno) === 1062 || String(error?.code || "").toUpperCase() === "ER_DUP_ENTRY") {
       return res.status(409).json({ error: "Ein Eintrag mit diesen Schluesseldaten existiert bereits." });
     }
+    if (Number(error?.errno) === 1451 || String(error?.code || "").toUpperCase() === "ER_ROW_IS_REFERENCED_2") {
+      return res.status(409).json({
+        error: "Der Eintrag wird noch verwendet und kann deshalb nicht geloescht werden.",
+      });
+    }
     console.error(error);
     const technicalMessage =
       String(error?.sqlMessage || "").trim()
       || String(error?.message || "").trim()
       || fallbackMessage;
     return res.status(500).json({ error: technicalMessage });
+  }
+
+  function quoteCatalogIdentifier(identifier) {
+    return `\`${String(identifier || "").replace(/`/g, "``")}\``;
+  }
+
+  async function fetchCatalogTables(conn) {
+    const [rows] = await conn.query(
+      `
+      SELECT
+        table_name,
+        COALESCE(table_comment, '') AS table_comment
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND LEFT(table_name, 8) = 'anm_kat_'
+        AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+      `,
+    );
+    return rows || [];
+  }
+
+  async function requireCatalogTable(conn, requestedTableName) {
+    const tableName = String(requestedTableName || "").trim();
+    if (!/^anm_kat_[a-zA-Z0-9_]+$/.test(tableName)) {
+      const error = new Error("Der angeforderte Katalog ist ungueltig.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const [rows] = await conn.query(
+      `
+      SELECT table_name, COALESCE(table_comment, '') AS table_comment
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_name = ?
+        AND LEFT(table_name, 8) = 'anm_kat_'
+        AND table_type = 'BASE TABLE'
+      LIMIT 1
+      `,
+      [tableName],
+    );
+    if (!rows?.[0]) {
+      const error = new Error("Der angeforderte Katalog wurde nicht gefunden.");
+      error.statusCode = 404;
+      throw error;
+    }
+    return rows[0];
+  }
+
+  function catalogInputKind(column) {
+    const dataType = String(column?.data_type || "").toLowerCase();
+    const columnType = String(column?.column_type || "").toLowerCase();
+    if (dataType === "tinyint" && columnType === "tinyint(1)") return "boolean";
+    if (["int", "bigint", "smallint", "mediumint", "tinyint", "decimal", "numeric", "float", "double", "real"].includes(dataType)) {
+      return "number";
+    }
+    if (dataType === "date") return "date";
+    if (["datetime", "timestamp"].includes(dataType)) return "datetime-local";
+    if (dataType === "time") return "time";
+    if (dataType === "enum") return "select";
+    return "text";
+  }
+
+  function catalogEnumValues(columnType) {
+    const type = String(columnType || "");
+    if (!/^enum\(/i.test(type)) return [];
+    const body = type.slice(type.indexOf("(") + 1, -1);
+    const values = [];
+    const pattern = /'((?:[^'\\]|\\.)*)'/g;
+    let match;
+    while ((match = pattern.exec(body))) {
+      values.push(match[1].replace(/\\'/g, "'").replace(/\\\\/g, "\\"));
+    }
+    return values;
+  }
+
+  async function fetchCatalogDefinition(conn, tableName) {
+    const table = await requireCatalogTable(conn, tableName);
+    const [columnRows] = await conn.query(
+      `
+      SELECT
+        column_name,
+        ordinal_position,
+        column_default,
+        is_nullable,
+        data_type,
+        column_type,
+        character_maximum_length,
+        numeric_precision,
+        numeric_scale,
+        column_key,
+        extra,
+        column_comment,
+        generation_expression
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = ?
+      ORDER BY ordinal_position
+      `,
+      [table.table_name],
+    );
+    const columns = (columnRows || []).map((column) => {
+      const extra = String(column.extra || "").toLowerCase();
+      const generated = !!String(column.generation_expression || "").trim() || extra.includes("generated");
+      const autoIncrement = extra.includes("auto_increment");
+      return {
+        name: String(column.column_name),
+        comment: String(column.column_comment || ""),
+        data_type: String(column.data_type || ""),
+        column_type: String(column.column_type || ""),
+        nullable: String(column.is_nullable || "").toUpperCase() === "YES",
+        default: column.column_default,
+        max_length: column.character_maximum_length === null ? null : Number(column.character_maximum_length),
+        precision: column.numeric_precision === null ? null : Number(column.numeric_precision),
+        scale: column.numeric_scale === null ? null : Number(column.numeric_scale),
+        primary: String(column.column_key || "").toUpperCase() === "PRI",
+        auto_increment: autoIncrement,
+        generated,
+        readonly: autoIncrement || generated || String(column.column_key || "").toUpperCase() === "PRI",
+        input_kind: catalogInputKind(column),
+        enum_values: catalogEnumValues(column.column_type),
+      };
+    });
+    const primaryKey = columns.filter((column) => column.primary).map((column) => column.name);
+    if (!primaryKey.length) {
+      const error = new Error("Der Katalog besitzt keinen Primaerschluessel und kann nicht bearbeitet werden.");
+      error.statusCode = 409;
+      throw error;
+    }
+    return {
+      table: {
+        name: String(table.table_name),
+        comment: String(table.table_comment || ""),
+      },
+      columns,
+      primary_key: primaryKey,
+    };
+  }
+
+  function catalogWhereByKey(definition, rawKey) {
+    const key = rawKey && typeof rawKey === "object" ? rawKey : {};
+    const params = [];
+    const clauses = definition.primary_key.map((columnName) => {
+      if (!Object.prototype.hasOwnProperty.call(key, columnName)) {
+        const error = new Error(`Primaerschluessel ${columnName} fehlt.`);
+        error.statusCode = 400;
+        throw error;
+      }
+      params.push(key[columnName]);
+      return `${quoteCatalogIdentifier(columnName)} <=> ?`;
+    });
+    return { sql: clauses.join(" AND "), params };
+  }
+
+  function catalogWritableValues(definition, rawValues, { insert = false } = {}) {
+    const values = rawValues && typeof rawValues === "object" ? rawValues : {};
+    const columnsByName = new Map(definition.columns.map((column) => [column.name, column]));
+    const result = {};
+    for (const [name, value] of Object.entries(values)) {
+      const column = columnsByName.get(name);
+      if (!column || column.readonly || (!insert && column.primary)) continue;
+      result[name] = value === "" && column.nullable ? null : value;
+    }
+    return result;
+  }
+
+  async function fetchCatalogContents(conn, requestedTableName) {
+    const definition = await fetchCatalogDefinition(conn, requestedTableName);
+    const columnNames = new Set(definition.columns.map((column) => column.name));
+    const orderColumns = [];
+    if (columnNames.has("sortierung")) orderColumns.push("sortierung");
+    for (const primaryColumn of definition.primary_key) {
+      if (!orderColumns.includes(primaryColumn)) orderColumns.push(primaryColumn);
+    }
+    const orderSql = orderColumns.length
+      ? ` ORDER BY ${orderColumns.map(quoteCatalogIdentifier).join(", ")}`
+      : "";
+    const [rows] = await conn.query(
+      `SELECT * FROM ${quoteCatalogIdentifier(definition.table.name)}${orderSql}`,
+    );
+    return { ...definition, rows: rows || [] };
   }
 
   async function fetchAdminAnmSchools(conn) {
@@ -3723,6 +3910,85 @@ function createAuthModule(poolProvider) {
       res.json(await fetchAdminBootstrap());
     } catch (error) {
       return adminErrorResponse(res, error, "Verwaltungsdaten konnten nicht geladen werden.");
+    }
+  });
+
+  router.get("/admin/catalogs", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const tables = await fetchCatalogTables(getPool());
+      return res.json({
+        catalogs: tables.map((table) => ({
+          name: String(table.table_name || ""),
+          comment: String(table.table_comment || ""),
+        })),
+      });
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Kataloge konnten nicht geladen werden.");
+    }
+  });
+
+  router.get("/admin/catalogs/:tableName", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      return res.json(await fetchCatalogContents(getPool(), req.params.tableName));
+    } catch (error) {
+      return adminErrorResponse(res, error, "Der Katalog konnte nicht geladen werden.");
+    }
+  });
+
+  router.post("/admin/catalogs/:tableName/changes", authenticateToken, requireAdmin, async (req, res) => {
+    const conn = await getPool().getConnection();
+    try {
+      const definition = await fetchCatalogDefinition(conn, req.params.tableName);
+      const inserts = Array.isArray(req.body?.inserts) ? req.body.inserts : [];
+      const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
+      const deletes = Array.isArray(req.body?.deletes) ? req.body.deletes : [];
+      if (inserts.length + updates.length + deletes.length > 1000) {
+        const error = new Error("Ein Speichervorgang darf hoechstens 1000 Aenderungen enthalten.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      await conn.beginTransaction();
+
+      for (const entry of deletes) {
+        const where = catalogWhereByKey(definition, entry?.key);
+        await conn.query(
+          `DELETE FROM ${quoteCatalogIdentifier(definition.table.name)} WHERE ${where.sql}`,
+          where.params,
+        );
+      }
+
+      for (const entry of updates) {
+        const values = catalogWritableValues(definition, entry?.values, { insert: false });
+        const names = Object.keys(values);
+        if (!names.length) continue;
+        const where = catalogWhereByKey(definition, entry?.key);
+        await conn.query(
+          `UPDATE ${quoteCatalogIdentifier(definition.table.name)} SET ${names.map((name) => `${quoteCatalogIdentifier(name)} = ?`).join(", ")} WHERE ${where.sql}`,
+          [...names.map((name) => values[name]), ...where.params],
+        );
+      }
+
+      for (const entry of inserts) {
+        const values = catalogWritableValues(definition, entry?.values, { insert: true });
+        const names = Object.keys(values);
+        if (!names.length) {
+          await conn.query(`INSERT INTO ${quoteCatalogIdentifier(definition.table.name)} () VALUES ()`);
+          continue;
+        }
+        await conn.query(
+          `INSERT INTO ${quoteCatalogIdentifier(definition.table.name)} (${names.map(quoteCatalogIdentifier).join(", ")}) VALUES (${names.map(() => "?").join(", ")})`,
+          names.map((name) => values[name]),
+        );
+      }
+
+      await conn.commit();
+      return res.json(await fetchCatalogContents(conn, definition.table.name));
+    } catch (error) {
+      await conn.rollback().catch(() => {});
+      return adminErrorResponse(res, error, "Die Katalogaenderungen konnten nicht gespeichert werden.");
+    } finally {
+      conn.release();
     }
   });
 

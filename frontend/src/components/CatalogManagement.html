@@ -1,0 +1,148 @@
+<section class="catalog-management-page">
+  <div v-if="!isManagementSessionActive" class="catalog-empty">
+    Kataloge können nur mit einer aktiven Admin-Sitzung bearbeitet werden.
+  </div>
+
+  <div v-else class="catalog-layout">
+    <aside class="catalog-sidebar" aria-label="Katalogauswahl">
+      <button
+        v-for="catalog in catalogs"
+        :key="catalog.name"
+        :class="catalog.name === selectedCatalogName ? 'btn-primary' : 'btn-secondary'"
+        type="button"
+        :title="catalog.name"
+        :disabled="loading || saving"
+        @click="selectCatalog(catalog.name)"
+      >
+        {{ catalog.label }}
+      </button>
+      <p v-if="!loading && !catalogs.length" class="catalog-sidebar-empty">Keine Kataloge gefunden.</p>
+    </aside>
+
+    <section class="catalog-table-card">
+      <div class="catalog-toolbar">
+        <div>
+          <h3>{{ selectedLabel }}</h3>
+          <p v-if="selectedCatalog" :title="selectedCatalog.name">{{ selectedCatalog.name }}</p>
+        </div>
+        <div class="catalog-toolbar-actions">
+          <button class="btn-secondary" type="button" :disabled="loading || saving || !columns.length" @click="addRow">
+            Neuer Eintrag
+          </button>
+          <button class="btn-secondary" type="button" :disabled="saving || !hasChanges" @click="discardChanges">
+            Änderungen verwerfen
+          </button>
+          <button class="btn-primary" type="button" :disabled="loading || saving || !hasChanges" @click="saveChanges()">
+            {{ saving ? "Speichere..." : "Änderungen speichern" }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
+        <p>{{ errorMessage }}</p>
+      </div>
+      <div v-else-if="noticeMessage" class="feedback-panel feedback-panel-success">
+        <p>{{ noticeMessage }}</p>
+      </div>
+
+      <div v-if="loading" class="catalog-empty">Katalog wird geladen...</div>
+      <div v-else-if="selectedCatalog" class="catalog-table-wrap">
+        <table class="catalog-table">
+          <thead>
+            <tr>
+              <th v-for="column in columns" :key="column.name" :title="column.name">
+                {{ columnLabel(column) }}
+              </th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in rows"
+              :key="row.localId"
+              :class="{
+                'is-new': row.isNew,
+                'is-changed': !row.isNew && !row.deleted && rowChanged(row),
+                'is-deleted': row.deleted,
+              }"
+            >
+              <td v-for="column in columns" :key="`${row.localId}-${column.name}`">
+                <span v-if="column.readonly" class="catalog-readonly-value">
+                  {{ row.isNew && column.primary ? "Neu" : (row.values[column.name] ?? "-") }}
+                </span>
+                <label v-else-if="column.input_kind === 'boolean'" class="catalog-checkbox">
+                  <input
+                    type="checkbox"
+                    :checked="Boolean(Number(row.values[column.name]))"
+                    :disabled="saving || row.deleted"
+                    :aria-label="columnLabel(column)"
+                    @change="updateInput(row, column, $event)"
+                  />
+                </label>
+                <select
+                  v-else-if="column.input_kind === 'select'"
+                  :value="row.values[column.name] ?? ''"
+                  :disabled="saving || row.deleted"
+                  @change="updateInput(row, column, $event)"
+                >
+                  <option v-if="column.nullable" value="">–</option>
+                  <option v-for="option in column.enum_values" :key="option" :value="option">{{ option }}</option>
+                </select>
+                <input
+                  v-else
+                  :type="column.input_kind"
+                  :value="formatInputValue(row.values[column.name], column)"
+                  :maxlength="column.max_length || undefined"
+                  :disabled="saving || row.deleted"
+                  @input="updateInput(row, column, $event)"
+                />
+              </td>
+              <td class="catalog-row-actions">
+                <button class="btn-secondary" type="button" :disabled="saving" @click="toggleDeleted(row)">
+                  {{ row.deleted ? "Löschen rückgängig" : "Löschen" }}
+                </button>
+                <span v-if="row.isNew && !row.deleted" class="catalog-row-state">Neu</span>
+                <span v-else-if="rowChanged(row) && !row.deleted" class="catalog-row-state">Geändert</span>
+              </td>
+            </tr>
+            <tr v-if="!rows.length">
+              <td :colspan="columns.length + 1" class="catalog-table-empty">Dieser Katalog enthält keine Einträge.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div v-if="leaveDialogOpen" class="catalog-modal-overlay">
+    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Ungespeicherte Änderungen">
+      <h3>Ungespeicherte Änderungen</h3>
+      <p>Im Katalog „{{ selectedLabel }}“ liegen ungespeicherte Änderungen vor.</p>
+      <div class="catalog-modal-actions">
+        <button class="btn-secondary" type="button" :disabled="saving" @click="finishLeaveDialog(false)">Abbrechen</button>
+        <button class="btn-secondary" type="button" :disabled="saving" @click="discardAndLeave">Verwerfen und wechseln</button>
+        <button class="btn-primary" type="button" :disabled="saving" @click="saveAndLeave">
+          {{ saving ? "Speichere..." : "Speichern und wechseln" }}
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div v-if="deleteDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
+    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Löschungen bestätigen">
+      <h3>Einträge löschen?</h3>
+      <p>
+        Im Katalog „{{ selectedLabel }}“ werden {{ deletedRows.length }} Einträge endgültig gelöscht:
+      </p>
+      <ul>
+        <li v-for="row in deletedRows" :key="`delete-${row.localId}`">{{ rowDisplayName(row) }}</li>
+      </ul>
+      <div class="catalog-modal-actions">
+        <button class="btn-secondary" type="button" @click="finishDeleteDialog(false)">Abbrechen</button>
+        <button class="btn-primary catalog-danger-button" type="button" @click="finishDeleteDialog(true)">
+          Endgültig löschen
+        </button>
+      </div>
+    </section>
+  </div>
+</section>

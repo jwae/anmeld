@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import UserSessionCard from "./UserSessionCard.vue";
 import UserManagementPanel from "./UserManagementPanel.vue";
 
@@ -20,6 +20,13 @@ const props = defineProps<{
 const isAdminUser = computed<boolean>(
   () => String(props.user?.group_name || "").trim().toLowerCase() === "admin",
 );
+
+const userManagementRef = ref<{ requestLeave: () => Promise<boolean> } | null>(null);
+
+async function requestClose() {
+  const allowed = await (userManagementRef.value?.requestLeave() || Promise.resolve(true));
+  if (allowed) emit("close");
+}
 </script>
 
 <template src="./APPManagement.html"></template>

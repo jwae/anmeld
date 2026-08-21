@@ -4,6 +4,7 @@ import { authStore } from "../authStore";
 import apiClient from "../services/apiClient";
 import SchoolManagement from "./SchoolManagement.vue";
 import SchoolGroupManagement from "./SchoolGroupManagement.vue";
+import CatalogManagement from "./CatalogManagement.vue";
 import type { User } from "../types";
 
 const props = defineProps<{
@@ -30,6 +31,7 @@ const managementSchoolGroups = ref<any[]>([]);
 const managementSnapshots = ref<any[]>([]);
 const managementTerms = ref<any[]>([]);
 const activeManagementTab = ref<string>("users");
+const catalogManagementRef = ref<{ requestLeave: () => Promise<boolean> } | null>(null);
 const managementStats = ref({
   total_users: 0,
   active_users: 0,
@@ -154,8 +156,9 @@ function applyManagementBootstrap(data: any) {
   }
 }
 
-function clearManagementSession() {
+async function clearManagementSession() {
   if (hasExternalManagementSession.value) return;
+  if (!(await requestManagementLeave())) return;
   managementToken.value = "";
   managementSessionUser.value = null;
   managementError.value = "";
@@ -182,6 +185,17 @@ function clearManagementSession() {
   };
   resetGroupForm();
   resetUserForm();
+}
+
+async function requestManagementLeave() {
+  if (activeManagementTab.value !== "catalogs") return true;
+  return await (catalogManagementRef.value?.requestLeave() || Promise.resolve(true));
+}
+
+async function requestManagementTab(tabName: string) {
+  if (tabName === activeManagementTab.value) return;
+  if (!(await requestManagementLeave())) return;
+  activeManagementTab.value = tabName;
 }
 
 function managementAuthHeaders() {
@@ -569,6 +583,8 @@ function handleSchoolManagementFeedback(feedback: any) {
   managementError.value = String(feedback?.error || "");
   managementNotice.value = String(feedback?.notice || "");
 }
+
+defineExpose({ requestLeave: requestManagementLeave });
 </script>
 
 <template src="./UserManagementPanel.html"></template>

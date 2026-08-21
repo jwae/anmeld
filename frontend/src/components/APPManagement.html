@@ -17,7 +17,7 @@
         :connected-port="connectedPort"
         :connected-database="connectedDatabase"
         :action-label="showCloseButton ? closeLabel : ''"
-        @action="emit('close')"
+        @action="requestClose"
       />
     </div>
   </div>
@@ -28,6 +28,7 @@
 
   <UserManagementPanel
     v-else
+    ref="userManagementRef"
     :management-token="token"
     :management-user="user"
     :embedded="true"
