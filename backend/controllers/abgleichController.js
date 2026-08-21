@@ -559,8 +559,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       COALESCE(s.herkunft, '') AS herkunft,
       ${columns.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "''"} AS herkunftsschule_snr,
       COALESCE(src.name, '') AS quell_schule,
-      COALESCE(sch.name, sref.name, '') AS schule,
-      COALESCE(sch.ort, sref.ort, sref.city, '') AS ort,
+      COALESCE(sch.name, '') AS schule,
+      COALESCE(sch.ort, '') AS ort,
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
       NULLIF(TRIM(${studentIdColumn}), '') AS schueler_schul_id,
       COALESCE(s.abgleich_status, '') AS abgleich_status,
@@ -573,8 +573,6 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       ON src.snr = ${columns.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "NULL"}
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
-    LEFT JOIN school sref
-      ON sref.snr = ${schoolColumn}
     ${foerderJoin}
     ${whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : ""}
     ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC
@@ -840,7 +838,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     `
     SELECT
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
-      COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule') AS schule,
+      COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule') AS schule,
       COALESCE(cap.kapazitaet, 0) AS kapazitaet,
       COUNT(*) AS gesamt,
       COALESCE(SUM(CASE WHEN ${statusExpr} = 'neuaufnahme' THEN 1 ELSE 0 END), 0) AS neuaufnahme,
@@ -851,12 +849,10 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     FROM anm_schueler s
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
-    LEFT JOIN school sref
-      ON sref.snr = ${schoolColumn}
     ${capacityJoin}
     ${assignedWhereClause}
-    GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0)
-    ORDER BY COALESCE(NULLIF(TRIM(sch.name), ''), NULLIF(TRIM(sref.name), ''), 'Ohne Schule') ASC
+    GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0)
+    ORDER BY COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule') ASC
     `,
     assignedParams,
   );

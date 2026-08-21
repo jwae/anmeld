@@ -12,7 +12,7 @@ const apiClient = axios.create({
 });
 
 // Callback for unauthorized requests (401)
-// We use a callback to avoid circular dependencies with useAuth/useDashboardNavigation
+// We use a callback to avoid circular dependencies with the authentication state.
 let unauthorizedCallback: (() => void) | null = null;
 
 export function registerUnauthorizedCallback(callback: () => void) {

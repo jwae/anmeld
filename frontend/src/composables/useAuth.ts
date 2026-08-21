@@ -58,8 +58,8 @@ export function useAuth() {
     }
   }
 
-  function continueAfterLogin(firstAllowedDashboard: { value: string }): string | null {
-    if (!pendingLogin.value) return null;
+  function continueAfterLogin(): boolean {
+    if (!pendingLogin.value) return false;
 
     const token = pendingLogin.value.token || "";
     const user = pendingLogin.value.user || {};
@@ -71,9 +71,8 @@ export function useAuth() {
       : [];
 
     setToken(token, username, groupName, dashboardKeys, dashboardPermissions, user.user_id || "");
-    const view = firstAllowedDashboard.value || "uebersicht";
     pendingLogin.value = null;
-    return view;
+    return true;
   }
 
   async function logout() {

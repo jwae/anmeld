@@ -41,7 +41,7 @@
 
         <div class="login-status-chip" :class="{ 'login-status-chip-success': !!pendingLogin }">
           <i :class="pendingLogin ? 'bi bi-person-check' : 'bi bi-person'"></i>
-          <span>{{ pendingLogin ? "Login bestaetigt" : "Nicht angemeldet" }}</span>
+          <span>{{ pendingLogin ? "Login bestätigt" : "Nicht angemeldet" }}</span>
         </div>
       </div>
 
@@ -79,16 +79,6 @@
           </button>
 
           <button
-            v-else-if="!isPendingAdmin"
-            class="btn-primary"
-            @click="continueAfterLogin"
-            :disabled="loginLoading"
-            type="button"
-          >
-            Weiter zum Dashboard
-          </button>
-
-          <button
             v-if="pendingLogin && isPendingAdmin"
             class="btn-secondary login-manage-users-btn login-manage-users-btn-primary"
             type="button"
@@ -120,7 +110,7 @@
               Wähle jetzt <strong>Zum Anmeldeverfahren</strong>.
             </template>
             <template v-else>
-              Wähle jetzt <strong>Weiter zum Dashboard</strong>.
+              Für dieses Konto ist kein Anwendungsbereich freigeschaltet.
             </template>
           </p>
         </div>
@@ -137,123 +127,5 @@
       :token="authStore.token"
       @close="logout"
     />
-  </template>
-
-  <template v-else>
-    <header class="header header-auth-row">
-      <div>
-        <h1>Dashboard</h1>
-        <p>Dashboard-Ansicht nach Login.</p>
-      </div>
-      <UserSessionCard      
-        :user-label="currentUserLabel"
-        :connected-host="connectedHost || host"
-        :connected-port="connectedPort || port"
-        :connected-database="connectedDatabase || database"
-        action-label="Logout"
-        @action="logout"
-      />
-    </header>
-
-    <DashboardFiltersPanel
-      v-model:snapshot-name-selection="snapshotNameSelection"
-      v-model:school-term-selection="schoolTermSelection"
-      v-model:selected-city="selectedCity"
-      v-model:selected-snr="selectedSnr"
-      :snapshot-name-options="snapshotNameOptions"
-      :school-term-options="schoolTermOptions"
-      :cities="cities"
-      :schools-filtered-for-dropdown="schoolsFilteredForDropdown"
-      :summary-items="dashboardSummaryItems"
-      :error-message="dashboardErrorMessage"
-    />
-
-    <DashboardTabs
-      v-model="view"
-      :tabs="dashboardTabs"
-    />
-
-  <!-- ===== Dashboard 1 ===== -->
-  <!-- ===== Dashboard 2 ===== -->
-  <ClassStrengthDashboard
-    v-if="view === 'klassenstaerken'"
-    v-model:lower-threshold="lowerThreshold"
-    v-model:upper-threshold="upperThreshold"
-    :class-codes="classCodes"
-    :class-rows-count="classRows.length"
-    :error="errorClasses"
-    :grand-total-classes="grandTotalClasses"
-    :schools-in-class-matrix="schoolsInClassMatrix"
-    :get-class-header-label="getClassHeaderLabel"
-    :get-class-students="getClassStudents"
-    :total-for-class="totalForClass"
-    :total-for-school="totalForSchool"
-    :class-cell-class="classCellClass"
-  />
-
-  <!-- ===== Dashboard 4 Uebersicht ===== -->
-  <OverviewDashboard
-    v-if="view === 'uebersicht'"
-    :selected-snapshot="selectedSnapshotForOverview"
-    :overview="overview"
-    :total-students-overview="totalStudentsOverview"
-    :special-needs-overview="specialNeedsOverview"
-    :special-needs-percent-overview="specialNeedsPercentOverview"
-    :ef-overview="efOverview"
-    :ef-percent-overview="efPercentOverview"
-    :migration-percent-overview="migrationPercentOverview"
-    :nationality-percent-overview="nationalityPercentOverview"
-    :h-track-percent-overview="hTrackPercentOverview"
-    :gender-chart-option="genderChartOption"
-    :grade-chart-option="gradeChartOption"
-    :support-chart-option="supportChartOption"
-    :ef-chart-option="efChartOption"
-    :migration-chart-option="migrationChartOption"
-    :nationality-chart-option="nationalityChartOption"
-    :religion-chart-option="religionChartOption"
-    :education-track-chart-option="educationTrackChartOption"
-    :h-track-grade-chart-option="hTrackGradeChartOption"
-  />
-
-  <StudentNumbersDashboard
-    v-if="view === 'schuelerzahlen'"
-    :selected-snapshot="selectedSnapshotForOverview"
-    :loading="loadingOverview"
-    :error="errorOverview"
-    :school-trend-series-count="schoolTrendSeriesCount"
-    :school-trend-chart-option="schoolTrendChartOption"
-    :cumulative-school-trend-chart-option="cumulativeSchoolTrendChartOption"
-    :ef-trend-chart-option="efTrendChartOption"
-    :ef-trend-rows="efTrendRows"
-    :school-trend-terms="schoolTrendTerms"
-    :school-trend-schools="schoolTrendSchools"
-    :get-school-trend-students="getSchoolTrendStudents"
-  />
-
-  <TeachersDashboard
-    v-if="view === 'lehrkraefte'"
-    :selected-snapshot="selectedSnapshotForOverview"
-    :loading="loadingTeachers"
-    :error="errorTeachers"
-    :teacher-chart-option="teacherChartOption"
-    :teacher-summary="teacherSummary"
-    :teacher-school-rows="teacherSchoolRows"
-  />
-
-  <DazDashboard
-    v-if="view === 'daz'"
-    v-model:lower-threshold="dazLowerThreshold"
-    v-model:upper-threshold="dazUpperThreshold"
-    :class-codes="dazClassCodes"
-    :class-rows-count="dazRows.length"
-    :error="errorDaz"
-    :grand-total-classes="grandTotalDaz"
-    :schools-in-class-matrix="schoolsInDazMatrix"
-    :get-class-header-label="getDazClassHeaderLabel"
-    :get-class-students="getDaz"
-    :total-for-class="totalDazForClass"
-    :total-for-school="totalDazForSchool"
-    :class-cell-class="dazCellClass"
-  />
   </template>
 </div>

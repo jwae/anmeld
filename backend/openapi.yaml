@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: Schul-Stat API
-  description: API for collecting and aggregating statistical data from school databases.
+  title: Schulanmeldeverfahren API
+  description: API zur Verwaltung des schulischen Anmeldeverfahrens.
   version: 1.0.0
 servers:
   - url: http://localhost:3000
@@ -24,85 +24,6 @@ components:
           type: string
         code:
           type: string
-
-    School:
-      type: object
-      properties:
-        snr:
-          type: string
-        name:
-          type: string
-        city:
-          type: string
-
-    Snapshot:
-      type: object
-      properties:
-        termId:
-          type: integer
-        schoolYear:
-          type: integer
-        termNo:
-          type: integer
-        snapshotDate:
-          type: string
-          format: date
-        info:
-          type: string
-
-    KPIBreakdownItem:
-      type: object
-      properties:
-        name:
-          type: string
-        value:
-          type: number
-
-    OverviewData:
-      type: object
-      properties:
-        totals:
-          type: object
-          properties:
-            totalStudents:
-              type: number
-            specialNeeds:
-              type: number
-            specialNeedsPercent:
-              type: number
-        genderBreakdown:
-          type: array
-          items:
-            $ref: '#/components/schemas/KPIBreakdownItem'
-        gradeBreakdown:
-          type: array
-          items:
-            $ref: '#/components/schemas/KPIBreakdownItem'
-        studentTrend:
-          type: array
-          items:
-            type: object
-            properties:
-              snapshot_date:
-                type: string
-              total_students:
-                type: number
-              ef_students:
-                type: number
-
-    TeacherData:
-      type: object
-      properties:
-        totalTeachers:
-          type: number
-        sexBreakdown:
-          type: array
-          items:
-            $ref: '#/components/schemas/KPIBreakdownItem'
-        ageBreakdown:
-          type: array
-          items:
-            $ref: '#/components/schemas/KPIBreakdownItem'
 
     User:
       type: object
@@ -187,65 +108,3 @@ paths:
                     type: string
                   user:
                     $ref: '#/components/schemas/User'
-
-  /api/meta/schools:
-    get:
-      summary: List schools
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: schoolYear
-          in: query
-          schema:
-            type: integer
-        - name: termNo
-          in: query
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: List of schools
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/School'
-
-  /api/kpi/overview:
-    get:
-      summary: Get overview statistics
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: snapshotDate
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Statistics data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OverviewData'
-
-  /api/kpi/teachers:
-    get:
-      summary: Get teacher statistics
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: snapshotDate
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Teacher data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TeacherData'
