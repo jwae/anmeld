@@ -90,19 +90,6 @@ CREATE TABLE `anm_verfahren` (
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- anmeld.app_dashboard definition
-
-CREATE TABLE `app_dashboard` (
-  `dashboard_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `dashboard_key` varchar(50) NOT NULL,
-  `dashboard_name` varchar(100) NOT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`dashboard_id`),
-  UNIQUE KEY `dashboard_key` (`dashboard_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=1083 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
 -- anmeld.app_group definition
 
 CREATE TABLE `app_group` (
@@ -114,6 +101,20 @@ CREATE TABLE `app_group` (
   PRIMARY KEY (`group_id`),
   UNIQUE KEY `group_name` (`group_name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+-- anmeld.app_permission definition
+
+CREATE TABLE `app_permission` (
+  `permission_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `permission_key` varchar(100) NOT NULL,
+  `permission_name` varchar(150) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`permission_id`),
+  UNIQUE KEY `uq_app_permission_key` (`permission_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 
@@ -219,16 +220,16 @@ CREATE TABLE `anm_schulen` (
   CONSTRAINT `fk_anm_schulen_sf` FOREIGN KEY (`sf_id`) REFERENCES `anm_kat_sf` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- anmeld.app_group_dashboard definition
+-- anmeld.app_group_permission definition
 
-CREATE TABLE `app_group_dashboard` (
+CREATE TABLE `app_group_permission` (
   `group_id` int(10) unsigned NOT NULL,
-  `dashboard_id` int(10) unsigned NOT NULL,
+  `permission_id` int(10) unsigned NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`group_id`,`dashboard_id`),
-  KEY `fk_agd_dashboard` (`dashboard_id`),
-  CONSTRAINT `fk_agd_dashboard` FOREIGN KEY (`dashboard_id`) REFERENCES `app_dashboard` (`dashboard_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_agd_group` FOREIGN KEY (`group_id`) REFERENCES `app_group` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE
+  PRIMARY KEY (`group_id`,`permission_id`),
+  KEY `fk_app_group_permission_permission` (`permission_id`),
+  CONSTRAINT `fk_app_group_permission_group` FOREIGN KEY (`group_id`) REFERENCES `app_group` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_app_group_permission_permission` FOREIGN KEY (`permission_id`) REFERENCES `app_permission` (`permission_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
@@ -551,35 +552,41 @@ COLLATE=utf8mb4_unicode_ci;
 -- -----------------------------------------------------
 SET FOREIGN_KEY_CHECKS = 1;
 
-INSERT INTO `app_dashboard` VALUES
-(1,'uebersicht','Übersicht',1,'2026-03-06 18:25:39'),
-(2,'schuelerstaerken','Schülerstärken',1,'2026-03-06 18:25:39'),
-(3,'klassenstaerken','Klassenstärken',1,'2026-03-06 18:25:39'),
-(4,'daz','DAZ',1,'2026-03-06 18:25:39'),
-(5,'app-einstellungen','Einstellungen',1,'2026-03-06 19:24:28'),
-(6,'db-einstellungen','Datenbanken',1,'2026-03-06 19:25:46'),
-(7,'lehrerdaten','Lehrerdaten',1,'2026-04-18 19:49:39'),
-(768,'schuelerzahlen','Schülerzahlen',1,'2026-05-11 15:11:51');
-
 INSERT INTO `app_group` VALUES
-(1,'admin','Systemadministrator',1,'2026-03-06 17:45:14'),
-(2,'user','Standardbenutzer',1,'2026-03-06 17:45:14'),
-(3,'editor_daz','Kann Inhalte bearbeiten',1,'2026-03-06 17:45:14'),
-(12,'editor_L','Testgruppe',1,'2026-03-08 20:29:56');
+(1,'Administrator','Systemadministrator',1,'2026-03-06 17:45:14'),
+(2,'Sachbearbeitung','Fachliche Bearbeitung von Anmeldeverfahren',1,'2026-03-06 17:45:14'),
+(3,'Gast','Lesender Zugriff auf Anmeldeverfahren',1,'2026-03-06 17:45:14');
 
-INSERT INTO `app_group_dashboard` VALUES
-(1,1,'2026-05-11 15:12:51'),
-(1,2,'2026-05-11 15:12:51'),
-(1,3,'2026-05-11 15:12:51'),
-(1,4,'2026-05-11 15:12:51'),
-(1,5,'2026-05-11 15:12:51'),
-(1,6,'2026-05-11 15:12:51'),
-(1,7,'2026-05-11 15:12:51'),
-(1,768,'2026-05-11 15:12:51'),
-(2,1,'2026-05-11 15:12:26'),
-(2,768,'2026-05-11 15:12:26'),
-(3,4,'2026-05-11 15:12:40'),
-(12,7,'2026-05-11 15:12:32');
+INSERT INTO `app_permission`
+  (`permission_key`, `permission_name`, `description`, `is_active`)
+VALUES
+  ('verfahren.anzeigen', 'Verfahren anzeigen', 'Verfahren und zugehoerige Daten anzeigen', 1),
+  ('verfahren.bearbeiten', 'Verfahren bearbeiten', 'Fachliche Daten innerhalb eines Verfahrens bearbeiten; umfasst Verfahren, Runden, Schueler, Import, Abgleich, Kapazitaeten und Koordination', 1),
+  ('benutzer.bearbeiten', 'Benutzer bearbeiten', 'Benutzer verwalten', 1),
+  ('gruppen.bearbeiten', 'Gruppen bearbeiten', 'Gruppen und deren Berechtigungen verwalten', 1);
+
+INSERT INTO `app_group_permission` (`group_id`, `permission_id`)
+SELECT g.`group_id`, p.`permission_id`
+FROM `app_group` g
+JOIN `app_permission` p ON p.`permission_key` = 'verfahren.anzeigen'
+WHERE LOWER(TRIM(g.`group_name`)) = 'gast';
+
+INSERT INTO `app_group_permission` (`group_id`, `permission_id`)
+SELECT g.`group_id`, p.`permission_id`
+FROM `app_group` g
+JOIN `app_permission` p ON p.`permission_key` IN ('verfahren.anzeigen', 'verfahren.bearbeiten')
+WHERE LOWER(TRIM(g.`group_name`)) = 'sachbearbeitung';
+
+INSERT INTO `app_group_permission` (`group_id`, `permission_id`)
+SELECT g.`group_id`, p.`permission_id`
+FROM `app_group` g
+JOIN `app_permission` p ON p.`permission_key` IN (
+  'verfahren.anzeigen',
+  'verfahren.bearbeiten',
+  'benutzer.bearbeiten',
+  'gruppen.bearbeiten'
+)
+WHERE LOWER(TRIM(g.`group_name`)) = 'administrator';
 
 INSERT INTO `app_user` VALUES
 (10,1,'Administrator','admin',NULL,'$2a$10$f96qA8oo/03zn1LKVIPtOuIGUxhhOebwsLp/jGEemF7QQLUGsRbm.',1,'2026-03-07 20:48:28','2026-05-14 12:09:41','2026-05-14 12:09:41');

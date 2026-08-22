@@ -12,6 +12,7 @@ const props = defineProps<{
   nextAvailableRoundNumber?: number | null;
   procedureLocked?: boolean;
   canCreateRound?: boolean;
+  isReadonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -53,7 +54,7 @@ const selectedRound = computed<Anmelderunde | null>(
         <p v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
       </div>
       <div v-if="verfahren" class="anm-card-head-actions">
-        <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreateRound === false" @click="emit('create-round')">
+        <button v-if="!isReadonly" class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreateRound === false" @click="emit('create-round')">
           {{ nextAvailableRoundNumber ? `Runde ${nextAvailableRoundNumber} anlegen` : "Runden vollstaendig" }}
         </button>
         <span class="anm-badge">{{ items.length }}</span>
@@ -156,7 +157,7 @@ const selectedRound = computed<Anmelderunde | null>(
                   v-if="item.id === nextRoundId"
                   class="btn-secondary anm-inline-btn"
                   type="button"
-                  :disabled="procedureLocked"
+                  :disabled="procedureLocked || isReadonly"
                   @click.stop="emit('start-round', item)"
                 >
                   Runde starten
@@ -168,7 +169,7 @@ const selectedRound = computed<Anmelderunde | null>(
               </div>
             </td>
             <td class="anm-cell-actions">
-              <div class="anm-actions">
+              <div v-if="!isReadonly" class="anm-actions">
                 <button
                   class="btn-secondary anm-icon-btn"
                   type="button"

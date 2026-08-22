@@ -1,4 +1,4 @@
--- Entfernt die nicht mehr verwendeten Tabellen des alten Statistik-Dashboards
+-- Entfernt die nicht mehr verwendeten Tabellen des alten Statistikmoduls
 -- und der aufgegebenen Import-Protokollierung. anm_* und app_* bleiben erhalten.
 SET FOREIGN_KEY_CHECKS = 0;
 

@@ -6,11 +6,7 @@ export interface User {
   user_id?: string | number;
   username: string;
   group_name: string;
-  dashboards: string[];
-  dashboard_permissions: Array<{
-    dashboard_key: string;
-    dashboard_name: string;
-  }>;
+  permissions: string[];
 }
 
 export interface LoginResponse {

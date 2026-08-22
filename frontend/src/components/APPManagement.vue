@@ -17,9 +17,10 @@ const props = defineProps<{
   closeLabel?: string;
 }>();
 
-const isAdminUser = computed<boolean>(
-  () => String(props.user?.group_name || "").trim().toLowerCase() === "admin",
-);
+const canManageApp = computed<boolean>(() => {
+  const permissions = Array.isArray(props.user?.permissions) ? props.user.permissions : [];
+  return permissions.includes("benutzer.bearbeiten") || permissions.includes("gruppen.bearbeiten");
+});
 
 const userManagementRef = ref<{ requestLeave: () => Promise<boolean> } | null>(null);
 

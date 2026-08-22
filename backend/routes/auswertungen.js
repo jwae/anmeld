@@ -1,11 +1,11 @@
 const express = require("express");
 const createAuswertungenController = require("../controllers/auswertungenController");
 
-function createAuswertungenRouter({ authenticateToken, requireAdmin, getPool }) {
+function createAuswertungenRouter({ requirePermission, getPool }) {
   const router = express.Router();
   const controller = createAuswertungenController({ getPool });
 
-  router.use(authenticateToken, requireAdmin);
+  router.use(requirePermission("verfahren.anzeigen"));
 
   router.get("/catalog", controller.catalog);
   router.get("/offene-anmeldungen", controller.offeneAnmeldungen);

@@ -71,10 +71,10 @@ async function loadFallgrundOptions(pool) {
   })).filter((row) => row.id > 0);
 }
 
-async function loadProcedureSchoolNumbers(pool, verfahrenId) {
+async function loadProcedureSchools(pool, verfahrenId) {
   const [rows] = await pool.query(
     `
-    SELECT DISTINCT s.snr
+    SELECT DISTINCT s.snr, s.name
     FROM anm_verfahren_schulgruppe vsg
     JOIN anm_schulgruppe_schule sgs
       ON sgs.schulgruppe_id = vsg.schulgruppe_id
@@ -82,14 +82,17 @@ async function loadProcedureSchoolNumbers(pool, verfahrenId) {
       ON s.snr = sgs.snr
     WHERE vsg.verfahren_id = ?
       AND vsg.rolle = 'Zielschulen'
-    ORDER BY s.snr ASC
+    ORDER BY s.name ASC, s.snr ASC
     `,
     [verfahrenId],
   );
 
   return (rows || [])
-    .map((row) => normalizeText(row?.snr))
-    .filter(Boolean);
+    .map((row) => ({
+      snr: normalizeText(row?.snr),
+      name: normalizeText(row?.name),
+    }))
+    .filter((row) => row.snr);
 }
 
 async function loadOpenCaseCountsByStudent(pool, verfahrenId) {
@@ -948,10 +951,11 @@ function createAbgleichController({ getPool }) {
         const rows = await loadSchuelerRows(pool, verfahrenId, rundeId);
         const summary = await loadSchuelerCardSummary(pool, verfahrenId, rundeId);
         const schoolOverview = await loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId);
-        const schoolNumbersInProcedure = await loadProcedureSchoolNumbers(pool, verfahrenId);
+        const schoolsInProcedure = await loadProcedureSchools(pool, verfahrenId);
+        const schoolNumbersInProcedure = schoolsInProcedure.map((school) => school.snr);
         const anmeldestatusOptions = await loadAnmeldestatusCodes(pool);
         const fallgrundOptions = await loadFallgrundOptions(pool);
-        return res.json({ rows, summary, schoolOverview, schoolNumbersInProcedure, anmeldestatusOptions, fallgrundOptions });
+        return res.json({ rows, summary, schoolOverview, schoolsInProcedure, schoolNumbersInProcedure, anmeldestatusOptions, fallgrundOptions });
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");
@@ -1057,6 +1061,13 @@ function createAbgleichController({ getPool }) {
 
         const pool = getPool();
         await assertWritableContext(pool, verfahrenId, rundeId);
+        const anmeldeschuleSnr = normalizeText(req.body?.schulnummer || req.body?.anmeldeschule_snr);
+        if (anmeldeschuleSnr) {
+          const schoolsInProcedure = await loadProcedureSchools(pool, verfahrenId);
+          if (!schoolsInProcedure.some((school) => school.snr === anmeldeschuleSnr)) {
+            return sendError(res, 400, "Die ausgewaehlte aufnehmende Schule gehoert nicht zum Verfahren.");
+          }
+        }
         const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
         const [rows] = await pool.query(
           `

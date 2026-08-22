@@ -58,6 +58,11 @@ type SchoolOverviewRow = {
   zieldifferent: number;
 };
 
+type ProcedureSchoolRow = {
+  snr: string;
+  name: string;
+};
+
 const props = defineProps<{
   token?: string;
   verfahrenId: number | null;
@@ -76,6 +81,7 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const schuelerRows = ref<SchuelerRow[]>([]);
 const schoolOverviewRows = ref<SchoolOverviewRow[]>([]);
+const schoolsInProcedure = ref<ProcedureSchoolRow[]>([]);
 const schoolNumbersInProcedure = ref<string[]>([]);
 const anmeldestatusOptions = ref<string[]>([]);
 const fallgrundOptions = ref<FallgrundOption[]>([]);
@@ -435,6 +441,7 @@ async function loadData() {
   if (!props.verfahrenId || !props.rundeId) {
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    schoolsInProcedure.value = [];
     schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
@@ -448,6 +455,7 @@ async function loadData() {
     const response = await abgleichService.getSchuelerUebersicht(props.verfahrenId, props.rundeId, props.token);
     schuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
     schoolOverviewRows.value = Array.isArray(response?.schoolOverview) ? response.schoolOverview : [];
+    schoolsInProcedure.value = Array.isArray(response?.schoolsInProcedure) ? response.schoolsInProcedure : [];
     schoolNumbersInProcedure.value = Array.isArray(response?.schoolNumbersInProcedure) ? response.schoolNumbersInProcedure.map((value: unknown) => normalizeText(value)).filter(Boolean) : [];
     anmeldestatusOptions.value = Array.isArray(response?.anmeldestatusOptions) ? response.anmeldestatusOptions : [];
     fallgrundOptions.value = Array.isArray(response?.fallgrundOptions) ? response.fallgrundOptions : [];
@@ -461,6 +469,7 @@ async function loadData() {
     errorMessage.value = error?.response?.data?.error || error?.message || "Die Abgleichsansicht konnte nicht geladen werden.";
     schuelerRows.value = [];
     schoolOverviewRows.value = [];
+    schoolsInProcedure.value = [];
     schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
@@ -906,80 +915,93 @@ function toggleSchuleFilter(schuleName: string) {
           </div>
 
           <div class="case-dialog-body case-dialog-body-edit">
-            <div class="edit-form-grid">
-              <label>
-                <span>Schueler-ID</span>
-                <input v-model="editForm.schueler_schul_id" type="text" />
-              </label>
-              <label>
-                <span>Schul-Nr</span>
-                <input v-model="editForm.schulnummer" type="text" />
-              </label>
-              <label>
-                <span>Vorname</span>
-                <input v-model="editForm.vorname" type="text" />
-              </label>
-              <label>
-                <span>Nachname</span>
-                <input v-model="editForm.nachname" type="text" />
-              </label>
-              <label>
-                <span>Geburtsdatum</span>
-                <input v-model="editForm.geburtsdatum" type="date" />
-              </label>
-              <label>
-                <span>Herkunft</span>
-                <select v-model="editForm.herkunft">
-                  <option value="">Bitte waehlen</option>
-                  <option v-for="option in herkunftEditOptions" :key="option" :value="option">{{ option }}</option>
-                </select>
-              </label>
-              <label>
-                <span>Abgleichstatus</span>
-                <select v-model="editForm.abgleich_status">
-                  <option value="">Bitte waehlen</option>
-                  <option value="Nur Pool">Nur Pool</option>
-                  <option value="Nur Anmeldung">Nur Anmeldung</option>
-                  <option value="Pool + Anm">Pool + Anm</option>
-                </select>
-              </label>
-              <label>
-                <span>Anmeldestatus</span>
-                <select v-model="editForm.anmeldestatus">
-                  <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
-                </select>
-              </label>
-              <label>
-                <span>LE</span>
-                <select v-model="editForm.foerderbedarf">
-                  <option value="0">Nein</option>
-                  <option value="1">Ja</option>
-                </select>
-              </label>
-              <label>
-                <span>ZD</span>
-                <select v-model="editForm.zieldifferent">
-                  <option value="0">Nein</option>
-                  <option value="1">Ja</option>
-                </select>
-              </label>
-              <label>
-                <span>Strasse</span>
-                <input v-model="editForm.strasse" type="text" />
-              </label>
-              <label>
-                <span>PLZ</span>
-                <input v-model="editForm.plz" type="text" />
-              </label>
-              <label class="edit-form-full">
-                <span>Ort</span>
-                <input v-model="editForm.ort" type="text" />
-              </label>
-              <label class="edit-form-full">
-                <span>Bemerkung</span>
-                <textarea v-model="editForm.bemerkung" rows="4"></textarea>
-              </label>
-            </div>
+            <section class="edit-form-section" aria-labelledby="edit-student-data-title">
+              <div class="edit-form-grid">
+                <label>
+                  <span>Schueler-ID</span>
+                  <input v-model="editForm.schueler_schul_id" type="text" />
+                </label>
+                <label>
+                  <span>Geburtsdatum</span>
+                  <input v-model="editForm.geburtsdatum" type="date" />
+                </label>
+                <label>
+                  <span>Vorname</span>
+                  <input v-model="editForm.vorname" type="text" />
+                </label>
+                <label>
+                  <span>Nachname</span>
+                  <input v-model="editForm.nachname" type="text" />
+                </label>
+                <label>
+                  <span>Strasse</span>
+                  <input v-model="editForm.strasse" type="text" />
+                </label>
+                <label>
+                  <span>PLZ</span>
+                  <input v-model="editForm.plz" type="text" />
+                </label>
+                <label class="edit-form-full">
+                  <span>Ort</span>
+                  <input v-model="editForm.ort" type="text" />
+                </label>
+                <label>
+                  <span>LE</span>
+                  <select v-model="editForm.foerderbedarf">
+                    <option value="0">Nein</option>
+                    <option value="1">Ja</option>
+                  </select>
+                </label>
+                <label>
+                  <span>ZD</span>
+                  <select v-model="editForm.zieldifferent">
+                    <option value="0">Nein</option>
+                    <option value="1">Ja</option>
+                  </select>
+                </label>
+                <label class="edit-form-full">
+                  <span>Abgleichstatus</span>
+                  <select v-model="editForm.abgleich_status">
+                    <option value="">Bitte waehlen</option>
+                    <option value="Nur Pool">Nur Pool</option>
+                    <option value="Nur Anmeldung">Nur Anmeldung</option>
+                    <option value="Pool + Anm">Pool + Anm</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="edit-form-section edit-form-assignment-section" aria-label="Anmeldung und Schule">
+              <div class="edit-form-context-grid">
+                <label>
+                  <span>Herkunft</span>
+                  <select v-model="editForm.herkunft">
+                    <option value="">Bitte waehlen</option>
+                    <option v-for="option in herkunftEditOptions" :key="option" :value="option">{{ option }}</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Aufnehemende Schule</span>
+                  <select v-model="editForm.schulnummer">
+                    <option value="">Bitte waehlen</option>
+                    <option v-for="school in schoolsInProcedure" :key="school.snr" :value="school.snr">
+                      {{ school.name }} ({{ school.snr }})
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  <span>Anmeldestatus</span>
+                  <select v-model="editForm.anmeldestatus">
+                    <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <label class="edit-form-remark">
+              <span>Bemerkung</span>
+              <textarea v-model="editForm.bemerkung" rows="4"></textarea>
+            </label>
           </div>
 
           <div class="case-dialog-actions">
@@ -1456,7 +1478,7 @@ function toggleSchuleFilter(schuleName: string) {
 }
 
 .case-dialog-edit {
-  width: min(920px, 100%);
+  width: min(840px, 100%);
   max-height: calc(100vh - 40px);
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
@@ -1492,7 +1514,7 @@ function toggleSchuleFilter(schuleName: string) {
 
 .case-dialog-body {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .case-dialog-body-edit {
@@ -1501,18 +1523,50 @@ function toggleSchuleFilter(schuleName: string) {
   padding-right: 4px;
 }
 
+.edit-form-section {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-form-section-title {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #dbe6f2;
+  color: #17385f;
+  font-size: 15px;
+}
+
+.edit-form-assignment-section {
+  margin-top: 2px;
+  padding: 12px;
+  border: 1px solid #c7e3cf;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f4fbf6 0%, #edf8f0 100%);
+  box-shadow: inset 4px 0 0 #8fc49e;
+}
+
 .edit-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  gap: 8px 12px;
 }
 
-.edit-form-grid label {
+.edit-form-context-grid {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.edit-form-grid span {
+.edit-form-grid label,
+.edit-form-context-grid label,
+.edit-form-remark {
+  display: grid;
+  gap: 4px;
+}
+
+.edit-form-grid span,
+.edit-form-context-grid span,
+.edit-form-remark span {
   color: #5a7393;
   font-size: 10px;
   font-weight: 700;
@@ -1522,7 +1576,8 @@ function toggleSchuleFilter(schuleName: string) {
 
 .edit-form-grid input,
 .edit-form-grid select,
-.edit-form-grid textarea {
+.edit-form-context-grid select,
+.edit-form-remark textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid #d7e2ef;
@@ -1534,7 +1589,11 @@ function toggleSchuleFilter(schuleName: string) {
   font: inherit;
 }
 
-.edit-form-grid textarea {
+.edit-form-remark {
+  margin-top: 4px;
+}
+
+.edit-form-remark textarea {
   min-height: 96px;
   resize: vertical;
 }
@@ -1582,7 +1641,8 @@ function toggleSchuleFilter(schuleName: string) {
     flex-basis: auto;
   }
 
-  .edit-form-grid {
+  .edit-form-grid,
+  .edit-form-context-grid {
     grid-template-columns: 1fr;
   }
 }

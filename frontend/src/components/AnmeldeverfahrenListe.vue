@@ -9,6 +9,7 @@ defineProps<{
   canCreate?: boolean;
   canStart?: boolean;
   canFinish?: boolean;
+  isReadonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -43,7 +44,7 @@ function formatTimestamp(value: string) {
         <h3>Anmeldeverfahren</h3>
         <p>Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
       </div>
-      <div class="anm-card-head-actions">
+      <div v-if="!isReadonly" class="anm-card-head-actions">
         <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreate === false" @click="emit('create')">
           Neues Verfahren
         </button>
@@ -90,7 +91,7 @@ function formatTimestamp(value: string) {
             <td>{{ item.arbeitsrunde_nummer ? `Runde ${item.arbeitsrunde_nummer}` : "-" }}</td>
             <td class="anm-cell-muted">{{ formatTimestamp(item.updated_at) }}</td>
             <td class="anm-cell-actions">
-              <div class="anm-actions">
+              <div v-if="!isReadonly" class="anm-actions">
                 <button
                   class="btn-secondary anm-icon-btn"
                   type="button"

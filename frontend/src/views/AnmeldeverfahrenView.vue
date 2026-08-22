@@ -6,6 +6,7 @@ const props = defineProps<{
   token?: string;
   verfahrenId?: number | null;
   rundeId?: number | null;
+  isReadonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -52,6 +53,7 @@ function handleBereichSelectionUpdate(payload: {
       :token="token"
       :initial-verfahren-id="verfahrenId"
       :initial-runde-id="rundeId"
+      :is-readonly="isReadonly"
       @update-context="handleBereichContextUpdate"
       @update-selection="handleBereichSelectionUpdate"
     />

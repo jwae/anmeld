@@ -3,15 +3,15 @@
       <div class="user-management-card-title">
         <div>
           <p class="eyebrow">Verwaltung</p>
-          <h2>Dashboard-User verwalten</h2>
+          <h2>Benutzer verwalten</h2>
           <p class="user-management-intro">
-            Pflege Benutzerkonten, Gruppen und die Freigabe der Dashboards direkt in der App-Datenbank.
+            Pflege Benutzerkonten, Gruppen und deren Berechtigungen direkt in der App-Datenbank.
           </p>
         </div>
 
         <div class="user-management-session" :class="{ 'user-management-session-active': isManagementSessionActive }">
           <i :class="isManagementSessionActive ? 'bi bi-shield-check' : 'bi bi-shield-lock'"></i>
-          <span>{{ isManagementSessionActive ? managementSessionLabel : "Admin-Login erforderlich" }}</span>
+          <span>{{ isManagementSessionActive ? managementSessionLabel : "Verwaltungsberechtigung erforderlich" }}</span>
         </div>
       </div>
 
@@ -57,11 +57,11 @@
     <div v-if="!isManagementSessionActive" class="user-management-empty">
       <p>
         <template v-if="hasExternalManagementSession">
-          Die Dashboard-Verwaltung ist nur mit einer aktiven Admin-Sitzung verfuegbar.
+          Die Verwaltung ist nur mit einer berechtigten Sitzung verfuegbar.
         </template>
         <template v-else>
-          Trage oben einen Admin-Benutzernamen und das Passwort ein und lade dann die Verwaltung.
-          Nur Mitglieder der Gruppe <code>admin</code> erhalten Zugriff.
+          Trage oben einen berechtigten Benutzernamen und das Passwort ein und lade dann die Verwaltung.
+          Erforderlich ist <code>benutzer.bearbeiten</code> oder <code>gruppen.bearbeiten</code>.
         </template>
       </p>
     </div>
@@ -91,13 +91,6 @@
             </strong>
           </article>
           <article class="user-management-stat">
-            <span class="user-management-stat-label">Dashboards</span>
-            <strong>
-              {{ managementStats.total_dashboards }}
-              <small>aktiv in der App</small>
-            </strong>
-          </article>
-          <article class="user-management-stat">
             <span class="user-management-stat-label">Schulserver</span>
             <strong>
               {{ managementStats.total_school_sources }}
@@ -119,6 +112,7 @@
 
       <div class="user-management-tabs" role="tablist" aria-label="Benutzerverwaltung Bereiche">
         <button
+          v-if="canManageUsers"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'users' }"
           type="button"
@@ -131,11 +125,12 @@
           <span>Benutzer</span>
         </button>
         <button
+          v-if="canManageGroups"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'groups' }"
           type="button"
           role="tab"
-          title="Gruppen und deren Dashboard-Berechtigungen verwalten."
+          title="Gruppen und deren Berechtigungen verwalten."
           :aria-selected="activeManagementTab === 'groups' ? 'true' : 'false'"
           @click="requestManagementTab('groups')"
         >
@@ -143,6 +138,7 @@
           <span>Gruppen</span>
         </button>
         <button
+          v-if="canManageProcedure"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'schools' }"
           type="button"
@@ -155,6 +151,7 @@
           <span>Schulen</span>
         </button>
         <button
+          v-if="canManageProcedure"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'school-groups' }"
           type="button"
@@ -167,6 +164,7 @@
           <span>Schulgruppen</span>
         </button>
         <button
+          v-if="canManageProcedure"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'catalogs' }"
           type="button"
@@ -180,7 +178,7 @@
         </button>
       </div>
 
-      <div v-if="activeManagementTab === 'users'" class="user-management-tab-panel" role="tabpanel">
+      <div v-if="activeManagementTab === 'users' && canManageUsers" class="user-management-tab-panel" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
           <section class="user-management-panel">
             <div class="user-management-panel-head">
@@ -277,7 +275,7 @@
                 v-for="user in managementUsers"
                 :key="`list-user-${user.user_id}`"
                 class="user-management-list-item user-management-user-card"
-                :class="{ 'is-admin-user': String(user.group_name || '').trim().toLowerCase() === 'admin' }"
+                :class="{ 'has-administration-permissions': managedUserHasAdministrationPermissions(user) }"
               >
                 <div class="user-management-list-row">
                   <strong>{{ user.username }}</strong>
@@ -316,13 +314,13 @@
         </div>
       </div>
 
-      <div v-else-if="activeManagementTab === 'groups'" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'groups' && canManageGroups" class="user-management-tab-panel" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
           <section class="user-management-panel">
             <div class="user-management-panel-head">
               <div>
                 <h3>Gruppenverwaltung</h3>
-                <p>Gruppen steuern die Dashboard-Freigaben.</p>
+                <p>Gruppen steuern die Berechtigungen ihrer Benutzer.</p>
               </div>
               <button class="btn-secondary" type="button" @click="resetGroupForm" :disabled="managementSaving">
                 Neue Gruppe
@@ -350,19 +348,19 @@
             </div>
 
             <div class="user-management-checklist">
-              <p class="field-label">Dashboard-Freigaben</p>
+              <p class="field-label">Berechtigungen</p>
               <label
-                v-for="dashboardEntry in managementDashboards"
-                :key="dashboardEntry.dashboard_id"
+                v-for="permission in managementPermissions"
+                :key="permission.permission_id"
                 class="user-management-checkitem"
               >
                 <input
-                  v-model="groupForm.dashboard_ids"
+                  v-model="groupForm.permission_ids"
                   type="checkbox"
-                  :value="dashboardEntry.dashboard_id"
-                  :disabled="managementSaving"
+                  :value="permission.permission_id"
+                  :disabled="managementSaving || !permission.is_active"
                 />
-                <span>{{ dashboardEntry.dashboard_name }}</span>
+                <span>{{ permission.permission_name }} ({{ permission.permission_key }})</span>
               </label>
             </div>
 
@@ -404,7 +402,7 @@
                 </div>
                 <p>{{ group.group_description || "Keine Beschreibung" }}</p>
                 <small>
-                  {{ Array.isArray(group.dashboards) && group.dashboards.length ? group.dashboards.map((entry) => entry.dashboard_name).join(", ") : "Keine Dashboard-Freigaben" }}
+                  {{ Array.isArray(group.permissions) && group.permissions.length ? group.permissions.map((entry) => entry.permission_name).join(", ") : "Keine Berechtigungen" }}
                 </small>
                 <div class="user-management-list-actions">
                   <button class="btn-secondary" type="button" @click="editManagementGroup(group.group_id)" :disabled="managementSaving">

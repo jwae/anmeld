@@ -1,10 +1,10 @@
 <section class="app-management">
   <div class="app-management-header">
     <div>
-      <p class="app-management-eyebrow">Dashboard-Verwaltung</p>
+      <p class="app-management-eyebrow">Anwendungsverwaltung</p>
       <h2>App-Verwaltung</h2>
       <p class="app-management-intro">
-        Verwalte Benutzer, Gruppen und Schulen mit dem aktuell angemeldeten Admin-Konto.
+        Verwalte Benutzer, Gruppen und Schulen entsprechend den Berechtigungen des angemeldeten Kontos.
       </p>
     </div>
 
@@ -22,8 +22,8 @@
     </div>
   </div>
 
-  <div v-if="!isAdminUser" class="app-management-empty">
-    Diese Verwaltung ist nur fuer Admin-Konten verfuegbar.
+  <div v-if="!canManageApp" class="app-management-empty">
+    Fuer diese Verwaltung fehlt die erforderliche Berechtigung.
   </div>
 
   <UserManagementPanel

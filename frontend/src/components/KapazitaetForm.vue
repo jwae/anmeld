@@ -5,6 +5,7 @@ const props = defineProps<{
   kapazitaet: any | null;
   schulen: any[];
   verfahrenId: number | null;
+  errorMessage?: string;
 }>();
 
 const emit = defineEmits<{
@@ -123,9 +124,18 @@ function save() {
         </button>
       </div>
 
-      <div v-if="errors.length" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Bitte prüfen</p>
-        <ul class="validation-list">
+      <div
+        v-if="errorMessage || errors.length"
+        class="feedback-panel feedback-panel-error kapazitaet-form-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        <div class="kapazitaet-form-error-heading">
+          <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
+          <p class="feedback-title">Eingaben konnten nicht gespeichert werden</p>
+        </div>
+        <p v-if="errorMessage" class="kapazitaet-form-error-message">{{ errorMessage }}</p>
+        <ul v-if="errors.length" class="validation-list">
           <li v-for="error in errors" :key="error">{{ error }}</li>
         </ul>
       </div>
@@ -311,6 +321,47 @@ textarea:disabled {
 .validation-list {
   margin: 0;
   padding-left: 18px;
+}
+
+.kapazitaet-form-error {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 2px solid #dc2626;
+  border-left-width: 6px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%);
+  color: #7f1d1d;
+  box-shadow: 0 10px 26px rgba(185, 28, 28, 0.16);
+}
+
+.kapazitaet-form-error-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kapazitaet-form-error-heading i {
+  flex: 0 0 auto;
+  color: #dc2626;
+  font-size: 22px;
+}
+
+.kapazitaet-form-error-heading .feedback-title,
+.kapazitaet-form-error-message {
+  margin: 0;
+}
+
+.kapazitaet-form-error-heading .feedback-title {
+  color: #991b1b;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.kapazitaet-form-error-message,
+.kapazitaet-form-error .validation-list {
+  margin-top: 10px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .modal-actions {

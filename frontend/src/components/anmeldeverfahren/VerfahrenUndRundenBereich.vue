@@ -12,6 +12,7 @@ const props = defineProps<{
   token?: string;
   initialVerfahrenId?: number | null;
   initialRundeId?: number | null;
+  isReadonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -110,13 +111,15 @@ const focusedRunde = computed<Anmelderunde | null>(
 
 const selectedProcedureLocked = computed<boolean>(() => selectedVerfahren.value?.status === "Beendet");
 const procedureFormMode = computed<"full" | "limited" | "readonly">(() => {
+  if (props.isReadonly) return "readonly";
   if (!verfahrenForm.value.id || verfahrenForm.value.status === "Vorbereitet") return "full";
   return verfahrenForm.value.status === "In Bearbeitung" ? "limited" : "readonly";
 });
 const procedureVisibilityEditable = computed<boolean>(() => (
-  verfahrenForm.value.status === "Vorbereitet" || verfahrenForm.value.status === "Beendet"
+  !props.isReadonly && (verfahrenForm.value.status === "Vorbereitet" || verfahrenForm.value.status === "Beendet")
 ));
 const roundFormMode = computed<"full" | "limited" | "readonly">(() => {
+  if (props.isReadonly) return "readonly";
   const round = runden.value.find((item) => item.id === rundenForm.value.id) || null;
   if (!round) return "full";
   if (selectedProcedureLocked.value || round.status === "Beendet") return "readonly";
@@ -146,7 +149,8 @@ const nextSuggestedRoundNumber = computed<number | null>(() => (
 ));
 
 const canCreateRound = computed<boolean>(() => (
-  !!selectedVerfahrenId.value
+  !props.isReadonly
+  && !!selectedVerfahrenId.value
   && !selectedProcedureLocked.value
   && nextSuggestedRoundNumber.value !== null
 ));
@@ -341,11 +345,13 @@ function resetRundenFormToSelection() {
 }
 
 function openCreateProcedureOverlay() {
+  if (props.isReadonly) return;
   resetVerfahrenForm();
   showProcedureOverlay.value = true;
 }
 
 function openEditProcedureOverlay(item: Anmeldeverfahren) {
+  if (props.isReadonly) return;
   verfahrenForm.value = {
     id: item.id,
     schuljahr: item.schuljahr,
@@ -358,6 +364,7 @@ function openEditProcedureOverlay(item: Anmeldeverfahren) {
 }
 
 function openCreateRoundOverlay() {
+  if (props.isReadonly) return;
   if (!selectedVerfahrenId.value) {
     showError(null, "Bitte zuerst ein Anmeldeverfahren auswaehlen.");
     return;
@@ -371,6 +378,7 @@ function openCreateRoundOverlay() {
 }
 
 function openEditRoundOverlay(item: Anmelderunde) {
+  if (props.isReadonly) return;
   focusedRundenId.value = item.id;
   rundenForm.value = {
     id: item.id,
@@ -395,6 +403,7 @@ function selectRunde(id: number) {
 }
 
 async function submitVerfahren() {
+  if (props.isReadonly) return;
   const schuljahr = verfahrenForm.value.schuljahr.trim();
   const bezeichnung = verfahrenForm.value.bezeichnung.trim();
   if (!schuljahr) {
@@ -441,6 +450,7 @@ async function submitVerfahren() {
 }
 
 function openDeleteProcedureOverlay(item: Anmeldeverfahren) {
+  if (props.isReadonly) return;
   if (!canDeleteProcedure(item)) {
     showError(null, "Nur beendete Verfahren koennen geloescht werden.");
     return;
@@ -461,6 +471,7 @@ function resetDeleteProcedureOverlay() {
 }
 
 async function confirmDeleteVerfahren() {
+  if (props.isReadonly) return;
   if (!pendingDeleteProcedure.value || deletingVerfahrenId.value) return;
   const item = pendingDeleteProcedure.value;
   const deletingSelectedProcedure = selectedVerfahrenId.value === item.id;
@@ -484,6 +495,7 @@ async function confirmDeleteVerfahren() {
 }
 
 async function submitRunde() {
+  if (props.isReadonly) return;
   if (!selectedVerfahrenId.value) {
     errorMessage.value = "Bitte zuerst ein Anmeldeverfahren auswaehlen.";
     successMessage.value = "";
@@ -548,6 +560,7 @@ async function submitRunde() {
 }
 
 async function deleteRunde(item: Anmelderunde) {
+  if (props.isReadonly) return;
   const confirmed = window.confirm(`Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`);
   if (!confirmed) return;
 
@@ -564,6 +577,7 @@ async function deleteRunde(item: Anmelderunde) {
 }
 
 async function startProcedure() {
+  if (props.isReadonly) return;
   if (!selectedVerfahren.value) return;
   try {
     const response = await anmeldeverfahrenService.start(selectedVerfahren.value.id, props.token);
@@ -588,6 +602,7 @@ async function startProcedure() {
 }
 
 async function finishProcedure() {
+  if (props.isReadonly) return;
   if (!selectedVerfahren.value) return;
   const confirmed = window.confirm(`Soll das Verfahren "${selectedVerfahren.value.bezeichnung}" wirklich beendet werden?`);
   if (!confirmed) return;
@@ -605,6 +620,7 @@ function selectWorkingRound(id: number) {
 }
 
 function openStartRoundOverlay(item: Anmelderunde) {
+  if (props.isReadonly) return;
   pendingStartRound.value = item;
   showStartRoundOverlay.value = true;
 }
@@ -615,6 +631,7 @@ function closeStartRoundOverlay() {
 }
 
 async function startRound() {
+  if (props.isReadonly) return;
   if (!pendingStartRound.value) return;
   const item = pendingStartRound.value;
   try {
@@ -679,9 +696,10 @@ onBeforeUnmount(() => {
         :selected-id="selectedVerfahrenId"
         :loading="loadingVerfahren"
         :deleting-id="deletingVerfahrenId"
-        :can-create="true"
-        :can-start="selectedVerfahren?.status === 'Vorbereitet'"
-        :can-finish="selectedVerfahren?.status === 'In Bearbeitung'"
+        :is-readonly="isReadonly"
+        :can-create="!isReadonly"
+        :can-start="!isReadonly && selectedVerfahren?.status === 'Vorbereitet'"
+        :can-finish="!isReadonly && selectedVerfahren?.status === 'In Bearbeitung'"
         @select="selectVerfahren"
         @edit="openEditProcedureOverlay"
         @delete="openDeleteProcedureOverlay"
@@ -699,6 +717,7 @@ onBeforeUnmount(() => {
         :next-round-id="nextStartableRound?.id ?? null"
         :procedure-locked="selectedProcedureLocked"
         :can-create-round="canCreateRound"
+        :is-readonly="isReadonly"
         :next-available-round-number="nextSuggestedRoundNumber"
         @select="selectRunde"
         @edit="openEditRoundOverlay"

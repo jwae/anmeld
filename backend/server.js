@@ -253,7 +253,7 @@ async function autoConfigurePoolFromEnv() {
 const {
   router: authRouter,
   authenticateToken,
-  requireAdmin,
+  requirePermission,
 } = createAuthModule(getPool);
 
 app.get("/api/connection/status", (req, res) => {
@@ -318,13 +318,13 @@ app.post("/api/connection/test", async (req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api", ensureDatabaseConfigured, authenticateToken);
-app.use("/api/anmeldeverfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api/verfahren", createAnmeldeverfahrenRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api", createAnmelderundenRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api/abgleich", createAbgleichRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api/koordination", createKoordinationRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api/importe", createImporteRouter({ authenticateToken, requireAdmin, getPool }));
-app.use("/api/auswertungen", createAuswertungenRouter({ authenticateToken, requireAdmin, getPool }));
+app.use("/api/anmeldeverfahren", createAnmeldeverfahrenRouter({ requirePermission, getPool }));
+app.use("/api/verfahren", createAnmeldeverfahrenRouter({ requirePermission, getPool }));
+app.use("/api", createAnmelderundenRouter({ requirePermission, getPool }));
+app.use("/api/abgleich", createAbgleichRouter({ requirePermission, getPool }));
+app.use("/api/koordination", createKoordinationRouter({ requirePermission, getPool }));
+app.use("/api/importe", createImporteRouter({ requirePermission, getPool }));
+app.use("/api/auswertungen", createAuswertungenRouter({ requirePermission, getPool }));
 
 // Dynamischer Pool-Proxy fuer die Kapazitaeten-Routen
 const poolProxy = {
@@ -332,7 +332,7 @@ const poolProxy = {
   execute: (...args) => currentPool.execute(...args),
   getConnection: (...args) => currentPool.getConnection(...args),
 };
-app.use("/api", createKapazitaetenRoutes(poolProxy));
+app.use("/api", createKapazitaetenRoutes(poolProxy, { requirePermission }));
 
 const port = Number(process.env.PORT || 3000);
 

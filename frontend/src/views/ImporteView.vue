@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import importService from "../services/importService";
+import { can } from "../authStore";
 import KapazitaetenView from "./KapazitaetenView.vue";
 import PoolImport from "../components/PoolImport.vue";
 import AnmeldungImport from "../components/AnmeldungImport.vue";
@@ -22,9 +23,10 @@ const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 const refreshVersion = ref(0);
+const canDeleteStudentData = computed(() => can("verfahren.bearbeiten"));
 
 async function handleDeleteAll() {
-  if (props.isReadonly) return;
+  if (!canDeleteStudentData.value || props.isReadonly) return;
   const firstConfirm = confirm("Moechten Sie wirklich alle Schuelerdaten aus der Tabelle 'anm_schueler' loeschen?");
   if (!firstConfirm) return;
 
@@ -88,11 +90,14 @@ async function handleDeleteAll() {
       :is-readonly="isReadonly"
     />
 
-    <section class="importe-danger-zone">
+    <section v-if="canDeleteStudentData" class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
         <p class="importe-eyebrow">Gefahrenbereich</p>
-        <h3>Schuelerdaten loeschen (fuer Testzwecke)</h3>
-        <p>Diese Aktion loescht alle Schuelerdaten aus den Import-, Abgleich- und Falltabellen.</p>
+        <h3>
+          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+          <span>Schülerdaten löschen</span>
+        </h3>
+        <p>Diese Aktion löscht aus dem aktivierten Verfahren alle Schülerdaten aus den Import-, Abgleich- und Falltabellen.</p>
       </div>
 
       <button
@@ -145,6 +150,9 @@ async function handleDeleteAll() {
   margin: 0;
   color: #7f1d1d;
   font-size: 1.3em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .importe-danger-zone-copy p:not(.importe-eyebrow) {

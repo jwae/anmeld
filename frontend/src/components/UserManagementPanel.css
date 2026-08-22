@@ -486,7 +486,7 @@ button:disabled {
   border-radius: 12px;
 }
 
-.user-management-user-card.is-admin-user {
+.user-management-user-card.has-administration-permissions {
   border-color: #efc7c7;
   background: #fff7f7;
 }

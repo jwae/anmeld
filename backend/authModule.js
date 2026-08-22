@@ -6,6 +6,9 @@ const https = require("https");
 const net = require("net");
 const path = require("path");
 const { pathToFileURL } = require("url");
+const { can, requirePermission, requireAnyPermission } = require("./lib/permissions");
+
+const ADMINISTRATION_PERMISSION_KEYS = ["benutzer.bearbeiten", "gruppen.bearbeiten"];
 
 let svwsConnectionModulePromise = null;
 
@@ -1116,67 +1119,24 @@ function createAuthModule(poolProvider) {
     return rows && rows[0] ? rows[0] : null;
   }
 
-  async function normalizeDashboardRows(rows) {
-    return (rows || [])
-      .map((r) => ({
-        dashboard_key: String(r.dashboard_key || "").trim(),
-        dashboard_name: String(r.dashboard_name || "").trim(),
-      }))
-      .filter((r) => r.dashboard_key && r.dashboard_name);
-  }
-
-  async function ensureDashboardCatalog(conn) {
-    await conn.query(
-      `
-      INSERT INTO app_dashboard (dashboard_key, dashboard_name, is_active)
-      VALUES (?, ?, 1)
-      ON DUPLICATE KEY UPDATE
-        dashboard_name = IF(TRIM(dashboard_name) = '', VALUES(dashboard_name), dashboard_name),
-        is_active = 1
-      `,
-      ["lehrerdaten", "Lehrerdaten"],
-    );
-  }
-
-  async function loadDashboardKeysByGroup(groupId, groupName = "") {
-    await ensureDashboardCatalog(getPool());
-
-    if (String(groupName).trim().toLowerCase() === "admin") {
-      const [rows] = await getPool().query(
-        `
-        SELECT d.dashboard_key, d.dashboard_name
-        FROM app_dashboard d
-        WHERE d.is_active = 1
-        ORDER BY d.dashboard_key
-        `,
-      );
-
-      return normalizeDashboardRows(rows);
-    }
-
+  async function loadPermissionsForUser(userId) {
     const [rows] = await getPool().query(
       `
-      SELECT
-        d.dashboard_key,
-        d.dashboard_name
-      FROM app_group_dashboard agd
-      JOIN app_dashboard d ON d.dashboard_id = agd.dashboard_id
-      WHERE agd.group_id = ?
-        AND d.is_active = 1
-      ORDER BY d.dashboard_key
+      SELECT p.permission_key
+      FROM app_user u
+      JOIN app_group g ON g.group_id = u.group_id
+      JOIN app_group_permission gp ON gp.group_id = g.group_id
+      JOIN app_permission p ON p.permission_id = gp.permission_id
+      WHERE u.user_id = ?
+        AND p.is_active = 1
+      ORDER BY p.permission_key
       `,
-      [groupId],
+      [userId],
     );
 
-    return normalizeDashboardRows(rows);
-  }
-
-  function requireAdmin(req, res, next) {
-    const groupName = String(req.user?.groupName || "").trim().toLowerCase();
-    if (groupName !== "admin") {
-      return res.status(403).json({ error: "Nur Admins duerfen diese Verwaltung nutzen." });
-    }
-    next();
+    return (rows || [])
+      .map((row) => String(row.permission_key || "").trim())
+      .filter(Boolean);
   }
 
   function toNullableText(value, maxLength = 255) {
@@ -1233,24 +1193,19 @@ function createAuthModule(poolProvider) {
       .sort((a, b) => a - b);
   }
 
-  async function fetchAdminDashboards(conn) {
+  async function fetchAdminPermissions(conn) {
     const [rows] = await conn.query(
       `
-      SELECT
-        dashboard_id,
-        dashboard_key,
-        dashboard_name,
-        is_active,
-        created_at
-      FROM app_dashboard
-      ORDER BY dashboard_name, dashboard_key
+      SELECT permission_id, permission_key, permission_name, description, is_active, created_at
+      FROM app_permission
+      ORDER BY permission_name, permission_key
       `,
     );
-
     return (rows || []).map((row) => ({
-      dashboard_id: Number(row.dashboard_id),
-      dashboard_key: String(row.dashboard_key || "").trim(),
-      dashboard_name: String(row.dashboard_name || "").trim(),
+      permission_id: Number(row.permission_id),
+      permission_key: String(row.permission_key || "").trim(),
+      permission_name: String(row.permission_name || "").trim(),
+      description: toNullableText(row.description),
       is_active: Number(row.is_active) === 1,
       created_at: row.created_at,
     }));
@@ -1264,14 +1219,9 @@ function createAuthModule(poolProvider) {
         g.group_name,
         g.group_description,
         g.is_active,
-        g.created_at,
-        d.dashboard_id,
-        d.dashboard_key,
-        d.dashboard_name
+        g.created_at
       FROM app_group g
-      LEFT JOIN app_group_dashboard agd ON agd.group_id = g.group_id
-      LEFT JOIN app_dashboard d ON d.dashboard_id = agd.dashboard_id
-      ORDER BY g.group_name, d.dashboard_name, d.dashboard_key
+      ORDER BY g.group_name
       `,
     );
 
@@ -1285,25 +1235,35 @@ function createAuthModule(poolProvider) {
           group_description: toNullableText(row.group_description),
           is_active: Number(row.is_active) === 1,
           created_at: row.created_at,
-          dashboard_ids: [],
-          dashboards: [],
-        });
-      }
-
-      if (row.dashboard_id) {
-        const group = groups.get(groupId);
-        group.dashboard_ids.push(Number(row.dashboard_id));
-        group.dashboards.push({
-          dashboard_id: Number(row.dashboard_id),
-          dashboard_key: String(row.dashboard_key || "").trim(),
-          dashboard_name: String(row.dashboard_name || "").trim(),
         });
       }
     }
 
+    const [permissionRows] = await conn.query(
+      `
+      SELECT gp.group_id, p.permission_id, p.permission_key, p.permission_name
+      FROM app_group_permission gp
+      JOIN app_permission p ON p.permission_id = gp.permission_id
+      ORDER BY p.permission_name, p.permission_key
+      `,
+    );
+    for (const row of permissionRows || []) {
+      const group = groups.get(Number(row.group_id));
+      if (!group) continue;
+      if (!group.permission_ids) group.permission_ids = [];
+      if (!group.permissions) group.permissions = [];
+      group.permission_ids.push(Number(row.permission_id));
+      group.permissions.push({
+        permission_id: Number(row.permission_id),
+        permission_key: String(row.permission_key || "").trim(),
+        permission_name: String(row.permission_name || "").trim(),
+      });
+    }
+
     return [...groups.values()].map((group) => ({
       ...group,
-      dashboard_ids: uniqueSortedInts(group.dashboard_ids),
+      permission_ids: uniqueSortedInts(group.permission_ids || []),
+      permissions: group.permissions || [],
     }));
   }
 
@@ -1347,10 +1307,9 @@ function createAuthModule(poolProvider) {
 
   async function fetchAdminBootstrap() {
     const conn = getPool();
-    await ensureDashboardCatalog(conn);
 
-    const [dashboards, groups, users, schools, schoolGroups] = await Promise.all([
-      fetchAdminDashboards(conn),
+    const [permissions, groups, users, schools, schoolGroups] = await Promise.all([
+      fetchAdminPermissions(conn),
       fetchAdminGroups(conn),
       fetchAdminUsers(conn),
       fetchAdminAnmSchools(conn),
@@ -1358,7 +1317,7 @@ function createAuthModule(poolProvider) {
     ]);
 
     return {
-      dashboards,
+      permissions,
       groups,
       users,
       schools,
@@ -1371,7 +1330,6 @@ function createAuthModule(poolProvider) {
         active_users: users.filter((user) => user.is_active).length,
         total_groups: groups.length,
         active_groups: groups.filter((group) => group.is_active).length,
-        total_dashboards: dashboards.length,
         total_schools: schools.length,
         total_school_sources: schools.length,
         active_school_sources: schools.filter((school) => school.is_active).length,
@@ -1383,21 +1341,45 @@ function createAuthModule(poolProvider) {
     };
   }
 
-  async function ensureDashboardIdsExist(conn, dashboardIds) {
-    const ids = uniqueSortedInts(dashboardIds);
+  async function fetchProcedureBootstrap() {
+    const conn = getPool();
+    const [adminSchools, schoolGroups] = await Promise.all([
+      fetchAdminAnmSchools(conn),
+      fetchAdminSchoolGroups(conn),
+    ]);
+    const schools = adminSchools.map((school) => ({
+      snr: school.snr,
+      name: school.name,
+      school_name: school.school_name,
+      plz: school.plz,
+      ort: school.ort,
+      strasse: school.strasse,
+      latitude: school.latitude,
+      longitude: school.longitude,
+      sf_id: school.sf_id,
+      school_form_code: school.school_form_code,
+      school_form_name: school.school_form_name,
+      school_form_sf: school.school_form_sf,
+      is_active: school.is_active,
+    }));
+    return {
+      schools,
+      school_sources: schools,
+      school_groups: schoolGroups,
+    };
+  }
+
+  async function ensurePermissionIdsExist(conn, permissionIds) {
+    const ids = uniqueSortedInts(permissionIds);
     if (!ids.length) return [];
     const placeholders = ids.map(() => "?").join(", ");
     const [rows] = await conn.query(
-      `
-      SELECT dashboard_id
-      FROM app_dashboard
-      WHERE dashboard_id IN (${placeholders})
-      `,
+      `SELECT permission_id FROM app_permission WHERE is_active = 1 AND permission_id IN (${placeholders})`,
       ids,
     );
-    const existingIds = uniqueSortedInts((rows || []).map((row) => row.dashboard_id));
+    const existingIds = uniqueSortedInts((rows || []).map((row) => row.permission_id));
     if (existingIds.length !== ids.length) {
-      const error = new Error("Mindestens ein Dashboard ist ungueltig.");
+      const error = new Error("Mindestens eine Berechtigung ist ungueltig oder inaktiv.");
       error.statusCode = 400;
       throw error;
     }
@@ -1611,10 +1593,6 @@ function createAuthModule(poolProvider) {
     }
   }
 
-  function isAdminGroupName(groupName) {
-    return String(groupName || "").trim().toLowerCase() === "admin";
-  }
-
   async function loadUserById(conn, userId) {
     const [rows] = await conn.query(
       `
@@ -1622,10 +1600,8 @@ function createAuthModule(poolProvider) {
         u.user_id,
         u.group_id,
         u.username,
-        u.is_active,
-        g.group_name
+        u.is_active
       FROM app_user u
-      JOIN app_group g ON g.group_id = u.group_id
       WHERE u.user_id = ?
       LIMIT 1
       `,
@@ -1639,58 +1615,107 @@ function createAuthModule(poolProvider) {
     return rows[0];
   }
 
-  async function countActiveAdminUsers(conn, excludeUserId = 0) {
+  async function groupHasAdministrationPermissions(conn, groupId) {
+    const [rows] = await conn.query(
+      `
+      SELECT COUNT(DISTINCT p.permission_key) AS total
+      FROM app_group_permission gp
+      JOIN app_permission p ON p.permission_id = gp.permission_id
+      WHERE gp.group_id = ?
+        AND p.is_active = 1
+        AND p.permission_key IN (?, ?)
+      `,
+      [groupId, ...ADMINISTRATION_PERMISSION_KEYS],
+    );
+    return Number(rows?.[0]?.total || 0) === ADMINISTRATION_PERMISSION_KEYS.length;
+  }
+
+  async function permissionIdsContainAdministration(conn, permissionIds) {
+    const ids = uniqueSortedInts(permissionIds);
+    if (!ids.length) return false;
+    const placeholders = ids.map(() => "?").join(", ");
+    const [rows] = await conn.query(
+      `
+      SELECT COUNT(DISTINCT permission_key) AS total
+      FROM app_permission
+      WHERE permission_id IN (${placeholders})
+        AND is_active = 1
+        AND permission_key IN (?, ?)
+      `,
+      [...ids, ...ADMINISTRATION_PERMISSION_KEYS],
+    );
+    return Number(rows?.[0]?.total || 0) === ADMINISTRATION_PERMISSION_KEYS.length;
+  }
+
+  async function countActiveAdministrationUsers(conn, { excludeUserId = 0, excludeGroupId = 0 } = {}) {
     const params = [];
     let query = `
       SELECT COUNT(*) AS total
-      FROM app_user u
-      JOIN app_group g ON g.group_id = u.group_id
-      WHERE u.is_active = 1
-        AND g.is_active = 1
-        AND LOWER(TRIM(g.group_name)) = 'admin'
+      FROM (
+        SELECT u.user_id
+        FROM app_user u
+        JOIN app_group g ON g.group_id = u.group_id
+        JOIN app_group_permission gp ON gp.group_id = g.group_id
+        JOIN app_permission p ON p.permission_id = gp.permission_id
+        WHERE u.is_active = 1
+          AND g.is_active = 1
+          AND p.is_active = 1
+          AND p.permission_key IN ('benutzer.bearbeiten', 'gruppen.bearbeiten')
     `;
     if (excludeUserId) {
       query += " AND u.user_id <> ?";
       params.push(excludeUserId);
     }
+    if (excludeGroupId) {
+      query += " AND g.group_id <> ?";
+      params.push(excludeGroupId);
+    }
+    query += `
+        GROUP BY u.user_id
+        HAVING COUNT(DISTINCT p.permission_key) = 2
+      ) administration_users
+    `;
     const [rows] = await conn.query(query, params);
     return Number(rows?.[0]?.total || 0);
   }
 
-  async function ensureAdminGroupMutationAllowed(conn, currentGroup, nextGroupName, nextIsActive) {
-    if (!isAdminGroupName(currentGroup?.group_name)) return;
-    if (!isAdminGroupName(nextGroupName)) {
-      const error = new Error("Die Admin-Gruppe darf nicht umbenannt werden.");
-      error.statusCode = 409;
-      throw error;
-    }
-    if (Number(nextIsActive) !== 1) {
-      const error = new Error("Die Admin-Gruppe darf nicht deaktiviert werden.");
+  async function ensureAdministrationGroupMutationAllowed(conn, currentGroup, nextIsActive, nextPermissionIds) {
+    const currentlyProvidesAdministration = await groupHasAdministrationPermissions(conn, currentGroup?.group_id);
+    if (!currentlyProvidesAdministration) return;
+    const continuesProvidingAdministration = Number(nextIsActive) === 1
+      && await permissionIdsContainAdministration(conn, nextPermissionIds);
+    if (continuesProvidingAdministration) return;
+
+    const remainingAdministrators = await countActiveAdministrationUsers(conn, {
+      excludeGroupId: currentGroup.group_id,
+    });
+    if (remainingAdministrators <= 0) {
+      const error = new Error("Die Berechtigungen des letzten aktiven Administrators duerfen nicht entzogen werden.");
       error.statusCode = 409;
       throw error;
     }
   }
 
-  async function ensureAdminUserMutationAllowed(conn, userId, nextGroupId, nextIsActive) {
+  async function ensureAdministrationUserMutationAllowed(conn, userId, nextGroupId, nextIsActive) {
     const currentUser = await loadUserById(conn, userId);
-    if (!isAdminGroupName(currentUser.group_name)) return;
+    if (!await groupHasAdministrationPermissions(conn, currentUser.group_id)) return;
 
-    const targetGroup = await ensureGroupExists(conn, nextGroupId);
-    const staysAdmin = isAdminGroupName(targetGroup.group_name);
-    const staysActive = Number(nextIsActive) === 1;
-    if (staysAdmin && staysActive) return;
+    await ensureGroupExists(conn, nextGroupId);
+    const retainsAdministration = Number(nextIsActive) === 1
+      && await groupHasAdministrationPermissions(conn, nextGroupId);
+    if (retainsAdministration) return;
 
-    const remainingAdmins = await countActiveAdminUsers(conn, userId);
-    if (remainingAdmins <= 0) {
-      const error = new Error("Der letzte aktive Admin-Benutzer darf nicht deaktiviert, verschoben oder geloescht werden.");
+    const remainingAdministrators = await countActiveAdministrationUsers(conn, { excludeUserId: userId });
+    if (remainingAdministrators <= 0) {
+      const error = new Error("Der letzte aktive Administrator darf nicht deaktiviert, verschoben oder geloescht werden.");
       error.statusCode = 409;
       throw error;
     }
   }
 
-  function ensureCurrentAdminUserNotDeactivated(currentUserId, targetUserId, nextIsActive) {
+  function ensureCurrentUserNotDeactivated(currentUserId, targetUserId, nextIsActive) {
     if (Number(currentUserId) > 0 && Number(targetUserId) === Number(currentUserId) && Number(nextIsActive) !== 1) {
-      const error = new Error("Der aktuell eingeloggte Admin-Benutzer darf sich nicht selbst deaktivieren.");
+      const error = new Error("Der aktuell eingeloggte Benutzer darf sich nicht selbst deaktivieren.");
       error.statusCode = 409;
       throw error;
     }
@@ -1744,19 +1769,6 @@ function createAuthModule(poolProvider) {
     }
   }
 
-  async function syncGroupDashboards(conn, groupId, dashboardIds) {
-    await conn.query("DELETE FROM app_group_dashboard WHERE group_id = ?", [groupId]);
-    if (!dashboardIds.length) return;
-    const values = dashboardIds.map((dashboardId) => [groupId, dashboardId]);
-    await conn.query(
-      `
-      INSERT INTO app_group_dashboard (group_id, dashboard_id)
-      VALUES ?
-      `,
-      [values],
-    );
-  }
-
   function adminErrorResponse(res, error, fallbackMessage) {
     const statusCode = Number(error?.statusCode || 0);
     if (statusCode >= 400 && statusCode < 600) {
@@ -1776,6 +1788,16 @@ function createAuthModule(poolProvider) {
       || String(error?.message || "").trim()
       || fallbackMessage;
     return res.status(500).json({ error: technicalMessage });
+  }
+
+  async function syncGroupPermissions(conn, groupId, permissionIds) {
+    await conn.query("DELETE FROM app_group_permission WHERE group_id = ?", [groupId]);
+    if (!permissionIds.length) return;
+    const values = permissionIds.map((permissionId) => [groupId, permissionId]);
+    await conn.query(
+      "INSERT INTO app_group_permission (group_id, permission_id) VALUES ?",
+      [values],
+    );
   }
 
   function quoteCatalogIdentifier(identifier) {
@@ -2029,8 +2051,7 @@ function createAuthModule(poolProvider) {
       email: user.email,
       groupId: user.group_id,
       groupName: user.group_name,
-      dashboards: user.dashboard_keys || [],
-      dashboard_permissions: user.dashboard_permissions || [],
+      permissions: user.permissions || [],
     };
 
     return jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn });
@@ -2080,18 +2101,13 @@ function createAuthModule(poolProvider) {
         return res.status(401).json({ error: "Ungültige Zugangsdaten." });
       }
 
-      const dashboardPermissions = await loadDashboardKeysByGroup(
-        user.group_id,
-        user.group_name,
-      );
-      const dashboardKeys = dashboardPermissions.map((item) => item.dashboard_key);
-      if (!dashboardKeys.length) {
+      const permissions = await loadPermissionsForUser(user.user_id);
+      if (!permissions.length) {
         return res.status(403).json({
-          error: "Keine berechtigten Dashboards fuer diese Gruppe.",
+          error: "Keine aktiven Berechtigungen fuer diese Gruppe.",
         });
       }
-      user.dashboard_keys = dashboardKeys;
-      user.dashboard_permissions = dashboardPermissions;
+      user.permissions = permissions;
 
       await updateLastLogin(user.user_id);
 
@@ -2105,8 +2121,7 @@ function createAuthModule(poolProvider) {
           email: user.email,
           group_id: user.group_id,
           group_name: user.group_name,
-          dashboards: dashboardKeys,
-          dashboard_permissions: dashboardPermissions,
+          permissions: user.permissions,
         },
       });
     } catch (e) {
@@ -2126,7 +2141,15 @@ function createAuthModule(poolProvider) {
     res.json({ user: req.user });
   });
 
-  router.get("/admin/bootstrap", authenticateToken, requireAdmin, async (req, res) => {
+  router.get("/fachdaten/bootstrap", authenticateToken, requirePermission("verfahren.anzeigen"), async (_req, res) => {
+    try {
+      res.json(await fetchProcedureBootstrap());
+    } catch (error) {
+      return adminErrorResponse(res, error, "Schulen und Schulgruppen konnten nicht geladen werden.");
+    }
+  });
+
+  router.get("/admin/bootstrap", authenticateToken, requireAnyPermission(["benutzer.bearbeiten", "gruppen.bearbeiten"]), async (req, res) => {
     try {
       res.json(await fetchAdminBootstrap());
     } catch (error) {
@@ -2134,7 +2157,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.get("/admin/catalogs", authenticateToken, requireAdmin, async (req, res) => {
+  router.get("/admin/catalogs", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     try {
       const tables = await fetchCatalogTables(getPool());
       return res.json({
@@ -2148,7 +2171,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.get("/admin/catalogs/:tableName", authenticateToken, requireAdmin, async (req, res) => {
+  router.get("/admin/catalogs/:tableName", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     try {
       return res.json(await fetchCatalogContents(getPool(), req.params.tableName));
     } catch (error) {
@@ -2156,7 +2179,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/catalogs/:tableName/changes", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/catalogs/:tableName/changes", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const definition = await fetchCatalogDefinition(conn, req.params.tableName);
@@ -2213,13 +2236,13 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/groups", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/groups", authenticateToken, requirePermission("gruppen.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupName = toRequiredText(req.body?.group_name, "Gruppenname", 50);
       const groupDescription = toNullableText(req.body?.group_description, 255);
       const isActive = toFlag(req.body?.is_active, 1);
-      const dashboardIds = await ensureDashboardIdsExist(conn, req.body?.dashboard_ids);
+      const permissionIds = await ensurePermissionIdsExist(conn, req.body?.permission_ids);
       await ensureUniqueGroupName(conn, groupName);
 
       await conn.beginTransaction();
@@ -2231,7 +2254,7 @@ function createAuthModule(poolProvider) {
         [groupName, groupDescription, isActive],
       );
       const groupId = Number(result.insertId);
-      await syncGroupDashboards(conn, groupId, dashboardIds);
+      await syncGroupPermissions(conn, groupId, permissionIds);
       await conn.commit();
 
       res.status(201).json(await fetchAdminBootstrap());
@@ -2243,7 +2266,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.patch("/admin/groups/:groupId", authenticateToken, requireAdmin, async (req, res) => {
+  router.patch("/admin/groups/:groupId", authenticateToken, requirePermission("gruppen.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.params.groupId, "Gruppe");
@@ -2251,8 +2274,8 @@ function createAuthModule(poolProvider) {
       const groupName = toRequiredText(req.body?.group_name, "Gruppenname", 50);
       const groupDescription = toNullableText(req.body?.group_description, 255);
       const isActive = toFlag(req.body?.is_active, 1);
-      const dashboardIds = await ensureDashboardIdsExist(conn, req.body?.dashboard_ids);
-      await ensureAdminGroupMutationAllowed(conn, currentGroup, groupName, isActive);
+      const permissionIds = await ensurePermissionIdsExist(conn, req.body?.permission_ids);
+      await ensureAdministrationGroupMutationAllowed(conn, currentGroup, isActive, permissionIds);
       await ensureUniqueGroupName(conn, groupName, groupId);
 
       await conn.beginTransaction();
@@ -2264,7 +2287,7 @@ function createAuthModule(poolProvider) {
         `,
         [groupName, groupDescription, isActive, groupId],
       );
-      await syncGroupDashboards(conn, groupId, dashboardIds);
+      await syncGroupPermissions(conn, groupId, permissionIds);
       await conn.commit();
 
       res.json(await fetchAdminBootstrap());
@@ -2276,7 +2299,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/users", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/users", authenticateToken, requirePermission("benutzer.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.body?.group_id, "Gruppe");
@@ -2313,7 +2336,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.patch("/admin/users/:userId", authenticateToken, requireAdmin, async (req, res) => {
+  router.patch("/admin/users/:userId", authenticateToken, requirePermission("benutzer.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const userId = toPositiveInt(req.params.userId, "Benutzer");
@@ -2325,8 +2348,8 @@ function createAuthModule(poolProvider) {
       const isActive = toFlag(req.body?.is_active, 1);
       const password = String(req.body?.password || "").trim();
 
-      ensureCurrentAdminUserNotDeactivated(currentUserId, userId, isActive);
-      await ensureAdminUserMutationAllowed(conn, userId, groupId, isActive);
+      ensureCurrentUserNotDeactivated(currentUserId, userId, isActive);
+      await ensureAdministrationUserMutationAllowed(conn, userId, groupId, isActive);
       await ensureGroupExists(conn, groupId);
       validateEmailAddress(email);
       await ensureUniqueUserData(conn, { username, email, excludeUserId: userId });
@@ -2371,7 +2394,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/users/:userId", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/users/:userId", authenticateToken, requirePermission("benutzer.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const userId = toPositiveInt(req.params.userId, "Benutzer");
@@ -2381,7 +2404,7 @@ function createAuthModule(poolProvider) {
         error.statusCode = 409;
         throw error;
       }
-      await ensureAdminUserMutationAllowed(conn, userId, (await loadUserById(conn, userId)).group_id, 0);
+      await ensureAdministrationUserMutationAllowed(conn, userId, (await loadUserById(conn, userId)).group_id, 0);
 
       await conn.query("DELETE FROM app_user WHERE user_id = ?", [userId]);
       res.json(await fetchAdminBootstrap());
@@ -2392,16 +2415,11 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/groups/:groupId", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/groups/:groupId", authenticateToken, requirePermission("gruppen.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.params.groupId, "Gruppe");
-      const group = await ensureGroupExists(conn, groupId);
-      if (isAdminGroupName(group.group_name)) {
-        const error = new Error("Die Admin-Gruppe darf nicht geloescht werden.");
-        error.statusCode = 409;
-        throw error;
-      }
+      await ensureGroupExists(conn, groupId);
       const [userRows] = await conn.query(
         `
         SELECT COUNT(*) AS total
@@ -2417,7 +2435,6 @@ function createAuthModule(poolProvider) {
       }
 
       await conn.beginTransaction();
-      await conn.query("DELETE FROM app_group_dashboard WHERE group_id = ?", [groupId]);
       await conn.query("DELETE FROM app_group WHERE group_id = ?", [groupId]);
       await conn.commit();
       res.json(await fetchAdminBootstrap());
@@ -2429,7 +2446,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-groups", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-groups", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await ensureSchoolGroupTables(conn);
@@ -2456,7 +2473,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/school-groups/:groupId", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/school-groups/:groupId", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
@@ -2470,7 +2487,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
@@ -2493,7 +2510,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/school-groups/:groupId/schools/:snr", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const groupId = toPositiveInt(req.params.groupId, "Schulgruppe");
@@ -2514,7 +2531,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-sources", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-sources", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -2770,10 +2787,10 @@ function createAuthModule(poolProvider) {
     }
   }
 
-  router.post("/schulen/import/vorschau", authenticateToken, requireAdmin, handleSchoolImportPreview);
-  router.post("/schulen/import", authenticateToken, requireAdmin, handleSchoolImport);
+  router.post("/schulen/import/vorschau", authenticateToken, requirePermission("verfahren.bearbeiten"), handleSchoolImportPreview);
+  router.post("/schulen/import", authenticateToken, requirePermission("verfahren.bearbeiten"), handleSchoolImport);
 
-  router.post("/admin/anm-schools", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/anm-schools", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -2828,7 +2845,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.patch("/admin/anm-schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+  router.patch("/admin/anm-schools/:snr", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -2910,7 +2927,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/anm-schools/geocode-missing", authenticateToken, requireAdmin, async (_req, res) => {
+  router.post("/admin/anm-schools/geocode-missing", authenticateToken, requirePermission("verfahren.bearbeiten"), async (_req, res) => {
     const conn = await getPool().getConnection();
     try {
       await ensureAnmSchulenTable(conn);
@@ -2987,7 +3004,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/anm-schools/:snr", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/anm-schools/:snr", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await ensureAnmSchulenTable(conn);
@@ -3009,7 +3026,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/anm-schools", authenticateToken, requireAdmin, async (_req, res) => {
+  router.delete("/admin/anm-schools", authenticateToken, requirePermission("verfahren.bearbeiten"), async (_req, res) => {
     const conn = await getPool().getConnection();
     try {
       await ensureAnmSchulenTable(conn);
@@ -3024,7 +3041,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/schools/import-csv", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/schools/import-csv", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -3209,7 +3226,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-sources/import-csv", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-sources/import-csv", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -3399,7 +3416,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.patch("/admin/school-sources/:sourceId", authenticateToken, requireAdmin, async (req, res) => {
+  router.patch("/admin/school-sources/:sourceId", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();
@@ -3462,7 +3479,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.delete("/admin/school-sources/:sourceId", authenticateToken, requireAdmin, async (req, res) => {
+  router.delete("/admin/school-sources/:sourceId", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const sourceId = toPositiveInt(req.params.sourceId, "Schulserver-Quelle");
@@ -3476,7 +3493,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-sources/:sourceId/test", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-sources/:sourceId/test", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     let sourceHost = "";
     try {
@@ -3524,7 +3541,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-sources/test-draft", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-sources/test-draft", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     try {
       const draftSource = {
         db_host: toRequiredText(req.body?.db_host, "Server", 255),
@@ -3552,7 +3569,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/school-sources/test-all", authenticateToken, requireAdmin, async (req, res) => {
+  router.post("/admin/school-sources/test-all", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const sourceIds = Array.isArray(req.body?.source_ids)
@@ -3650,7 +3667,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.get("/admin/school-sources/:sourceId/classes-preview", authenticateToken, requireAdmin, async (req, res) => {
+  router.get("/admin/school-sources/:sourceId/classes-preview", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const sourceId = toPositiveInt(req.params.sourceId, "Schulserver-Quelle");
@@ -3695,7 +3712,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  return { router, authenticateToken, requireAdmin };
+  return { router, authenticateToken, requirePermission, can };
 }
 
-module.exports = { createAuthModule };
+module.exports = { createAuthModule, requirePermission, can };

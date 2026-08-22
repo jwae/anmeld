@@ -17,7 +17,7 @@
     />
   </template>
 
-  <template v-else-if="showAppManagement && pendingLogin && isPendingAdmin">
+  <template v-else-if="showAppManagement && pendingLogin && canPendingManageApp">
     <APPManagement
       :token="pendingLogin?.token || ''"
       :user="pendingLoginUser"
@@ -79,7 +79,7 @@
           </button>
 
           <button
-            v-if="pendingLogin && isPendingAdmin"
+            v-if="pendingLogin && canPendingViewProcedures"
             class="btn-secondary login-manage-users-btn login-manage-users-btn-primary"
             type="button"
             @click="openAnmeldeverfahren"
@@ -88,12 +88,12 @@
           </button>
 
           <button
-            v-if="pendingLogin && isPendingAdmin"
+            v-if="pendingLogin && canPendingManageApp"
             class="btn-secondary login-manage-users-btn"
             type="button"
             @click="showAppManagement = true"
           >
-            Dashboard-Verwaltung
+            App-Verwaltung
           </button>
         </div>
 
@@ -106,7 +106,7 @@
           <p class="feedback-title">Anmeldung erfolgreich</p>
           <p>
             Angemeldet als {{ pendingLoginUserLabel || "Benutzer" }}.
-            <template v-if="isPendingAdmin">
+            <template v-if="canPendingViewProcedures">
               Wähle jetzt <strong>Zum Anmeldeverfahren</strong>.
             </template>
             <template v-else>
@@ -118,7 +118,7 @@
     </section>
   </template>
 
-  <template v-else-if="isAnmRoute && isAuthenticatedAdmin">
+  <template v-else-if="isAnmRoute && canViewProcedures">
     <LoginCredentialsPage
       :user-label="currentUserLabel"
       :connected-host="connectedHost || host"

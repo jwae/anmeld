@@ -29,9 +29,18 @@ export function useAuth() {
     return groupName ? `${username} (${groupName})` : username;
   });
 
-  const isPendingAdmin = computed<boolean>(
-    () => String(pendingLoginUser.value?.group_name || "").trim().toLowerCase() === "admin",
+  const canPendingManageApp = computed<boolean>(
+    () => {
+      const permissions = Array.isArray(pendingLoginUser.value?.permissions)
+        ? pendingLoginUser.value.permissions
+        : [];
+      return permissions.includes("benutzer.bearbeiten") || permissions.includes("gruppen.bearbeiten");
+    },
   );
+  const canPendingViewProcedures = computed<boolean>(() => (
+    Array.isArray(pendingLoginUser.value?.permissions)
+    && pendingLoginUser.value.permissions.includes("verfahren.anzeigen")
+  ));
 
   async function login() {
     loginLoading.value = true;
@@ -65,12 +74,9 @@ export function useAuth() {
     const user = pendingLogin.value.user || {};
     const username = user.username || loginUsername.value;
     const groupName = user.group_name || "";
-    const dashboardKeys = Array.isArray(user.dashboards) ? user.dashboards : [];
-    const dashboardPermissions = Array.isArray(user.dashboard_permissions)
-      ? user.dashboard_permissions
-      : [];
+    const permissions = Array.isArray(user.permissions) ? user.permissions : [];
 
-    setToken(token, username, groupName, dashboardKeys, dashboardPermissions, user.user_id || "");
+    setToken(token, username, groupName, user.user_id || "", permissions);
     pendingLogin.value = null;
     return true;
   }
@@ -100,7 +106,8 @@ export function useAuth() {
     currentUserLabel,
     pendingLoginUser,
     pendingLoginUserLabel,
-    isPendingAdmin,
+    canPendingManageApp,
+    canPendingViewProcedures,
     login,
     continueAfterLogin,
     logout,

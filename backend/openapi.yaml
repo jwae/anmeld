@@ -34,7 +34,7 @@ components:
           type: string
         group_name:
           type: string
-        dashboards:
+        permissions:
           type: array
           items:
             type: string

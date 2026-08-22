@@ -10,6 +10,7 @@ import AuswertungenView from "../views/AuswertungenView.vue";
 import SchulenImVerfahrenBereich from "./anmeldeverfahren/SchulenImVerfahrenBereich.vue";
 import type { AnmeldeStatus, Anmeldeverfahrenstyp } from "../types";
 import { APP_PATHS, navigateTo, replaceRoute, routeState } from "../router";
+import { can } from "../authStore";
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
@@ -33,8 +34,11 @@ const selectedVerfahrenstyp = ref<Anmeldeverfahrenstyp | null>(null);
 const selectedVerfahrenStatus = ref<AnmeldeStatus | null>(null);
 const selectedRundenId = ref<number | null>(null);
 const selectedRundenStatus = ref<AnmeldeStatus | null>(null);
+const canEditProcedures = computed<boolean>(() => can("verfahren.bearbeiten"));
 const isReviewMode = computed<boolean>(() => (
-  selectedVerfahrenStatus.value === "Beendet" || selectedRundenStatus.value !== "In Bearbeitung"
+  !canEditProcedures.value
+  || selectedVerfahrenStatus.value === "Beendet"
+  || selectedRundenStatus.value !== "In Bearbeitung"
 ));
 const hasMountedVerfahrenView = ref(routeState.path === APP_PATHS.anmVerfahren);
 const hasMenuSelectionContext = computed<boolean>(

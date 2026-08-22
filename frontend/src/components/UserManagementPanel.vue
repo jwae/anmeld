@@ -22,7 +22,7 @@ const managementNotice = ref<string>("");
 let feedbackTimeoutId: any = null;
 const managementToken = ref<string>("");
 const managementSessionUser = ref<User | null>(null);
-const managementDashboards = ref<any[]>([]);
+const managementPermissions = ref<any[]>([]);
 const managementGroups = ref<any[]>([]);
 const managementUsers = ref<any[]>([]);
 const managementSchools = ref<any[]>([]);
@@ -37,7 +37,6 @@ const managementStats = ref({
   active_users: 0,
   total_groups: 0,
   active_groups: 0,
-  total_dashboards: 0,
   total_schools: 0,
   total_school_sources: 0,
   active_school_sources: 0,
@@ -50,7 +49,7 @@ const groupForm = reactive({
   group_name: "",
   group_description: "",
   is_active: true,
-  dashboard_ids: [] as (string | number)[],
+  permission_ids: [] as (string | number)[],
 });
 const userForm = reactive({
   group_id: "",
@@ -72,6 +71,29 @@ const effectiveManagementUser = computed<User | null>(() =>
   hasExternalManagementSession.value ? (props.managementUser || null) : managementSessionUser.value,
 );
 const isManagementSessionActive = computed<boolean>(() => !!effectiveManagementToken.value);
+const canManageUsers = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && effectiveManagementUser.value.permissions.includes("benutzer.bearbeiten")
+));
+const canManageGroups = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && effectiveManagementUser.value.permissions.includes("gruppen.bearbeiten")
+));
+const canManageProcedure = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && effectiveManagementUser.value.permissions.includes("verfahren.bearbeiten")
+));
+
+watch([canManageUsers, canManageGroups, canManageProcedure], ([users, groups, procedures]) => {
+  const allowedTabs = [
+    ...(users ? ["users"] : []),
+    ...(groups ? ["groups"] : []),
+    ...(procedures ? ["schools", "school-groups", "catalogs"] : []),
+  ];
+  if (!allowedTabs.includes(activeManagementTab.value)) {
+    activeManagementTab.value = allowedTabs[0] || "users";
+  }
+}, { immediate: true });
 const managementSessionLabel = computed<string>(() => {
   const username = String(effectiveManagementUser.value?.username || "").trim();
   const groupName = String(effectiveManagementUser.value?.group_name || "").trim();
@@ -90,7 +112,15 @@ const activeManagementGroups = computed<any[]>(() =>
 
 function defaultManagementGroupId(): string {
   const preferredGroup = activeManagementGroups.value.find(
-    (group) => String(group.group_name || "").trim().toLowerCase() === "user",
+    (group) => {
+      const keys = Array.isArray(group.permissions)
+        ? group.permissions.map((permission: any) => String(permission.permission_key || ""))
+        : [];
+      return keys.includes("verfahren.anzeigen")
+        && !keys.includes("verfahren.bearbeiten")
+        && !keys.includes("benutzer.bearbeiten")
+        && !keys.includes("gruppen.bearbeiten");
+    },
   );
   if (preferredGroup?.group_id) return String(preferredGroup.group_id);
   return activeManagementGroups.value[0]?.group_id ? String(activeManagementGroups.value[0].group_id) : "";
@@ -101,7 +131,7 @@ function resetGroupForm() {
   groupForm.group_name = "";
   groupForm.group_description = "";
   groupForm.is_active = true;
-  groupForm.dashboard_ids = [];
+  groupForm.permission_ids = [];
   selectedManagementGroupId.value = "";
 }
 
@@ -117,7 +147,7 @@ function resetUserForm() {
 }
 
 function applyManagementBootstrap(data: any) {
-  managementDashboards.value = Array.isArray(data?.dashboards) ? data.dashboards : [];
+  managementPermissions.value = Array.isArray(data?.permissions) ? data.permissions : [];
   managementGroups.value = Array.isArray(data?.groups) ? data.groups : [];
   managementUsers.value = Array.isArray(data?.users) ? data.users : [];
   managementSchools.value = Array.isArray(data?.schools) ? data.schools : [];
@@ -130,7 +160,6 @@ function applyManagementBootstrap(data: any) {
     active_users: Number(data?.stats?.active_users || 0),
     total_groups: Number(data?.stats?.total_groups || 0),
     active_groups: Number(data?.stats?.active_groups || 0),
-    total_dashboards: Number(data?.stats?.total_dashboards || 0),
     total_schools: Number(data?.stats?.total_schools || 0),
     total_school_sources: Number(data?.stats?.total_school_sources || 0),
     active_school_sources: Number(data?.stats?.active_school_sources || 0),
@@ -163,7 +192,7 @@ async function clearManagementSession() {
   managementSessionUser.value = null;
   managementError.value = "";
   managementNotice.value = "";
-  managementDashboards.value = [];
+  managementPermissions.value = [];
   managementGroups.value = [];
   managementUsers.value = [];
   managementSchools.value = [];
@@ -176,7 +205,6 @@ async function clearManagementSession() {
     active_users: 0,
     total_groups: 0,
     active_groups: 0,
-    total_dashboards: 0,
     total_schools: 0,
     total_school_sources: 0,
     active_school_sources: 0,
@@ -185,6 +213,16 @@ async function clearManagementSession() {
   };
   resetGroupForm();
   resetUserForm();
+}
+
+function managedUserHasAdministrationPermissions(user: any): boolean {
+  const group = managementGroups.value.find(
+    (entry) => String(entry.group_id) === String(user?.group_id || ""),
+  );
+  const keys = Array.isArray(group?.permissions)
+    ? group.permissions.map((permission: any) => String(permission.permission_key || ""))
+    : [];
+  return keys.includes("benutzer.bearbeiten") && keys.includes("gruppen.bearbeiten");
 }
 
 async function requestManagementLeave() {
@@ -274,7 +312,7 @@ watch(selectedManagementGroupId, (groupId) => {
   groupForm.group_name = group.group_name || "";
   groupForm.group_description = group.group_description || "";
   groupForm.is_active = !!group.is_active;
-  groupForm.dashboard_ids = Array.isArray(group.dashboard_ids) ? [...group.dashboard_ids] : [];
+  groupForm.permission_ids = Array.isArray(group.permission_ids) ? [...group.permission_ids] : [];
 });
 
 watch(selectedManagementUserId, (userId) => {
@@ -362,10 +400,11 @@ async function authenticateUserManagement() {
       password: props.loginPassword,
     });
     const user = resp.data?.user || {};
-    if (String(user.group_name || "").trim().toLowerCase() !== "admin") {
+    const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+    if (!permissions.includes("benutzer.bearbeiten") && !permissions.includes("gruppen.bearbeiten")) {
       managementToken.value = "";
       managementSessionUser.value = null;
-      managementError.value = "Fuer die Benutzerverwaltung ist ein Admin-Login erforderlich.";
+      managementError.value = "Fuer die Verwaltung fehlt die erforderliche Berechtigung.";
       return;
     }
 
@@ -400,7 +439,7 @@ async function saveManagementGroup() {
       group_name: groupForm.group_name,
       group_description: groupForm.group_description,
       is_active: groupForm.is_active,
-      dashboard_ids: groupForm.dashboard_ids,
+      permission_ids: groupForm.permission_ids,
     };
     const url = selectedManagementGroupId.value
       ? `/api/auth/admin/groups/${selectedManagementGroupId.value}`
@@ -481,7 +520,7 @@ async function toggleManagementGroupActive(group: any) {
         group_name: group.group_name,
         group_description: group.group_description,
         is_active: !group.is_active,
-        dashboard_ids: group.dashboard_ids,
+        permission_ids: group.permission_ids,
       },
       { headers: managementAuthHeaders() },
     );

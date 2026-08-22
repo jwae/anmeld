@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { loadToken, authStore } from "./authStore";
+import { loadToken, authStore, can } from "./authStore";
 import { APP_PATHS, isAnmRoutePath, navigateTo, replaceRoute, routeState } from "./router";
 import { useDatabaseLogin } from "./composables/useDatabaseLogin";
 import { useAuth } from "./composables/useAuth";
@@ -18,7 +18,7 @@ const {
 
 const {
   loginUsername, loginPassword, loginLoading, loginError, pendingLogin,
-  isAuthenticated, currentUserLabel, pendingLoginUser, pendingLoginUserLabel, isPendingAdmin,
+  isAuthenticated, currentUserLabel, pendingLoginUser, pendingLoginUserLabel, canPendingManageApp, canPendingViewProcedures,
   login: performLogin, continueAfterLogin: performContinueAfterLogin, logout: performLogout,
   testLoginPassword,
 } = useAuth();
@@ -32,9 +32,7 @@ const showDatabaseConnectStep = computed<boolean>(
 );
 const currentPath = computed<string>(() => routeState.path);
 const isAnmRoute = computed<boolean>(() => isAnmRoutePath(currentPath.value));
-const isAuthenticatedAdmin = computed<boolean>(
-  () => String(authStore.groupName || "").trim().toLowerCase() === "admin",
-);
+const canViewProcedures = computed<boolean>(() => can("verfahren.anzeigen"));
 
 applyDbDefaults();
 loadToken();
@@ -90,8 +88,8 @@ async function logout() {
   navigateTo(APP_PATHS.home);
 }
 
-watch([currentPath, isAuthenticated, isAuthenticatedAdmin], ([path, authenticated, admin]) => {
-  if (isAnmRoutePath(path) && (!authenticated || !admin)) {
+watch([currentPath, isAuthenticated, canViewProcedures], ([path, authenticated, mayView]) => {
+  if (isAnmRoutePath(path) && (!authenticated || !mayView)) {
     replaceRoute(APP_PATHS.home);
   }
 }, { immediate: true });
@@ -101,7 +99,7 @@ onMounted(async () => {
   if (!isDatabaseConfigured.value || !isAuthenticated.value) return;
 
   databaseConnectionConfirmed.value = true;
-  if (isAuthenticatedAdmin.value) {
+  if (canViewProcedures.value) {
     if (!isAnmRoute.value) replaceRoute(APP_PATHS.anmVerfahren);
     return;
   }

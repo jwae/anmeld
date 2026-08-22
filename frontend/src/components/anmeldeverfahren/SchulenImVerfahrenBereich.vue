@@ -168,7 +168,7 @@ function applyProcedureSchoolGroupSelection(response: VerfahrenSchulgruppenRespo
 async function loadSchoolCatalog() {
   loadingBeteiligteSchulen.value = true;
   try {
-    const response = await apiClient.get("/api/auth/admin/bootstrap", {
+    const response = await apiClient.get("/api/auth/fachdaten/bootstrap", {
       headers: props.token ? { Authorization: `Bearer ${props.token}` } : {},
     });
     beteiligteSchulen.value = (Array.isArray(response.data?.school_sources) ? response.data.school_sources : [])

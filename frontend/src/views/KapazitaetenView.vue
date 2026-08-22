@@ -233,6 +233,7 @@ async function confirmKapazitaetenImport() {
 
 function openAddForm(row?: any) {
   if (props.isReadonly) return;
+  errorMessage.value = '';
   currentKapazitaet.value = {
     id: null,
     verfahren_id: props.verfahrenId,
@@ -249,6 +250,7 @@ function openAddForm(row?: any) {
 
 function openEditForm(row: any) {
   if (props.isReadonly) return;
+  errorMessage.value = '';
   currentKapazitaet.value = {
     ...row,
     verfahren_id: props.verfahrenId,
@@ -259,10 +261,12 @@ function openEditForm(row: any) {
 function closeForm() {
   activeForm.value = null;
   currentKapazitaet.value = null;
+  errorMessage.value = '';
 }
 
 async function saveKapazitaet(data: any) {
   if (props.isReadonly) return;
+  errorMessage.value = '';
   try {
     if (!props.verfahrenId) {
       errorMessage.value = 'Bitte zuerst ein Anmeldeverfahren auswählen.';
@@ -343,7 +347,7 @@ onBeforeUnmount(() => {
       @change="handleKapazitaetenImportFileSelected"
     />
 
-    <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
+    <div v-if="errorMessage && !activeForm" class="feedback-panel feedback-panel-error">
       <p class="feedback-title">Fehler</p>
       <p>{{ errorMessage }}</p>
     </div>
@@ -386,6 +390,7 @@ onBeforeUnmount(() => {
       :kapazitaet="currentKapazitaet"
       :schulen="schools"
       :verfahren-id="verfahrenId"
+      :error-message="errorMessage"
       @save="saveKapazitaet"
       @cancel="closeForm"
     />
