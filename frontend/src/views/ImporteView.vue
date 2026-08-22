@@ -26,8 +26,9 @@ const refreshVersion = ref(0);
 const canDeleteStudentData = computed(() => can("verfahren.bearbeiten"));
 
 async function handleDeleteAll() {
-  if (!canDeleteStudentData.value || props.isReadonly) return;
-  const firstConfirm = confirm("Moechten Sie wirklich alle Schuelerdaten aus der Tabelle 'anm_schueler' loeschen?");
+  if (!canDeleteStudentData.value || props.isReadonly || !props.verfahrenId) return;
+  const verfahrenName = String(props.context?.verfahren || "aktuelles Verfahren");
+  const firstConfirm = confirm(`Moechten Sie wirklich alle Schuelerdaten des Verfahrens '${verfahrenName}' loeschen?`);
   if (!firstConfirm) return;
 
   const secondConfirm = confirm("Sind Sie sich absolut sicher? Diese Aktion kann nicht rueckgaengig gemacht werden!");
@@ -38,8 +39,8 @@ async function handleDeleteAll() {
     successMessage.value = "";
     loading.value = true;
 
-    const res = await importService.clearSchueler(props.token);
-    successMessage.value = res?.message || "Alle Schuelerdaten wurden erfolgreich geloescht.";
+    const res = await importService.clearSchueler(props.verfahrenId, props.token);
+    successMessage.value = res?.message || "Alle Schuelerdaten des aktuellen Verfahrens wurden erfolgreich geloescht.";
     refreshVersion.value += 1;
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Das Loeschen der Schuelerdaten ist fehlgeschlagen.";
@@ -103,7 +104,7 @@ async function handleDeleteAll() {
       <button
         class="btn-danger"
         type="button"
-        :disabled="loading || isReadonly"
+        :disabled="loading || isReadonly || !verfahrenId"
         @click="handleDeleteAll"
       >
         {{ loading ? "Loesche..." : "Alle Schuelerdaten loeschen" }}

@@ -2,12 +2,14 @@
 const { pathToFileURL } = require("node:url");
 
 const { assertWritableContext, assertStudentWritable } = require("../lib/anmeldeWriteGuard");
+const { normalizeImportRecommendation } = require("../lib/importRecommendation");
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
 const anmeldungsPreviewSessions = new Map();
 const anmSchuelerImportSessions = new Map();
 const anmSchuelerAnmeldungenImportSessions = new Map();
+const rueckmeldungenMgImportSessions = new Map();
 const tableColumnCache = new Map();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
 let svwsConnectionModulePromise = null;
@@ -378,6 +380,228 @@ function isValidIsoDate(value) {
   return false;
 }
 
+const MG_REQUIRED_HEADERS = ["SNr-Aufn.", "Name", "Vorname", "Geboren", "GL-Status", "Status"];
+const MG_HEADER_KEYS = {
+  "snr_aufn": "SNr-Aufn.",
+  "sname_aufn": "SName-Aufn.",
+  "name": "Name",
+  "vorname": "Vorname",
+  "geboren": "Geboren",
+  "str": "Str",
+  "plz": "PLZ",
+  "ort": "Ort",
+  "snr_abg": "SNr-Abg.",
+  "sname_abg": "SName-Abg.",
+  "empfehlung": "Empfehlung",
+  "gl_status": "GL-Status",
+  "anmeldedatum": "Anmeldedatum",
+  "status": "Status",
+  "bemerkung": "Bemerkung",
+};
+
+function normalizeMgDate(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(Date.UTC(1899, 11, 30) + Math.round(value) * 86400000);
+    return date.toISOString().slice(0, 10);
+  }
+  const normalized = normalizeDate(value);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+  const [year, month, day] = normalized.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return normalized;
+}
+
+function normalizeMgStatus(value) {
+  const text = normalizeTextLower(value);
+  if (text === "neuaufnahme") return "Neuaufnahme";
+  if (text === "warteliste") return "Warteliste";
+  return null;
+}
+
+function normalizeMgGlStatus(value) {
+  const text = normalizeTextLower(value);
+  if (["", "0", "nein", "false", "no", "n"].includes(text)) return { valid: true, value: 0 };
+  if (["1", "x", "ja", "true", "yes", "y"].includes(text)) return { valid: true, value: 1 };
+  return { valid: false, value: null };
+}
+
+function getMgRowValue(row, header) {
+  const expected = normalizeHeaderName(header);
+  const key = Object.keys(row || {}).find((entry) => normalizeHeaderName(entry) === expected);
+  return key ? row[key] : "";
+}
+
+function buildMgMatchKey(nachname, vorname, geburtsdatum) {
+  return `${normalizeText(nachname)}\u0000${normalizeText(vorname)}\u0000${normalizeText(geburtsdatum)}`;
+}
+
+async function validateRueckmeldungenMgRows(pool, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const headers = Array.isArray(payload?.headers) ? payload.headers.map(normalizeText) : [];
+  const normalizedHeaders = new Set(headers.map(normalizeHeaderName));
+  const missingHeaders = MG_REQUIRED_HEADERS.filter((header) => !normalizedHeaders.has(normalizeHeaderName(header)));
+  if (missingHeaders.length) {
+    const error = new Error(`Erforderliche Spalten fehlen: ${missingHeaders.join(", ")}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  const sourceRows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!sourceRows.length) {
+    const error = new Error("Die Excel-Datei enthaelt keine Datenzeilen.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (sourceRows.length > 10000) {
+    const error = new Error("Die Excel-Datei enthaelt zu viele Datenzeilen (maximal 10.000). ");
+    error.statusCode = 413;
+    throw error;
+  }
+
+  const [students] = await pool.query(
+    `SELECT id, nachname, vorname, DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+            anmeldeschule_snr, anmeldestatus, foerderbedarf, empfehlung,
+            herkunftsschule_snr, strasse, plz, ort, bemerkung
+       FROM anm_schueler
+      WHERE verfahren_id = ? AND runde_id = ?`,
+    [verfahrenId, rundeId],
+  );
+  const studentLookup = new Map();
+  for (const student of students || []) {
+    const key = buildMgMatchKey(student.nachname, student.vorname, normalizeMgDate(student.geburtsdatum));
+    if (!studentLookup.has(key)) studentLookup.set(key, []);
+    studentLookup.get(key).push(student);
+  }
+  const targetSchools = await loadProcedureSchoolLookup(pool, verfahrenId);
+  const [allSchools] = await pool.query("SELECT snr, name FROM anm_schulen");
+  const schoolLookup = new Map((allSchools || []).map((school) => [normalizeText(school.snr), school]));
+  const hasRecommendation = normalizedHeaders.has(normalizeHeaderName(MG_HEADER_KEYS.empfehlung));
+  const hasSourceSchool = normalizedHeaders.has(normalizeHeaderName(MG_HEADER_KEYS.snr_abg));
+
+  const rows = sourceRows.map((source, index) => {
+    const data = {
+      anmeldeschule_snr: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.snr_aufn)),
+      anmeldeschule_name: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.sname_aufn)),
+      nachname: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.name)),
+      vorname: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.vorname)),
+      geburtsdatum: normalizeMgDate(getMgRowValue(source, MG_HEADER_KEYS.geboren)),
+      strasse: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.str)),
+      plz: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.plz)),
+      ort: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.ort)),
+      herkunftsschule_snr: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.snr_abg)),
+      herkunftsschule_name: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.sname_abg)),
+      bemerkung: normalizeText(getMgRowValue(source, MG_HEADER_KEYS.bemerkung)),
+    };
+    const recommendation = normalizeImportRecommendation(getMgRowValue(source, MG_HEADER_KEYS.empfehlung));
+    const glStatus = normalizeMgGlStatus(getMgRowValue(source, MG_HEADER_KEYS.gl_status));
+    const status = normalizeMgStatus(getMgRowValue(source, MG_HEADER_KEYS.status));
+    data.empfehlung = recommendation.value;
+    data.foerderbedarf = glStatus.value;
+    data.anmeldestatus = status;
+    data.has_empfehlung = hasRecommendation;
+    data.has_herkunftsschule = hasSourceSchool;
+
+    const errors = [];
+    const warnings = [];
+    if (!data.nachname) errors.push("Nachname fehlt.");
+    if (!data.vorname) errors.push("Vorname fehlt.");
+    if (!data.geburtsdatum) errors.push("Geburtsdatum ist ungueltig.");
+    if (!status) errors.push("Ungueltiger Status.");
+    if (!glStatus.valid) errors.push("Ungueltiger GL-Status.");
+    if (!recommendation.valid) errors.push("Ungueltige Empfehlung.");
+    const targetSchool = targetSchools.get(data.anmeldeschule_snr);
+    const invalidTargetSchool = !targetSchool || !targetSchool.active;
+    const invalidSourceSchool = Boolean(hasSourceSchool && data.herkunftsschule_snr && !schoolLookup.has(data.herkunftsschule_snr));
+    if (invalidTargetSchool) errors.push("Ungueltige Schulnummer der aufnehmenden Schule.");
+    if (invalidSourceSchool) {
+      errors.push("Ungueltige Schulnummer der abgebenden Schule.");
+    }
+
+    const matches = data.nachname && data.vorname && data.geburtsdatum
+      ? (studentLookup.get(buildMgMatchKey(data.nachname, data.vorname, data.geburtsdatum)) || [])
+      : [];
+    let classification = "VALIDIERUNGSFEHLER";
+    if (matches.length === 0 && data.nachname && data.vorname && data.geburtsdatum) {
+      classification = "NICHT_GEFUNDEN";
+      errors.push("Schueler nicht gefunden.");
+    } else if (matches.length > 1) {
+      classification = "MEHRDEUTIG";
+      errors.push("Mehrdeutiger Treffer.");
+    } else if (errors.length === 0) {
+      classification = "OK";
+    }
+    const student = matches.length === 1 ? matches[0] : null;
+    if (student && data.herkunftsschule_snr && normalizeText(student.herkunftsschule_snr)
+      && normalizeText(student.herkunftsschule_snr) !== data.herkunftsschule_snr) {
+      warnings.push("SNr-Abg. weicht von der hinterlegten Herkunftsschule ab.");
+    }
+    return {
+      row_number: Number(source?.__row_number || index + 2),
+      classification,
+      status: classification === "OK" ? "ok" : "fehler",
+      errors,
+      warnings,
+      invalid_school_number: invalidTargetSchool || invalidSourceSchool,
+      invalid_target_school_number: invalidTargetSchool,
+      invalid_source_school_number: invalidSourceSchool,
+      data,
+      matched_student: student ? {
+        id: Number(student.id), nachname: student.nachname, vorname: student.vorname,
+        geburtsdatum: student.geburtsdatum, anmeldeschule_snr: student.anmeldeschule_snr,
+        anmeldestatus: student.anmeldestatus, foerderbedarf: Number(student.foerderbedarf || 0), empfehlung: student.empfehlung,
+      } : null,
+    };
+  });
+
+  const openCaseKeys = new Set();
+  for (const row of rows) {
+    const studentId = Number(row.matched_student?.id || 0);
+    if (!studentId) continue;
+    if (row.invalid_target_school_number) openCaseKeys.add(`${studentId}:ANMELDEFEHLER`);
+    if (row.invalid_source_school_number) openCaseKeys.add(`${studentId}:HERKUNFTSFEHLER`);
+  }
+  return {
+    rows,
+    summary: {
+      total: rows.length,
+      importable: rows.filter((row) => row.classification === "OK").length,
+      not_found: rows.filter((row) => row.classification === "NICHT_GEFUNDEN").length,
+      ambiguous: rows.filter((row) => row.classification === "MEHRDEUTIG").length,
+      validation_errors: rows.filter((row) => row.classification === "VALIDIERUNGSFEHLER").length,
+      invalid_school_numbers: rows.filter((row) => row.invalid_school_number).length,
+      open_case_candidates: openCaseKeys.size,
+      warnings: rows.filter((row) => row.warnings.length > 0).length,
+    },
+  };
+}
+
+async function updateRueckmeldungMgStudent(connection, row) {
+  const data = row.data;
+  const assignments = [
+    "anmeldeschule_snr = ?", "anmeldestatus = ?", "foerderbedarf = ?",
+    "nachname = ?", "vorname = ?", "geburtsdatum = ?", "strasse = ?", "plz = ?", "ort = ?", "bemerkung = ?",
+  ];
+  const values = [
+    data.anmeldeschule_snr, data.anmeldestatus, data.foerderbedarf,
+    data.nachname, data.vorname, data.geburtsdatum, data.strasse || null, data.plz || null, data.ort || null, data.bemerkung || null,
+  ];
+  if (data.has_empfehlung) {
+    assignments.push("empfehlung = ?");
+    values.push(data.empfehlung);
+  }
+  if (data.has_herkunftsschule) {
+    assignments.push("herkunftsschule_snr = ?");
+    values.push(data.herkunftsschule_snr || null);
+  }
+  values.push(Number(row.matched_student.id));
+  const [result] = await connection.query(
+    `UPDATE anm_schueler SET ${assignments.join(", ")}, updated_at = NOW() WHERE id = ?`,
+    values,
+  );
+  if (Number(result?.affectedRows || 0) !== 1) throw new Error(`Zeile ${row.row_number}: Schuelerdatensatz konnte nicht aktualisiert werden.`);
+}
+
 function buildPoolImportSummary(rows) {
   const totalRows = Number(rows.length || 0);
   const selectedRows = rows.filter((row) => row.selected && row.status !== "fehler").length;
@@ -471,6 +695,7 @@ async function validatePoolImportRows(pool, payload) {
   const rows = csvRows.map((row) => {
     const record = row?.record || {};
     const rowNumber = Number(row?.row_number || 0);
+    const recommendation = normalizeImportRecommendation(record?.[mapping.empfehlung] || "");
     const data = {
       source_school_snr: normalizeText(record?.[mapping.source_school_snr] || ""),
       schueler_id: normalizeText(record?.[mapping.schueler_id] || ""),
@@ -483,7 +708,7 @@ async function validatePoolImportRows(pool, payload) {
       foerderbedarf: normalizeText(record?.[mapping.foerderbedarf] || ""),
       zieldifferent: normalizeText(record?.[mapping.zieldifferent] || ""),
       ef: normalizeText(record?.[mapping.ef] || ""),
-      empfehlung: normalizeText(record?.[mapping.empfehlung] || ""),
+      empfehlung: recommendation.value || "",
       teilnahmestatus: normalizeText(record?.[mapping.teilnahmestatus] || ""),
       quell_jahrgang: normalizeText(record?.[mapping.quell_jahrgang] || ""),
       bemerkung: normalizeText(record?.[mapping.bemerkung] || ""),
@@ -514,7 +739,7 @@ async function validatePoolImportRows(pool, payload) {
     if (data.teilnahmestatus && !["Aktiv", "Wegzug", "Abgemeldet", "Verstorben"].includes(data.teilnahmestatus)) {
       errors.push("Teilnahmestatus ist ungueltig.");
     }
-    if (data.empfehlung && empfehlungByCode.size > 0 && !empfehlungByCode.has(normalizeTextLower(data.empfehlung))) {
+    if (!recommendation.valid || (data.empfehlung && empfehlungByCode.size > 0 && !empfehlungByCode.has(normalizeTextLower(data.empfehlung)))) {
       errors.push("Empfehlung ist unbekannt.");
     }
     const existing = existingById.get(data.schueler_id);
@@ -2737,7 +2962,9 @@ async function ensureOpenCaseForUnknownProcedureSchool(pool, payload) {
 }
 
 function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
-  const empfehlungText = normalizeText(parsedRow.getValue(["empfehlung", "empfehlung_code"])) || "KEINE";
+  const recommendation = normalizeImportRecommendation(
+    normalizeText(parsedRow.getValue(["empfehlung", "empfehlung_code"])) || "KEINE",
+  );
   const data = {
     snr: normalizeText(parsedRow.getValue(["snr", "anmeldeschule_snr", "herkunftsschule_snr", "herkunftsschule_snr_nr"])),
     schueler_id: normalizeText(parsedRow.getValue(["schueler_id", "schueler_nr"])),
@@ -2749,7 +2976,7 @@ function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
     ort: normalizeText(parsedRow.getValue(["ort", "city"])),
     foerderbedarf: normalizeText(parsedRow.getValue("foerderbedarf")),
     zieldifferent: normalizeText(parsedRow.getValue("zieldifferent")),
-    empfehlung: empfehlungText,
+    empfehlung: recommendation.value || recommendation.normalized,
   };
 
   const errors = [];
@@ -2764,7 +2991,7 @@ function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
   if (!data.strasse) errors.push("strasse fehlt.");
   if (!data.plz) errors.push("plz fehlt.");
   if (!data.ort) errors.push("ort fehlt.");
-  if (!empfehlungByCode.has(normalizeTextLower(data.empfehlung))) {
+  if (!recommendation.valid || !empfehlungByCode.has(normalizeTextLower(data.empfehlung))) {
     errors.push("empfehlung ist unbekannt.");
   }
 
@@ -4721,38 +4948,203 @@ function createImporteController({ getPool }) {
       }
     },
 
+    rueckmeldungenMgValidate: async (req, res) => {
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        const pool = getPool();
+        await assertWritableContext(pool, verfahrenId, rundeId);
+        await assertProcedureType(pool, verfahrenId, ["GS", "SEK1"], "Der Import Rueckmeldungen MG ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
+        const validation = await validateRueckmeldungenMgRows(pool, req.body || {});
+        const session = storePreview(rueckmeldungenMgImportSessions, {
+          verfahren_id: verfahrenId,
+          runde_id: rundeId,
+          rows: validation.rows,
+          summary: validation.summary,
+        });
+        return res.json({
+          validation_token: session.token,
+          expires_at: new Date(session.expires_at).toISOString(),
+          rows: validation.rows,
+          summary: validation.summary,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die Rueckmeldungen MG konnten nicht validiert werden.");
+      }
+    },
+
+    rueckmeldungenMgExecute: async (req, res) => {
+      const connection = await getPool().getConnection();
+      try {
+        const verfahrenId = Number(req.body?.verfahren_id || 0);
+        const rundeId = Number(req.body?.runde_id || 0);
+        if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
+        if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
+        await assertWritableContext(connection, verfahrenId, rundeId);
+        await assertProcedureType(connection, verfahrenId, ["GS", "SEK1"], "Der Import Rueckmeldungen MG ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
+        const validationToken = normalizeText(req.body?.validation_token);
+        const validation = getPreview(rueckmeldungenMgImportSessions, validationToken);
+        if (!validation) return sendError(res, 409, "Die Validierung ist abgelaufen oder nicht mehr vorhanden.");
+        if (Number(validation.verfahren_id) !== verfahrenId || Number(validation.runde_id) !== rundeId) {
+          return sendError(res, 409, "Die Validierung gehoert nicht zum ausgewaehlten Verfahren und zur ausgewaehlten Runde.");
+        }
+        const importableRows = (validation.rows || []).filter((row) => row.classification === "OK");
+        const schoolErrorCases = new Map();
+        for (const row of validation.rows || []) {
+          const studentId = Number(row?.matched_student?.id || 0);
+          if (!studentId) continue;
+          if (row?.invalid_target_school_number) {
+            schoolErrorCases.set(`${studentId}:ANMELDEFEHLER`, { studentId, row, fallgrundCode: "ANMELDEFEHLER" });
+          }
+          if (row?.invalid_source_school_number) {
+            schoolErrorCases.set(`${studentId}:HERKUNFTSFEHLER`, { studentId, row, fallgrundCode: "HERKUNFTSFEHLER" });
+          }
+        }
+        if (!importableRows.length && !schoolErrorCases.size) {
+          return sendError(res, 400, "Es sind keine importierbaren Datensaetze oder offenen Faelle vorhanden.");
+        }
+
+        await connection.beginTransaction();
+        const rowResults = [];
+        let openCases = 0;
+        for (const { studentId, row, fallgrundCode } of schoolErrorCases.values()) {
+          const isSourceError = fallgrundCode === "HERKUNFTSFEHLER";
+          const schoolErrors = (row.errors || []).filter((message) => {
+            const normalizedMessage = normalizeTextLower(message);
+            return isSourceError ? normalizedMessage.includes("abgebenden schule") : normalizedMessage.includes("aufnehmenden schule");
+          });
+          const noteParts = [
+            `Rueckmeldungen MG, Zeile ${Number(row.row_number || 0)}`,
+            `${row.data?.nachname || ""}, ${row.data?.vorname || ""}`.trim(),
+            schoolErrors.join(" "),
+          ].filter(Boolean);
+          const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
+            verfahren_id: verfahrenId,
+            schueler_id: studentId,
+            fallgrund_code: fallgrundCode,
+            note: noteParts.join(" | "),
+          });
+          if (openCaseResult.created || openCaseResult.updated) openCases += 1;
+          rowResults.push({
+            row_number: row.row_number,
+            action: openCaseResult.created ? "OFFENER_FALL_ERSTELLT" : "OFFENER_FALL_AKTUALISIERT",
+            message: `Offener Fall ${fallgrundCode} wegen ungueltiger Schulnummer wurde angelegt bzw. aktualisiert.`,
+          });
+        }
+        for (const row of importableRows) {
+          await updateRueckmeldungMgStudent(connection, row);
+          rowResults.push({ row_number: row.row_number, action: "AKTUALISIERT", message: "Rueckmeldung wurde uebernommen." });
+        }
+        await connection.commit();
+        rueckmeldungenMgImportSessions.delete(validationToken);
+        return res.status(201).json({
+          success: true,
+          updated: importableRows.length,
+          skipped: Number(validation.summary?.total || 0) - importableRows.length,
+          not_found: Number(validation.summary?.not_found || 0),
+          ambiguous: Number(validation.summary?.ambiguous || 0),
+          validation_errors: Number(validation.summary?.validation_errors || 0),
+          technical_errors: 0,
+          open_cases: openCases,
+          row_results: rowResults,
+        });
+      } catch (error) {
+        await connection.rollback().catch(() => {});
+        console.error(error);
+        return sendError(res, error?.statusCode || 500, error?.message || "Der Import Rueckmeldungen MG konnte nicht abgeschlossen werden.");
+      } finally {
+        connection.release();
+      }
+    },
+
     clearSchuelerDaten: async (req, res) => {
+      const verfahrenId = Number(req.query?.verfahren_id || 0);
+      if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
       const pool = getPool();
       const connection = await pool.getConnection();
       try {
+        await assertWritableContext(connection, verfahrenId);
         const [lockedRows] = await connection.query(
-          `SELECT
-             (SELECT COUNT(*) FROM anm_verfahren WHERE status = 'Beendet') AS beendete_verfahren,
-             (SELECT COUNT(*) FROM anm_runde WHERE status = 'Beendet') AS beendete_runden`,
+          `SELECT COUNT(*) AS beendete_runden
+             FROM anm_runde
+            WHERE verfahren_id = ?
+              AND status = 'Beendet'`,
+          [verfahrenId],
         );
-        if (Number(lockedRows?.[0]?.beendete_verfahren || 0) > 0 || Number(lockedRows?.[0]?.beendete_runden || 0) > 0) {
-          return sendError(res, 409, "Die globale Testloeschung ist nicht moeglich, solange schreibgeschuetzte Verfahren oder Runden vorhanden sind.");
+        if (Number(lockedRows?.[0]?.beendete_runden || 0) > 0) {
+          return sendError(res, 409, "Die Schuelerdaten koennen nicht geloescht werden, weil das Verfahren beendete Runden enthaelt.");
         }
         await connection.beginTransaction();
 
         const tableDeletionOrder = [
           "anm_schueler_abgleich",
           "anm_offener_fall",
+          "anm_merkzettel",
           "anm_anmeldung",
           "anm_schueler_anmeldung",
           "anm_schueler",
-          "anm_schueler_pool",
         ];
+        const tableColumnsByName = new Map();
+        for (const tableName of [...tableDeletionOrder, "anm_schueler_pool"]) {
+          tableColumnsByName.set(tableName, await loadTableColumns(connection, tableName));
+        }
+
+        const poolColumns = tableColumnsByName.get("anm_schueler_pool") || new Set();
+        const poolReferenceTables = ["anm_schueler_abgleich", "anm_offener_fall", "anm_merkzettel", "anm_anmeldung"]
+          .filter((tableName) => {
+            const columns = tableColumnsByName.get(tableName) || new Set();
+            return columns.has("verfahren_id") && columns.has("schueler_pool_id");
+          });
+        const legacyPoolIds = new Set();
+        if (poolColumns.size > 0 && !poolColumns.has("verfahren_id")) {
+          for (const tableName of poolReferenceTables) {
+            const [referenceRows] = await connection.query(
+              `SELECT DISTINCT schueler_pool_id AS id FROM ${tableName} WHERE verfahren_id = ? AND schueler_pool_id IS NOT NULL`,
+              [verfahrenId],
+            );
+            for (const row of referenceRows || []) {
+              const id = Number(row?.id || 0);
+              if (id > 0) legacyPoolIds.add(id);
+            }
+          }
+        }
+
         const deletedByTable = {};
         let deletedRows = 0;
 
         for (const tableName of tableDeletionOrder) {
-          const tableColumns = await loadTableColumns(connection, tableName);
+          const tableColumns = tableColumnsByName.get(tableName) || new Set();
           if (tableColumns.size === 0) continue;
+          if (!tableColumns.has("verfahren_id")) {
+            const error = new Error(`${tableName} kann nicht sicher nach Verfahren geloescht werden, weil verfahren_id fehlt.`);
+            error.statusCode = 500;
+            throw error;
+          }
 
-          const [result] = await connection.query(`DELETE FROM ${tableName}`);
+          const [result] = await connection.query(`DELETE FROM ${tableName} WHERE verfahren_id = ?`, [verfahrenId]);
           const affectedRows = Number(result?.affectedRows || 0);
           deletedByTable[tableName] = affectedRows;
+          deletedRows += affectedRows;
+        }
+
+        if (poolColumns.size > 0) {
+          let poolResult = { affectedRows: 0 };
+          if (poolColumns.has("verfahren_id")) {
+            [poolResult] = await connection.query("DELETE FROM anm_schueler_pool WHERE verfahren_id = ?", [verfahrenId]);
+          } else if (legacyPoolIds.size > 0) {
+            const referenceGuards = poolReferenceTables.map(
+              (tableName) => `NOT EXISTS (SELECT 1 FROM ${tableName} ref WHERE ref.schueler_pool_id = p.id)`,
+            );
+            [poolResult] = await connection.query(
+              `DELETE p FROM anm_schueler_pool p WHERE p.id IN (?)${referenceGuards.length ? ` AND ${referenceGuards.join(" AND ")}` : ""}`,
+              [[...legacyPoolIds]],
+            );
+          }
+          const affectedRows = Number(poolResult?.affectedRows || 0);
+          deletedByTable.anm_schueler_pool = affectedRows;
           deletedRows += affectedRows;
         }
 
@@ -4760,15 +5152,17 @@ function createImporteController({ getPool }) {
         poolPreviewSessions.clear();
         anmeldungsPreviewSessions.clear();
         anmSchuelerImportSessions.clear();
+        rueckmeldungenMgImportSessions.clear();
         return res.json({
           success: true,
-          message: `Alle Schuelerdaten (${deletedRows} Datensaetze) wurden erfolgreich geloescht.`,
+          message: `Alle Schuelerdaten des aktuellen Verfahrens (${deletedRows} Datensaetze) wurden erfolgreich geloescht.`,
+          verfahren_id: verfahrenId,
           deleted_by_table: deletedByTable,
         });
       } catch (error) {
-        await connection.rollback();
+        await connection.rollback().catch(() => {});
         console.error("Error clearing student data:", error);
-        return sendError(res, 500, "Die Schuelerdaten konnten nicht geloescht werden.", error.message);
+        return sendError(res, error?.statusCode || 500, error?.message || "Die Schuelerdaten konnten nicht geloescht werden.");
       } finally {
         connection.release();
       }

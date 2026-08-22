@@ -140,8 +140,21 @@ export const importService = {
     return response.data;
   },
 
-  async clearSchueler(token?: string) {
-    const response = await apiClient.delete("/api/importe/schueler/alle", buildAuthConfig(token));
+  async validateRueckmeldungenMg(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anmeldungen/rueckmeldungen-mg/validate", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async executeRueckmeldungenMg(payload: Record<string, unknown>, token?: string) {
+    const response = await apiClient.post("/api/importe/anmeldungen/rueckmeldungen-mg/execute", payload, buildAuthConfig(token));
+    return response.data;
+  },
+
+  async clearSchueler(verfahrenId: number, token?: string) {
+    const response = await apiClient.delete("/api/importe/schueler/alle", {
+      params: { verfahren_id: verfahrenId },
+      ...buildAuthConfig(token),
+    });
     return response.data;
   },
 };

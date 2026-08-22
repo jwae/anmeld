@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import AnmeldungenImportOverlay from "./AnmeldungenImportOverlay.vue";
+import RueckmeldungenMgImportOverlay from "./RueckmeldungenMgImportOverlay.vue";
 import type { Anmeldeverfahrenstyp } from "../types";
 
 type SchoolRow = {
@@ -29,6 +30,7 @@ const successMessage = ref("");
 const importSummary = ref<any | null>(null);
 const isExpanded = ref(false);
 const showCsvImportOverlay = ref(false);
+const showRueckmeldungenMgOverlay = ref(false);
 const showSchildDiagnosticsOverlay = ref(false);
 const schildDiagnostics = ref<Array<{
   snr: string;
@@ -83,6 +85,13 @@ function openCsvImportOverlay() {
   errorMessage.value = "";
   successMessage.value = "";
   showCsvImportOverlay.value = true;
+}
+
+function openRueckmeldungenMgOverlay() {
+  if (props.isReadonly || !props.verfahrenId || !props.rundeId || importing.value) return;
+  errorMessage.value = "";
+  successMessage.value = "";
+  showRueckmeldungenMgOverlay.value = true;
 }
 
 async function importiereAnmeldungenAusSchild3() {
@@ -141,11 +150,26 @@ async function handleWizardSuccess(result: any) {
   await loadSchools();
 }
 
+async function handleRueckmeldungenMgSuccess(result: any) {
+  importSummary.value = {
+    total_summary: {
+      rows_read: Number(result?.updated || 0) + Number(result?.skipped || 0),
+      imported_rows: 0,
+      updated_rows: Number(result?.updated || 0),
+      skipped_rows: Number(result?.skipped || 0),
+      error_rows: Number(result?.technical_errors || 0),
+    },
+  };
+  successMessage.value = `${Number(result?.updated || 0)} Rückmeldungen aus MG wurden aktualisiert.`;
+  await loadSchools();
+}
+
 watch(() => [props.verfahrenId, props.rundeId], () => {
   importSummary.value = null;
   successMessage.value = "";
   errorMessage.value = "";
   showCsvImportOverlay.value = false;
+  showRueckmeldungenMgOverlay.value = false;
   showSchildDiagnosticsOverlay.value = false;
   schildDiagnostics.value = [];
   loadSchools();
@@ -179,6 +203,9 @@ onMounted(() => {
         </button>
         <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3
+        </button>
+        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openRueckmeldungenMgOverlay">
+          Rückmeldungen MG
         </button>
       </div>
     </div>
@@ -248,6 +275,15 @@ onMounted(() => {
       :schools="schools.map((school) => ({ snr: school.snr, name: school.name }))"
       @close="showCsvImportOverlay = false"
       @success="handleWizardSuccess"
+    />
+
+    <RueckmeldungenMgImportOverlay
+      :open="showRueckmeldungenMgOverlay"
+      :token="token"
+      :verfahren-id="verfahrenId"
+      :runde-id="rundeId"
+      @close="showRueckmeldungenMgOverlay = false"
+      @success="handleRueckmeldungenMgSuccess"
     />
 
     <div

@@ -24,6 +24,8 @@ function createImporteRouter({ requirePermission, getPool }) {
   router.post("/anmeldungen/vorschau", requirePermission("verfahren.bearbeiten"), controller.anmeldungenPreview);
   router.post("/anmeldungen/alle", requirePermission("verfahren.bearbeiten"), controller.anmeldungenImportAll);
   router.post("/anmeldungen/schild3", requirePermission("verfahren.bearbeiten"), controller.importiereAnmeldungenAusSchild3);
+  router.post("/anmeldungen/rueckmeldungen-mg/validate", requirePermission("verfahren.bearbeiten"), controller.rueckmeldungenMgValidate);
+  router.post("/anmeldungen/rueckmeldungen-mg/execute", requirePermission("verfahren.bearbeiten"), controller.rueckmeldungenMgExecute);
   router.post("/anmeldungen/:snr", requirePermission("verfahren.bearbeiten"), controller.anmeldungenImportSchool);
 
   return router;
