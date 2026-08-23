@@ -552,7 +552,8 @@ INSERT INTO `anm_kat_fallgrund` (`id`, `code`, `bezeichnung`, `sortierung`, `akt
 (17,'ANMELDEFEHLER','Kind wurde nicht an zugewiesener Schule angemeldet!',8,1),
 (18,'STAMMDATEN_ABWEICHUNG','Stammdaten weichen von den vorhandenen Eingaben ab.',9,1),
 (19,'SCHULE_ABWEICHEND','Anmeldung abweichend von zugeordneter Schule aus vorheriger Runde.',10,1),
-(20,'HERKUNFTSFEHLER','Ungültige oder nicht zuordenbare Herkunftsschule.',11,1);
+(20,'HERKUNFTSFEHLER','Ungültige oder nicht zuordenbare Herkunftsschule.',11,1),
+(21,'EMPFEHLUNG_ABWEICHUNG','Importierte Empfehlung weicht vom hinterlegten Wert ab.',12,1);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;

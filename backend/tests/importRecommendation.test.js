@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { normalizeImportRecommendation } = require("../lib/importRecommendation");
+const { normalizeImportRecommendation, importRecommendationDiffers } = require("../lib/importRecommendation");
 
 test("Empfehlungswerte aus Importdateien werden auf Katalogcodes gemappt", () => {
   assert.equal(normalizeImportRecommendation(" H ").value, "HS");
@@ -20,4 +20,11 @@ test("Bereits interne Empfehlungscodes bleiben kompatibel", () => {
 test("Leere Werte werden auf KEINE gemappt und unbekannte Werte sind ungueltig", () => {
   assert.deepEqual(normalizeImportRecommendation("  "), { valid: true, value: "KEINE", normalized: "" });
   assert.deepEqual(normalizeImportRecommendation("unbekannt"), { valid: false, value: null, normalized: "UNBEKANNT" });
+});
+
+test("Empfehlungsabweichungen werden nur bei vorhandener Importspalte markiert", () => {
+  assert.equal(importRecommendationDiffers("RS_GY", "RS_GY", true), false);
+  assert.equal(importRecommendationDiffers(" rs_gy ", "RS_GY", true), false);
+  assert.equal(importRecommendationDiffers("GY", "RS_GY", true), true);
+  assert.equal(importRecommendationDiffers("GY", "RS_GY", false), false);
 });

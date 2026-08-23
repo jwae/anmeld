@@ -153,14 +153,14 @@ async function handleWizardSuccess(result: any) {
 async function handleRueckmeldungenMgSuccess(result: any) {
   importSummary.value = {
     total_summary: {
-      rows_read: Number(result?.updated || 0) + Number(result?.skipped || 0),
-      imported_rows: 0,
+      rows_read: Number(result?.inserted || 0) + Number(result?.updated || 0) + Number(result?.skipped || 0),
+      imported_rows: Number(result?.inserted || 0),
       updated_rows: Number(result?.updated || 0),
       skipped_rows: Number(result?.skipped || 0),
       error_rows: Number(result?.technical_errors || 0),
     },
   };
-  successMessage.value = `${Number(result?.updated || 0)} Rückmeldungen aus MG wurden aktualisiert.`;
+  successMessage.value = `${Number(result?.inserted || 0)} Schüler neu angelegt, ${Number(result?.updated || 0)} Rückmeldungen aktualisiert.`;
   await loadSchools();
 }
 

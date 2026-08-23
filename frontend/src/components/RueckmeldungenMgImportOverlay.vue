@@ -84,7 +84,7 @@ async function executeImport() {
 }
 
 function classificationLabel(value: string) {
-  return ({ OK: "OK", NICHT_GEFUNDEN: "Schüler nicht gefunden", MEHRDEUTIG: "Mehrdeutiger Treffer", VALIDIERUNGSFEHLER: "Validierungsfehler" } as Record<string, string>)[value] || value;
+  return ({ OK: "OK", NEU: "Neu", ABWEICHUNG: "Möglicher Schreibfehler", NICHT_GEFUNDEN: "Schüler nicht gefunden", MEHRDEUTIG: "Mehrdeutiger Treffer", VALIDIERUNGSFEHLER: "Validierungsfehler" } as Record<string, string>)[value] || value;
 }
 
 function formatGermanDate(value: unknown) {
@@ -134,14 +134,17 @@ function formatGermanDate(value: unknown) {
             <table>
               <thead><tr><th>Zeile</th><th>Kind</th><th>Geboren</th><th>Aufnahme</th><th>Status</th><th>GL</th><th>Empfehlung</th><th>Prüfergebnis</th></tr></thead>
               <tbody>
-                <tr v-for="row in rows" :key="row.row_number" :class="{ invalid: row.classification !== 'OK' }">
+                <tr v-for="row in rows" :key="row.row_number" :class="{ invalid: ['MEHRDEUTIG', 'VALIDIERUNGSFEHLER'].includes(row.classification), 'has-warning': row.classification === 'ABWEICHUNG' }">
                   <td>{{ row.row_number }}</td>
                   <td><strong>{{ row.data.nachname }}, {{ row.data.vorname }}</strong><small v-if="row.matched_student">Treffer-ID {{ row.matched_student.id }}</small></td>
                   <td>{{ formatGermanDate(row.data.geburtsdatum) }}</td>
                   <td>{{ row.data.anmeldeschule_snr || '–' }}</td>
                   <td>{{ row.data.anmeldestatus || '–' }}</td>
                   <td>{{ row.data.foerderbedarf === 1 ? 'Ja' : row.data.foerderbedarf === 0 ? 'Nein' : '–' }}</td>
-                  <td>{{ row.data.empfehlung || '–' }}</td>
+                  <td :class="{ 'recommendation-mismatch': row.recommendation_mismatch }">
+                    <strong>{{ row.data.empfehlung || '–' }}</strong>
+                    <small v-if="row.recommendation_mismatch">DB bleibt: {{ row.matched_student?.empfehlung || '–' }}</small>
+                  </td>
                   <td><span class="status-pill" :class="row.classification.toLowerCase()">{{ classificationLabel(row.classification) }}</span><small v-if="row.errors?.length">{{ row.errors.join(' ') }}</small><small v-if="row.warnings?.length" class="warning">{{ row.warnings.join(' ') }}</small></td>
                 </tr>
               </tbody>
@@ -154,13 +157,15 @@ function formatGermanDate(value: unknown) {
           <div class="summary-grid">
             <div><strong>{{ summary.total || 0 }}</strong><span>Datensätze gesamt</span></div>
             <div class="positive"><strong>{{ summary.importable || 0 }}</strong><span>Importierbar</span></div>
+            <div class="positive"><strong>{{ summary.new_students || 0 }}</strong><span>Neue Schüler</span></div>
+            <div><strong>{{ summary.possible_typos || 0 }}</strong><span>Mögliche Schreibfehler</span></div>
             <div><strong>{{ summary.not_found || 0 }}</strong><span>Nicht gefunden</span></div>
             <div><strong>{{ summary.ambiguous || 0 }}</strong><span>Mehrdeutig</span></div>
             <div><strong>{{ summary.validation_errors || 0 }}</strong><span>Validierungsfehler</span></div>
             <div><strong>{{ summary.open_case_candidates || 0 }}</strong><span>Offene Fälle vorgesehen</span></div>
             <div><strong>{{ summary.warnings || 0 }}</strong><span>Mit Warnung</span></div>
           </div>
-          <p class="summary-note">Nur eindeutig gematchte, valide Datensätze werden aktualisiert. Alle übrigen Zeilen bleiben unverändert.</p>
+          <p class="summary-note">Exakte Treffer werden aktualisiert, Datensätze ohne Zwei-von-drei-Kandidaten neu angelegt. Mögliche Schreibfehler und mehrdeutige Treffer werden nicht importiert.</p>
         </section>
 
         <section v-else-if="step === 4" class="mg-panel processing-panel">
@@ -170,6 +175,7 @@ function formatGermanDate(value: unknown) {
         <section v-else class="mg-panel result-panel">
           <h4>Import abgeschlossen</h4>
           <div class="summary-grid">
+            <div class="positive"><strong>{{ result?.inserted || 0 }}</strong><span>Neu angelegt</span></div>
             <div class="positive"><strong>{{ result?.updated || 0 }}</strong><span>Erfolgreich aktualisiert</span></div>
             <div><strong>{{ result?.skipped || 0 }}</strong><span>Übersprungen</span></div>
             <div><strong>{{ result?.not_found || 0 }}</strong><span>Nicht gefunden</span></div>
@@ -201,7 +207,8 @@ function formatGermanDate(value: unknown) {
 .mg-head,.mg-footer,.panel-title{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.mg-head h3,.mg-panel h4{margin:0}.mg-head p:last-child,.mg-panel p{color:#526985}.mg-eyebrow{margin:0 0 8px!important;text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:700;color:#6680a3!important}
 .icon-button{width:38px;height:38px;border:0;border-radius:50%;font-size:24px;background:#eef4fd;color:#19365b;cursor:pointer}.mg-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:0;padding:0;list-style:none}.mg-steps li{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;background:#f1f5f9;color:#718096;font-size:13px;font-weight:700}.mg-steps li span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#dbe4f0}.mg-steps li.active{background:#e8f1ff;color:#1459a8}.mg-steps li.done{background:#edf9f2;color:#197044}
 .mg-content{min-height:0;overflow:auto}.mg-panel{display:grid;gap:18px;min-height:100%;align-content:start;padding:4px}.mg-message{padding:12px 14px;margin-bottom:12px;border-radius:12px}.mg-message.error{border:1px solid #fca5a5;background:#fff5f5;color:#991b1b}.upload-panel{max-width:720px;margin:auto;align-content:center}.file-picker{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px;border:2px dashed #b9cce3;border-radius:18px;background:#f8fbff}.file-picker input{max-width:260px}.required-columns{display:grid;gap:7px;padding:14px 16px;border-radius:14px;background:#eef4fd;color:#365675}
-.table-wrap{overflow:auto;max-height:55vh;border:1px solid #dbe4f0;border-radius:16px}table{width:100%;min-width:1100px;border-collapse:collapse;font-size:13px}th,td{padding:9px 10px;border-bottom:1px solid #e5edf6;text-align:left;vertical-align:top}th{position:sticky;top:0;z-index:1;background:#f8fbff;color:#5a7393;text-transform:uppercase;font-size:11px}tr.invalid{background:#fffafa}td small{display:block;margin-top:5px;color:#687b93}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eaf8ef;color:#166534;font-weight:700;white-space:nowrap}.status-pill.nicht_gefunden,.status-pill.mehrdeutig,.status-pill.validierungsfehler{background:#fff0f0;color:#a61b1b}td small.warning{color:#9a6700}
+.table-wrap{overflow:auto;max-height:55vh;border:1px solid #dbe4f0;border-radius:16px}table{width:100%;min-width:1100px;border-collapse:collapse;font-size:13px}th,td{padding:9px 10px;border-bottom:1px solid #e5edf6;text-align:left;vertical-align:top}th{position:sticky;top:0;z-index:1;background:#f8fbff;color:#5a7393;text-transform:uppercase;font-size:11px}tr.invalid{background:#fffafa}tr.has-warning{background:#fffbeb}td small{display:block;margin-top:5px;color:#687b93}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eaf8ef;color:#166534;font-weight:700;white-space:nowrap}.status-pill.neu{background:#dbeafe;color:#1d4ed8}.status-pill.abweichung{background:#fff3cd;color:#92400e}.status-pill.nicht_gefunden,.status-pill.mehrdeutig,.status-pill.validierungsfehler{background:#fff0f0;color:#a61b1b}td small.warning{color:#9a6700}
+.recommendation-mismatch{background:#fff7e6;color:#92400e}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}.summary-grid div{display:grid;gap:5px;padding:18px;border:1px solid #dbe4f0;border-radius:16px;background:#fff}.summary-grid strong{font-size:28px}.summary-grid span{color:#5d7390}.summary-grid .positive{border-color:#a7e0bd;background:#f2fbf5;color:#166534}.summary-note{padding:14px 16px;border-radius:14px;background:#eef4fd}.processing-panel,.result-panel{place-content:center;text-align:center}.result-panel .summary-grid{text-align:left;min-width:min(900px,80vw)}.spinner{width:48px;height:48px;margin:auto;border:5px solid #dbeafe;border-top-color:#1459a8;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .mg-footer{align-items:center}.mg-nav{display:flex;gap:10px}.btn-secondary,.btn-primary{border:0;border-radius:999px;padding:10px 17px;font-weight:700;cursor:pointer}.btn-secondary{background:#eef4fd;color:#17385f}.btn-primary{background:#1459a8;color:#fff}.btn-primary:disabled,.btn-secondary:disabled{opacity:.5;cursor:not-allowed}@media(max-width:800px){.mg-steps{grid-template-columns:1fr}.mg-steps li:not(.active){display:none}.mg-dialog{padding:18px}.mg-footer{align-items:stretch;flex-direction:column}.mg-nav{justify-content:flex-end}}
 </style>

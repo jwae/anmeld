@@ -26,4 +26,9 @@ function normalizeImportRecommendation(value) {
   };
 }
 
-module.exports = { normalizeImportRecommendation };
+function importRecommendationDiffers(importedValue, storedValue, fieldPresent = true) {
+  if (!fieldPresent) return false;
+  return String(importedValue ?? "").trim().toUpperCase() !== String(storedValue ?? "").trim().toUpperCase();
+}
+
+module.exports = { normalizeImportRecommendation, importRecommendationDiffers };

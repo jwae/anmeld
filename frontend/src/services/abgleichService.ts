@@ -67,4 +67,12 @@ export default {
     );
     return response.data;
   },
+
+  async deleteSchueler(id: number, token?: string) {
+    const response = await apiClient.delete(
+      `/api/importe/pool/schueler/${encodeURIComponent(String(id))}`,
+      buildAuthConfig(token),
+    );
+    return response.data;
+  },
 };

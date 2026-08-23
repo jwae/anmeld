@@ -92,6 +92,8 @@ const caseFallgrundId = ref<number>(0);
 const caseBemerkung = ref("");
 const editDialogOpen = ref(false);
 const editDialogSaving = ref(false);
+const deleteDialogOpen = ref(false);
+const editDialogDeleting = ref(false);
 const selectedEditRow = ref<SchuelerRow | null>(null);
 const editForm = ref<Record<string, string>>({});
 
@@ -291,10 +293,44 @@ function openEditDialog(row: SchuelerRow) {
 
 function closeEditDialog(force: boolean | Event = false) {
   const shouldForce = typeof force === "boolean" ? force : false;
-  if (editDialogSaving.value && !shouldForce) return;
+  if ((editDialogSaving.value || editDialogDeleting.value) && !shouldForce) return;
   editDialogOpen.value = false;
   selectedEditRow.value = null;
   editForm.value = {};
+}
+
+function openDeleteDialog() {
+  if (props.isReadonly || !selectedEditRow.value) return;
+  deleteDialogOpen.value = true;
+}
+
+function closeDeleteDialog(force = false) {
+  if (editDialogDeleting.value && !force) return;
+  deleteDialogOpen.value = false;
+}
+
+async function deleteSelectedStudent() {
+  if (props.isReadonly || !selectedEditRow.value) return;
+  const rowId = Number(selectedEditRow.value.schueler_id || 0);
+  if (!rowId) {
+    errorMessage.value = "Der Schuelerdatensatz konnte nicht geloescht werden: ID fehlt.";
+    return;
+  }
+
+  try {
+    editDialogDeleting.value = true;
+    errorMessage.value = "";
+    successMessage.value = "";
+    const response = await abgleichService.deleteSchueler(rowId, props.token);
+    closeDeleteDialog(true);
+    closeEditDialog(true);
+    await loadData();
+    successMessage.value = response?.message || "Der Schuelerdatensatz wurde geloescht.";
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Der Schuelerdatensatz konnte nicht geloescht werden.";
+  } finally {
+    editDialogDeleting.value = false;
+  }
 }
 
 async function saveEditDialog() {
@@ -921,10 +957,22 @@ function toggleSchuleFilter(schuleName: string) {
                   <span>Schueler-ID</span>
                   <input v-model="editForm.schueler_schul_id" type="text" />
                 </label>
-                <label>
-                  <span>Geburtsdatum</span>
-                  <input v-model="editForm.geburtsdatum" type="date" />
-                </label>
+                <div class="edit-birthdate-field">
+                  <label>
+                    <span>Geburtsdatum</span>
+                    <input v-model="editForm.geburtsdatum" type="date" />
+                  </label>
+                  <button
+                    type="button"
+                    class="edit-delete-button"
+                    title="Schuelerdatensatz loeschen"
+                    aria-label="Schuelerdatensatz loeschen"
+                    :disabled="editDialogSaving || editDialogDeleting || isReadonly"
+                    @click="openDeleteDialog"
+                  >
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
                 <label>
                   <span>Vorname</span>
                   <input v-model="editForm.vorname" type="text" />
@@ -1005,9 +1053,35 @@ function toggleSchuleFilter(schuleName: string) {
           </div>
 
           <div class="case-dialog-actions">
-            <button type="button" class="btn-secondary" :disabled="editDialogSaving" @click="closeEditDialog">Abbrechen</button>
-            <button type="button" class="btn-primary" :disabled="editDialogSaving || isReadonly" @click="saveEditDialog">
+            <button type="button" class="btn-secondary" :disabled="editDialogSaving || editDialogDeleting" @click="closeEditDialog">Abbrechen</button>
+            <button type="button" class="btn-primary" :disabled="editDialogSaving || editDialogDeleting || isReadonly" @click="saveEditDialog">
               {{ editDialogSaving ? "Speichere..." : "Speichern" }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="deleteDialogOpen" class="dialog-backdrop delete-dialog-backdrop" @click.self="closeDeleteDialog()">
+        <section class="case-dialog delete-student-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-student-dialog-title">
+          <div class="delete-dialog-head">
+            <div class="delete-dialog-icon" aria-hidden="true">
+              <i class="bi bi-trash"></i>
+            </div>
+            <div>
+              <h3 id="delete-student-dialog-title">Schuelerdatensatz wirklich loeschen?</h3>
+              <p>Diese Aktion kann nicht rueckgaengig gemacht werden.</p>
+            </div>
+          </div>
+
+          <div class="delete-dialog-student">
+            <strong>{{ selectedEditRow ? ([selectedEditRow.nachname, selectedEditRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}</strong>
+            <span>Geburtsdatum: {{ formatDate(editForm.geburtsdatum) }}</span>
+          </div>
+
+          <div class="case-dialog-actions">
+            <button type="button" class="btn-secondary" :disabled="editDialogDeleting" @click="closeDeleteDialog()">Abbrechen</button>
+            <button type="button" class="btn-danger" :disabled="editDialogDeleting || isReadonly" @click="deleteSelectedStudent">
+              {{ editDialogDeleting ? "Loesche..." : "Endgueltig loeschen" }}
             </button>
           </div>
         </section>
@@ -1564,6 +1638,45 @@ function toggleSchuleFilter(schuleName: string) {
   gap: 4px;
 }
 
+.edit-birthdate-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: end;
+}
+
+.edit-delete-button {
+  width: 42px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f0a8a8;
+  border-radius: 10px;
+  background: #fff1f1;
+  color: #b42318;
+  font-size: 17px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.edit-delete-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #d92d20;
+  background: #d92d20;
+  color: #fff;
+}
+
+.edit-delete-button:focus-visible {
+  outline: 3px solid rgba(217, 45, 32, 0.2);
+  outline-offset: 2px;
+}
+
+.edit-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .edit-form-grid span,
 .edit-form-context-grid span,
 .edit-form-remark span {
@@ -1618,6 +1731,74 @@ function toggleSchuleFilter(schuleName: string) {
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.delete-dialog-backdrop {
+  z-index: 230;
+}
+
+.delete-student-dialog {
+  width: min(520px, 100%);
+}
+
+.delete-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.delete-dialog-head h3 {
+  margin: 0;
+  color: #8a1c13;
+}
+
+.delete-dialog-head p {
+  margin: 5px 0 0;
+  color: #6f3b36;
+}
+
+.delete-dialog-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #fee4e2;
+  color: #b42318;
+  font-size: 21px;
+}
+
+.delete-dialog-student {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #f5c2bd;
+  border-radius: 14px;
+  background: #fff7f6;
+  color: #6f3b36;
+}
+
+.delete-dialog-student strong {
+  color: #8a1c13;
+}
+
+.btn-danger {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #c8281c;
+  color: #fff;
+  font-weight: 700;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #a91f16;
+}
+
+.btn-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 @media (max-width: 900px) {
