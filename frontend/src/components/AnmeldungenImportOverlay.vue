@@ -159,7 +159,7 @@ function buildAutoMapping(columns: string[]) {
   const byKey = new Map(columns.map((column) => [normalizeMappingKey(column), column]));
   const aliases: Record<string, string[]> = {
     schueler_id: ["schueler_id", "schueler_schul_id", "id"],
-    anmeldeschule_snr: ["anmeldeschule_snr", "snr", "schulnummer"],
+    anmeldeschule_snr: ["anmeldeschule_snr", "snr", "schul_nr", "schulnummer"],
     anmeldestatus: ["anmeldestatus", "status", "anmeldestatus_code"],
     vorname: ["vorname"],
     nachname: ["nachname", "name"],
@@ -172,7 +172,8 @@ function buildAutoMapping(columns: string[]) {
   for (const field of schemaFields.value) {
     if (field.readOnly) continue;
     next[field.key] =
-      (aliases[field.key] || [])
+      byKey.get(normalizeMappingKey(field.key))
+      || (aliases[field.key] || [])
         .map((entry) => byKey.get(normalizeMappingKey(entry)))
         .find(Boolean) || "";
   }
