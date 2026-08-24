@@ -54,6 +54,21 @@ async function loadAnmeldestatusCodes(pool) {
     .filter(Boolean);
 }
 
+async function loadSchuelerFieldComments(pool) {
+  const [rows] = await pool.query(`
+    SELECT COLUMN_NAME, COALESCE(COLUMN_COMMENT, '') AS column_comment
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'anm_schueler'
+      AND COLUMN_NAME IN ('herkunft', 'anmeldestatus', 'abgleich_status')
+  `);
+
+  return Object.fromEntries((rows || []).map((row) => [
+    normalizeText(row?.COLUMN_NAME).toLowerCase(),
+    normalizeText(row?.column_comment),
+  ]).filter(([columnName]) => columnName));
+}
+
 async function loadFallgrundOptions(pool) {
   const [rows] = await pool.query(
     `
@@ -955,7 +970,8 @@ function createAbgleichController({ getPool }) {
         const schoolNumbersInProcedure = schoolsInProcedure.map((school) => school.snr);
         const anmeldestatusOptions = await loadAnmeldestatusCodes(pool);
         const fallgrundOptions = await loadFallgrundOptions(pool);
-        return res.json({ rows, summary, schoolOverview, schoolsInProcedure, schoolNumbersInProcedure, anmeldestatusOptions, fallgrundOptions });
+        const fieldComments = await loadSchuelerFieldComments(pool);
+        return res.json({ rows, summary, schoolOverview, schoolsInProcedure, schoolNumbersInProcedure, anmeldestatusOptions, fallgrundOptions, fieldComments });
       } catch (error) {
         console.error(error);
         return sendError(res, 500, "Die Schueleruebersicht konnte nicht geladen werden.");

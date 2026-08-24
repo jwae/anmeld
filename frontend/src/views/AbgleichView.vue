@@ -85,6 +85,7 @@ const schoolsInProcedure = ref<ProcedureSchoolRow[]>([]);
 const schoolNumbersInProcedure = ref<string[]>([]);
 const anmeldestatusOptions = ref<string[]>([]);
 const fallgrundOptions = ref<FallgrundOption[]>([]);
+const fieldComments = ref<Record<string, string>>({});
 const caseDialogOpen = ref(false);
 const caseDialogSaving = ref(false);
 const selectedCaseRow = ref<SchuelerRow | null>(null);
@@ -130,6 +131,10 @@ function normalizeText(value: unknown) {
 
 function normalizeStatus(value: unknown) {
   return normalizeText(value) || "Ohne";
+}
+
+function fieldComment(columnName: string) {
+  return normalizeText(fieldComments.value[columnName]);
 }
 
 function normalizeStatusKey(value: unknown) {
@@ -481,6 +486,7 @@ async function loadData() {
     schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
+    fieldComments.value = {};
     summary.value = createEmptySummary();
     return;
   }
@@ -495,6 +501,7 @@ async function loadData() {
     schoolNumbersInProcedure.value = Array.isArray(response?.schoolNumbersInProcedure) ? response.schoolNumbersInProcedure.map((value: unknown) => normalizeText(value)).filter(Boolean) : [];
     anmeldestatusOptions.value = Array.isArray(response?.anmeldestatusOptions) ? response.anmeldestatusOptions : [];
     fallgrundOptions.value = Array.isArray(response?.fallgrundOptions) ? response.fallgrundOptions : [];
+    fieldComments.value = response?.fieldComments && typeof response.fieldComments === "object" ? response.fieldComments : {};
     const normalizedRows = Array.isArray(response?.rows) ? response.rows : [];
     summary.value = {
       ...createEmptySummary(),
@@ -509,6 +516,7 @@ async function loadData() {
     schoolNumbersInProcedure.value = [];
     anmeldestatusOptions.value = [];
     fallgrundOptions.value = [];
+    fieldComments.value = {};
     summary.value = createEmptySummary();
   } finally {
     loading.value = false;
@@ -1007,29 +1015,20 @@ function toggleSchuleFilter(schuleName: string) {
                     <option value="1">Ja</option>
                   </select>
                 </label>
-                <label class="edit-form-full">
-                  <span>Abgleichstatus</span>
-                  <select v-model="editForm.abgleich_status">
-                    <option value="">Bitte waehlen</option>
-                    <option value="Nur Pool">Nur Pool</option>
-                    <option value="Nur Anmeldung">Nur Anmeldung</option>
-                    <option value="Pool + Anm">Pool + Anm</option>
-                  </select>
-                </label>
               </div>
             </section>
 
             <section class="edit-form-section edit-form-assignment-section" aria-label="Anmeldung und Schule">
               <div class="edit-form-context-grid">
-                <label>
-                  <span>Herkunft</span>
+                <label :title="fieldComment('herkunft') || undefined">
+                  <span>Herkunft <i v-if="fieldComment('herkunft')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
                   <select v-model="editForm.herkunft">
                     <option value="">Bitte waehlen</option>
                     <option v-for="option in herkunftEditOptions" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </label>
                 <label>
-                  <span>Aufnehemende Schule</span>
+                  <span>Aufnehmende Schule</span>
                   <select v-model="editForm.schulnummer">
                     <option value="">Bitte waehlen</option>
                     <option v-for="school in schoolsInProcedure" :key="school.snr" :value="school.snr">
@@ -1037,10 +1036,19 @@ function toggleSchuleFilter(schuleName: string) {
                     </option>
                   </select>
                 </label>
-                <label>
-                  <span>Anmeldestatus</span>
+                <label :title="fieldComment('anmeldestatus') || undefined">
+                  <span>Anmeldestatus <i v-if="fieldComment('anmeldestatus')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
                   <select v-model="editForm.anmeldestatus">
                     <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
+                  </select>
+                </label>
+                <label :title="fieldComment('abgleich_status') || undefined">
+                  <span>Abgleichstatus <i v-if="fieldComment('abgleich_status')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
+                  <select v-model="editForm.abgleich_status">
+                    <option value="">Bitte waehlen</option>
+                    <option value="Nur Pool">Nur Pool</option>
+                    <option value="Nur Anmeldung">Nur Anmeldung</option>
+                    <option value="Pool + Anm">Pool + Anm</option>
                   </select>
                 </label>
               </div>
@@ -1555,6 +1563,8 @@ function toggleSchuleFilter(schuleName: string) {
   width: min(840px, 100%);
   max-height: calc(100vh - 40px);
   grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 18px;
 }
 
 .case-dialog-head {
@@ -1595,6 +1605,7 @@ function toggleSchuleFilter(schuleName: string) {
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+  gap: 8px;
 }
 
 .edit-form-section {
@@ -1612,7 +1623,7 @@ function toggleSchuleFilter(schuleName: string) {
 
 .edit-form-assignment-section {
   margin-top: 2px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid #c7e3cf;
   border-radius: 14px;
   background: linear-gradient(135deg, #f4fbf6 0%, #edf8f0 100%);
@@ -1622,13 +1633,13 @@ function toggleSchuleFilter(schuleName: string) {
 .edit-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  gap: 6px 10px;
 }
 
 .edit-form-context-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
 }
 
 .edit-form-grid label,
@@ -1647,7 +1658,7 @@ function toggleSchuleFilter(schuleName: string) {
 
 .edit-delete-button {
   width: 42px;
-  height: 38px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1687,15 +1698,21 @@ function toggleSchuleFilter(schuleName: string) {
   letter-spacing: 0.04em;
 }
 
+.edit-form-context-grid .edit-field-info {
+  margin-left: 3px;
+  color: #39734a;
+  font-size: 11px;
+}
+
 .edit-form-grid input,
 .edit-form-grid select,
 .edit-form-context-grid select,
 .edit-form-remark textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: 34px;
   border: 1px solid #d7e2ef;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 6px 9px;
   background: #fff;
   color: #17385f;
   font-size: 13px;
@@ -1707,7 +1724,7 @@ function toggleSchuleFilter(schuleName: string) {
 }
 
 .edit-form-remark textarea {
-  min-height: 96px;
+  min-height: 78px;
   resize: vertical;
 }
 

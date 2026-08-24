@@ -482,7 +482,7 @@ async function validateRueckmeldungenMgRows(pool, payload) {
   const [students] = await pool.query(
     `SELECT id, nachname, vorname, DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
             anmeldeschule_snr, anmeldestatus, foerderbedarf, empfehlung,
-            herkunftsschule_snr, strasse, plz, ort, bemerkung
+            herkunft, abgleich_status, herkunftsschule_snr, strasse, plz, ort, bemerkung
        FROM anm_schueler
       WHERE verfahren_id = ? AND runde_id = ?`,
     [verfahrenId, rundeId],
@@ -575,6 +575,7 @@ async function validateRueckmeldungenMgRows(pool, payload) {
     }
     const student = matches.length === 1 ? matches[0] : null;
     const displayedStudent = student || (nearMatches.length === 1 ? nearMatches[0] : null);
+    const abgleichStatus = student && hasPoolAbgleich(student) ? "Pool + Anm" : "Nur Anmeldung";
     const storedRecommendation = normalizeText(student?.empfehlung).toUpperCase();
     const recommendationMismatch = Boolean(
       student
@@ -598,6 +599,7 @@ async function validateRueckmeldungenMgRows(pool, payload) {
       invalid_target_school_number: invalidTargetSchool,
       invalid_source_school_number: invalidSourceSchool,
       recommendation_mismatch: recommendationMismatch,
+      abgleich_status: abgleichStatus,
       exact_match: Boolean(student),
       data,
       matched_student: displayedStudent ? {
@@ -641,11 +643,12 @@ async function validateRueckmeldungenMgRows(pool, payload) {
 async function updateRueckmeldungMgStudent(connection, row) {
   const data = row.data;
   const assignments = [
-    "anmeldeschule_snr = ?", "anmeldestatus = ?", "foerderbedarf = ?",
+    "anmeldeschule_snr = ?", "anmeldestatus = ?", "foerderbedarf = ?", "abgleich_status = ?",
+    "herkunft = CASE WHEN TRIM(COALESCE(herkunft, '')) = '' THEN ? ELSE herkunft END",
     "nachname = ?", "vorname = ?", "geburtsdatum = ?", "strasse = ?", "plz = ?", "ort = ?", "bemerkung = ?",
   ];
   const values = [
-    data.anmeldeschule_snr, data.anmeldestatus, data.foerderbedarf,
+    data.anmeldeschule_snr, data.anmeldestatus, data.foerderbedarf, row.abgleich_status, "Anmeldung",
     data.nachname, data.vorname, data.geburtsdatum, data.strasse || null, data.plz || null, data.ort || null, data.bemerkung || null,
   ];
   if (data.has_empfehlung && !row.recommendation_mismatch) {
@@ -674,7 +677,7 @@ async function insertRueckmeldungMgStudent(connection, verfahrenId, rundeId, row
   ];
   const values = [
     verfahrenId, rundeId, data.schueler_id, data.schueler_id, data.anmeldeschule_snr,
-    "Anmeldung", "Nur Anmeldung", data.anmeldestatus, data.vorname, data.nachname, data.geburtsdatum,
+    "Anmeldung", row.abgleich_status, data.anmeldestatus, data.vorname, data.nachname, data.geburtsdatum,
     data.foerderbedarf, data.strasse || null, data.plz || null, data.ort || null, data.bemerkung || null,
   ];
   if (data.has_empfehlung) {
