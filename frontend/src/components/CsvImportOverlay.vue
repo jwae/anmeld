@@ -35,6 +35,7 @@ const props = defineProps<{
   rundeId: number | null;
   title: string;
   importArt: "pool";
+  showGsPoolHelp?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -361,6 +362,7 @@ function handleClose() {
           :options="options"
           :drag-active="false"
           :busy="busy"
+          :show-gs-pool-help="showGsPoolHelp"
           @pick="openFilePicker"
           @drop="parseSelectedFile"
           @update:delimiter="options.delimiter = $event"

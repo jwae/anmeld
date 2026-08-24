@@ -834,6 +834,7 @@ onUnmounted(() => {
       :runde-id="rundeId"
       :title="title || 'Schuelerpool importieren (CSV, EWO-Datei)'"
       import-art="pool"
+      :show-gs-pool-help="verfahrenstyp === 'SEK1'"
       @close="showCsvImportOverlay = false"
       @success="handleCsvImportSuccess"
     />
