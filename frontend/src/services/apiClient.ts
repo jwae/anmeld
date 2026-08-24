@@ -24,7 +24,7 @@ export function registerUnauthorizedCallback(callback: () => void) {
  */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (authStore.token) {
+    if (authStore.token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${authStore.token}`;
     }
     return config;

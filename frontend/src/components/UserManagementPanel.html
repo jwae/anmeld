@@ -164,7 +164,7 @@
           <span>Schulgruppen</span>
         </button>
         <button
-          v-if="canManageProcedure"
+          v-if="canViewCatalogs"
           class="user-management-tab"
           :class="{ 'is-active': activeManagementTab === 'catalogs' }"
           type="button"
@@ -175,6 +175,19 @@
         >
           <i class="bi bi-journal-text" aria-hidden="true"></i>
           <span>Kataloge</span>
+        </button>
+        <button
+          v-if="canViewProtocol"
+          class="user-management-tab"
+          :class="{ 'is-active': activeManagementTab === 'protocol' }"
+          type="button"
+          role="tab"
+          title="Unveränderliches Anwendungsprotokoll anzeigen."
+          :aria-selected="activeManagementTab === 'protocol' ? 'true' : 'false'"
+          @click="requestManagementTab('protocol')"
+        >
+          <i class="bi bi-clock-history" aria-hidden="true"></i>
+          <span>App-Protokoll</span>
         </button>
       </div>
 
@@ -444,6 +457,13 @@
       <div v-else-if="activeManagementTab === 'catalogs'" class="user-management-tab-panel" role="tabpanel">
         <CatalogManagement
           ref="catalogManagementRef"
+          :management-token="effectiveManagementToken"
+          :is-management-session-active="isManagementSessionActive"
+          :can-edit-catalogs="canEditCatalogs"
+        />
+      </div>
+      <div v-else-if="activeManagementTab === 'protocol'" class="user-management-tab-panel" role="tabpanel">
+        <AppProtocol
           :management-token="effectiveManagementToken"
           :is-management-session-active="isManagementSessionActive"
         />

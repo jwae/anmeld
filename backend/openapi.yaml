@@ -108,3 +108,42 @@ paths:
                     type: string
                   user:
                     $ref: '#/components/schemas/User'
+
+  /api/auth/verwaltungsbereich/login:
+    post:
+      summary: Verwaltungsbereich oeffnen und protokollieren
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Verwaltungsbereich erfolgreich geoeffnet
+        '403':
+          description: Keine Verwaltungsberechtigung
+
+  /api/auth/verwaltungsbereich/logout:
+    post:
+      summary: Verwaltungsbereich abmelden und protokollieren
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Verwaltungsbereich erfolgreich abgemeldet
+
+  /api/auth/admin/protokoll:
+    get:
+      summary: Neueste Eintraege des App-Protokolls laden
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
+      responses:
+        '200':
+          description: App-Protokoll erfolgreich geladen
+        '403':
+          description: Keine Protokollberechtigung

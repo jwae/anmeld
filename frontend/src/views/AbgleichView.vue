@@ -437,6 +437,26 @@ const sortedRows = computed(() => {
   });
 });
 
+function currentEditRowIndex() {
+  const rowId = Number(selectedEditRow.value?.schueler_id || 0);
+  if (!rowId) return -1;
+  return sortedRows.value.findIndex((row) => Number(row.schueler_id) === rowId);
+}
+
+const canEditPreviousRow = computed(() => currentEditRowIndex() > 0);
+const canEditNextRow = computed(() => {
+  const index = currentEditRowIndex();
+  return index >= 0 && index < sortedRows.value.length - 1;
+});
+
+function openAdjacentEditRow(direction: -1 | 1) {
+  const currentIndex = currentEditRowIndex();
+  if (currentIndex < 0) return;
+  const nextRow = sortedRows.value[currentIndex + direction];
+  if (!nextRow) return;
+  openEditDialog(nextRow);
+}
+
 const duplicateNameBirthKeys = computed(() => {
   const counts = new Map<string, number>();
   for (const row of filteredRows.value) {
@@ -955,7 +975,38 @@ function toggleSchuleFilter(schuleName: string) {
                 {{ selectedEditRow ? ([selectedEditRow.nachname, selectedEditRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
               </p>
             </div>
-            <button type="button" class="case-dialog-close" aria-label="Dialog schliessen" @click="closeEditDialog">×</button>
+            <div class="edit-dialog-nav" aria-label="Datensatznavigation">
+              <button
+                type="button"
+                class="edit-dialog-nav-button"
+                :disabled="editDialogSaving || editDialogDeleting || !canEditPreviousRow"
+                aria-label="Vorherigen Schuelerdatensatz bearbeiten"
+                title="Vorheriger Datensatz"
+                @click="openAdjacentEditRow(-1)"
+              >
+                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="edit-dialog-nav-button"
+                :disabled="editDialogSaving || editDialogDeleting || !canEditNextRow"
+                aria-label="Naechsten Schuelerdatensatz bearbeiten"
+                title="Naechster Datensatz"
+                @click="openAdjacentEditRow(1)"
+              >
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="edit-dialog-nav-button"
+                :disabled="editDialogSaving || editDialogDeleting"
+                aria-label="Dialog schliessen"
+                title="Dialog schliessen"
+                @click="closeEditDialog"
+              >
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
 
           <div class="case-dialog-body case-dialog-body-edit">
@@ -1594,6 +1645,41 @@ function toggleSchuleFilter(schuleName: string) {
   color: #17385f;
   font-size: 24px;
   line-height: 1;
+}
+
+.edit-dialog-nav {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.edit-dialog-nav-button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: #eef4fd;
+  color: #1459a8;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.edit-dialog-nav-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #dbeafe;
+}
+
+.edit-dialog-nav-button:focus-visible {
+  outline: 3px solid rgba(20, 89, 168, 0.18);
+  outline-offset: 2px;
+}
+
+.edit-dialog-nav-button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .case-dialog-body {

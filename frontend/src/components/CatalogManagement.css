@@ -250,6 +250,12 @@ button:disabled {
   color: #8c2935;
 }
 
+.catalog-system-notice {
+  border: 1px solid #c8d9ee;
+  background: #f1f6fc;
+  color: #365675;
+}
+
 .catalog-modal-overlay {
   position: fixed;
   inset: 0;

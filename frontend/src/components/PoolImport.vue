@@ -100,6 +100,7 @@ const schildDiagnostics = ref<Array<{
 }>>([]);
 const poolCount = ref<number | null>(null);
 const poolSchuelerRows = ref<PoolSchuelerRow[]>([]);
+const poolFieldComments = ref<Record<string, string>>({});
 const loadingPoolSchueler = ref(false);
 const poolSearch = ref("");
 const poolStatusFilter = ref("alle");
@@ -255,6 +256,7 @@ async function loadPoolStats() {
 async function loadPoolSchueler() {
   if (!props.verfahrenId) {
     poolSchuelerRows.value = [];
+    poolFieldComments.value = {};
     return;
   }
 
@@ -262,8 +264,10 @@ async function loadPoolSchueler() {
     loadingPoolSchueler.value = true;
     const response = await importService.getPoolSchueler(props.verfahrenId, props.rundeId, props.token);
     poolSchuelerRows.value = Array.isArray(response?.rows) ? response.rows : [];
+    poolFieldComments.value = response?.fieldComments && typeof response.fieldComments === "object" ? response.fieldComments : {};
   } catch {
     poolSchuelerRows.value = [];
+    poolFieldComments.value = {};
   } finally {
     loadingPoolSchueler.value = false;
   }
@@ -271,6 +275,10 @@ async function loadPoolSchueler() {
 
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function poolFieldComment(columnName: string) {
+  return normalizeText(poolFieldComments.value[columnName]);
 }
 
 function normalizeDateKey(value: string | null | undefined) {
@@ -489,6 +497,10 @@ const canEditNextPoolRow = computed(() => {
   const index = currentEditPoolIndex();
   return index >= 0 && index < sortedPoolSchuelerRows.value.length - 1;
 });
+const currentEditPoolRow = computed(() => {
+  const index = currentEditPoolIndex();
+  return index >= 0 ? sortedPoolSchuelerRows.value[index] : null;
+});
 
 function openAdjacentPoolRow(direction: -1 | 1) {
   const currentIndex = currentEditPoolIndex();
@@ -502,6 +514,11 @@ function handleDeletePoolRow(row: PoolSchuelerRow) {
   if (props.isReadonly) return;
   pendingDeletePoolRow.value = row;
   showDeletePoolOverlay.value = true;
+}
+
+function handleDeleteCurrentPoolRow() {
+  if (!currentEditPoolRow.value) return;
+  handleDeletePoolRow(currentEditPoolRow.value);
 }
 
 function closeDeletePoolOverlay() {
@@ -731,6 +748,7 @@ onUnmounted(() => {
             <tr>
               <th>Nr.</th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('schueler_schul_id')">Schueler-ID{{ poolSortMarker('schueler_schul_id') }}</button></th>
+              <th class="detail-edit-head">Bearb.</th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('nachname')">Name + Vorname{{ poolSortMarker('nachname') }}</button></th>
               <th v-if="isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('von')">Von{{ poolSortMarker('von') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('geburtsdatum')">Geburtsdatum{{ poolSortMarker('geburtsdatum') }}</button></th>
@@ -741,7 +759,6 @@ onUnmounted(() => {
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('herkunft')">Herkunft{{ poolSortMarker('herkunft') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('abgleich_status')">Abgleichstatus{{ poolSortMarker('abgleich_status') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('anmeldestatus')">Anmeldestatus{{ poolSortMarker('anmeldestatus') }}</button></th>
-              <th class="detail-actions-head">Aktionen</th>
             </tr>
           </thead>
           <tbody>
@@ -758,6 +775,18 @@ onUnmounted(() => {
             >
               <td>{{ index + 1 }}</td>
               <td>{{ row.schueler_schul_id || "-" }}</td>
+              <td class="detail-edit-cell">
+                <button
+                  class="btn-secondary pool-icon-btn"
+                  type="button"
+                  title="Datensatz bearbeiten"
+                  aria-label="Datensatz bearbeiten"
+                  :disabled="isReadonly"
+                  @click="handleEditPoolRow(row)"
+                >
+                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                </button>
+              </td>
               <td>
                 {{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}
                 <span v-if="isDuplicatePoolChild(row)" class="duplicate-hint">Dublette</span>
@@ -790,28 +819,6 @@ onUnmounted(() => {
                   class="status-badge status-badge-without"
                 >{{ row.anmeldestatus }}</span>
                 <template v-else>{{ row.anmeldestatus || "-" }}</template>
-              </td>
-              <td class="detail-actions-cell">
-                <button
-                  class="btn-secondary pool-icon-btn"
-                  type="button"
-                  title="Datensatz bearbeiten"
-                  aria-label="Datensatz bearbeiten"
-                  :disabled="isReadonly"
-                  @click="handleEditPoolRow(row)"
-                >
-                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                </button>
-                <button
-                  class="btn-secondary pool-icon-btn pool-icon-btn-danger"
-                  type="button"
-                  title="Datensatz loeschen"
-                  aria-label="Datensatz loeschen"
-                  :disabled="isReadonly"
-                  @click="handleDeletePoolRow(row)"
-                >
-                  <i class="bi bi-trash" aria-hidden="true"></i>
-                </button>
               </td>
             </tr>
           </tbody>
@@ -899,6 +906,16 @@ onUnmounted(() => {
             >
               <i class="bi bi-chevron-right" aria-hidden="true"></i>
             </button>
+            <button
+              type="button"
+              class="head-icon-button pool-edit-close-button"
+              :disabled="savingEditPool || deletingPoolRow"
+              aria-label="Dialog schliessen"
+              title="Dialog schliessen"
+              @click="closeEditPoolOverlay"
+            >
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
         <div class="pool-edit-overlay-body">
@@ -907,10 +924,22 @@ onUnmounted(() => {
             <span>Schueler-ID</span>
             <input v-model="editPoolForm.schueler_id" type="text" />
           </label>
-          <label>
-            <span>Quell-Schueler-Nr</span>
-            <input v-model="editPoolForm.herkunftsschueler_nr" type="text" />
-          </label>
+          <div class="pool-edit-delete-field">
+            <label>
+              <span>Quell-Schueler-Nr</span>
+              <input v-model="editPoolForm.herkunftsschueler_nr" type="text" />
+            </label>
+            <button
+              type="button"
+              class="pool-edit-inline-delete-button"
+              :disabled="savingEditPool || deletingPoolRow || isReadonly || !currentEditPoolRow"
+              aria-label="Datensatz loeschen"
+              title="Datensatz loeschen"
+              @click="handleDeleteCurrentPoolRow"
+            >
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+          </div>
           <label>
             <span>Vorname</span>
             <input v-model="editPoolForm.vorname" class="pool-edit-input-soft" type="text" />
@@ -947,24 +976,28 @@ onUnmounted(() => {
             <span>Ort</span>
             <input v-model="editPoolForm.ort" type="text" />
           </label>
-          <label>
-            <span>Herkunft</span>
-            <select v-model="editPoolForm.herkunft">
-              <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
-            </select>
-          </label>
-          <label>
-            <span>Abgleichstatus</span>
-            <select v-model="editPoolForm.abgleich_status">
-              <option v-for="option in abgleichStatusOptions" :key="option" :value="option">{{ option }}</option>
-            </select>
-          </label>
-          <label>
-            <span>Anmeldestatus</span>
-            <select v-model="editPoolForm.anmeldestatus">
-              <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
-            </select>
-          </label>
+          <section class="pool-edit-status-section pool-edit-form-full" aria-label="Herkunft und Status">
+            <div class="pool-edit-status-grid">
+              <label :title="poolFieldComment('herkunft') || undefined">
+                <span>Herkunft <i v-if="poolFieldComment('herkunft')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select v-model="editPoolForm.herkunft">
+                  <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
+                </select>
+              </label>
+              <label :title="poolFieldComment('abgleich_status') || undefined">
+                <span>Abgleichstatus <i v-if="poolFieldComment('abgleich_status')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select v-model="editPoolForm.abgleich_status">
+                  <option v-for="option in abgleichStatusOptions" :key="option" :value="option">{{ option }}</option>
+                </select>
+              </label>
+              <label :title="poolFieldComment('anmeldestatus') || undefined">
+                <span>Anmeldestatus <i v-if="poolFieldComment('anmeldestatus')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select v-model="editPoolForm.anmeldestatus">
+                  <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
+                </select>
+              </label>
+            </div>
+          </section>
           <label>
             <span>Teilnahmestatus</span>
             <select v-model="editPoolForm.teilnahmestatus">
@@ -1541,13 +1574,13 @@ onUnmounted(() => {
   letter-spacing: 0.04em;
 }
 
-.detail-actions-head {
-  text-align: right !important;
+.detail-edit-head {
+  text-align: center !important;
 }
 
-.detail-actions-cell {
+.detail-edit-cell {
   white-space: nowrap;
-  text-align: right !important;
+  text-align: center !important;
 }
 
 .table-sort-btn {
@@ -1621,7 +1654,7 @@ onUnmounted(() => {
   min-width: 32px;
   min-height: 32px;
   padding: 0;
-  margin-left: 6px;
+  margin-left: 0;
   border: 1px solid #d7e2ef;
   display: inline-flex;
   align-items: center;
@@ -1630,15 +1663,6 @@ onUnmounted(() => {
 
 .pool-icon-btn i {
   font-size: 14px;
-}
-
-.pool-icon-btn-danger {
-  color: #b91c1c;
-  background: #fff5f5;
-}
-
-.pool-icon-btn-danger:hover:not(:disabled) {
-  background: #fee2e2;
 }
 
 .pool-import-overlay {
@@ -1675,6 +1699,8 @@ onUnmounted(() => {
 .pool-edit-overlay-card {
   width: min(920px, 100%);
   grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 18px;
+  gap: 12px;
 }
 
 .pool-delete-overlay-card {
@@ -1855,19 +1881,78 @@ onUnmounted(() => {
 .pool-edit-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  gap: 6px 10px;
 }
 
 .pool-edit-overlay-body {
   min-height: 0;
   overflow-y: auto;
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 2px;
+  padding-right: 2px;
 }
 
 .pool-edit-form-grid label {
   display: grid;
-  gap: 5px;
+  gap: 4px;
+}
+
+.pool-edit-delete-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: end;
+}
+
+.pool-edit-inline-delete-button {
+  width: 42px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f0a8a8;
+  border-radius: 10px;
+  background: #fff1f1;
+  color: #b42318;
+  font-size: 17px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.pool-edit-inline-delete-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #d92d20;
+  background: #d92d20;
+  color: #fff;
+}
+
+.pool-edit-inline-delete-button:focus-visible {
+  outline: 3px solid rgba(217, 45, 32, 0.2);
+  outline-offset: 2px;
+}
+
+.pool-edit-inline-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pool-edit-status-section {
+  padding: 10px;
+  border: 1px solid #c7e3cf;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f4fbf6 0%, #edf8f0 100%);
+  box-shadow: inset 4px 0 0 #8fc49e;
+}
+
+.pool-edit-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.pool-edit-status-grid .pool-edit-field-info {
+  margin-left: 3px;
+  color: #39734a;
+  font-size: 11px;
 }
 
 .pool-edit-form-grid span {
@@ -1882,17 +1967,17 @@ onUnmounted(() => {
 .pool-edit-form-grid select,
 .pool-edit-form-grid textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: 34px;
   border: 1px solid #d7e2ef;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 6px 9px;
   background: #fff;
   color: #17385f;
   font-size: 13px;
 }
 
 .pool-edit-form-grid textarea {
-  min-height: 96px;
+  min-height: 72px;
   resize: vertical;
 }
 
@@ -1951,6 +2036,10 @@ onUnmounted(() => {
 
   .pool-import-overlay-card {
     padding: 20px;
+  }
+
+  .pool-edit-status-grid {
+    grid-template-columns: 1fr;
   }
 
   .pool-import-overlay-actions {

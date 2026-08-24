@@ -6,6 +6,9 @@ interface CatalogSummary {
   name: string;
   comment: string;
   label?: string;
+  allow_insert?: boolean;
+  allow_delete?: boolean;
+  notice?: string;
 }
 
 interface CatalogColumn {
@@ -37,9 +40,11 @@ interface CatalogRow {
 const props = withDefaults(defineProps<{
   managementToken?: string;
   isManagementSessionActive?: boolean;
+  canEditCatalogs?: boolean;
 }>(), {
   managementToken: "",
   isManagementSessionActive: false,
+  canEditCatalogs: false,
 });
 
 const catalogs = ref<CatalogSummary[]>([]);
@@ -54,9 +59,11 @@ const errorMessage = ref("");
 const noticeMessage = ref("");
 const leaveDialogOpen = ref(false);
 const deleteDialogOpen = ref(false);
+const deactivateDialogOpen = ref(false);
 let localRowSequence = 0;
 let leaveResolver: ((allowed: boolean) => void) | null = null;
 let deleteResolver: ((confirmed: boolean) => void) | null = null;
+let deactivateResolver: ((confirmed: boolean) => void) | null = null;
 
 function headers() {
   return props.managementToken
@@ -107,6 +114,17 @@ function rowChanged(row: CatalogRow) {
 const hasChanges = computed(() => rows.value.some(rowChanged));
 const deletedRows = computed(() => rows.value.filter((row) => row.deleted && !row.isNew));
 const selectedLabel = computed(() => catalogLabel(selectedCatalog.value));
+const canInsertRows = computed(() => props.canEditCatalogs && selectedCatalog.value?.allow_insert !== false);
+const canDeleteRows = computed(() => props.canEditCatalogs && selectedCatalog.value?.allow_delete !== false);
+const deactivatedEventRows = computed(() => {
+  if (selectedCatalogName.value !== "anm_kat_ereignisse") return [];
+  return rows.value.filter((row) => (
+    !row.isNew
+    && !row.deleted
+    && Number(row.original.aktiv) === 1
+    && Number(row.values.aktiv) === 0
+  ));
+});
 
 function rowKey(row: CatalogRow) {
   return Object.fromEntries(primaryKey.value.map((name) => [name, row.original[name]]));
@@ -192,6 +210,7 @@ function defaultValue(column: CatalogColumn) {
 }
 
 function addRow() {
+  if (!canInsertRows.value) return;
   const values: Record<string, any> = {};
   for (const column of columns.value) values[column.name] = defaultValue(column);
   rows.value.push({
@@ -204,6 +223,7 @@ function addRow() {
 }
 
 function toggleDeleted(row: CatalogRow) {
+  if (!canDeleteRows.value) return;
   row.deleted = !row.deleted;
 }
 
@@ -254,6 +274,20 @@ function finishDeleteDialog(confirmed: boolean) {
   resolver?.(confirmed);
 }
 
+function confirmEventDeactivation() {
+  deactivateDialogOpen.value = true;
+  return new Promise<boolean>((resolve) => {
+    deactivateResolver = resolve;
+  });
+}
+
+function finishDeactivateDialog(confirmed: boolean) {
+  deactivateDialogOpen.value = false;
+  const resolver = deactivateResolver;
+  deactivateResolver = null;
+  resolver?.(confirmed);
+}
+
 async function saveChanges(options: { confirmDeletion?: boolean } = {}) {
   if (!hasChanges.value || saving.value || !selectedCatalogName.value) return !saving.value;
   const validationError = validateRows();
@@ -263,6 +297,7 @@ async function saveChanges(options: { confirmDeletion?: boolean } = {}) {
     return false;
   }
   if (deletedRows.value.length && options.confirmDeletion !== false && !(await confirmDeletes())) return false;
+  if (deactivatedEventRows.value.length && !(await confirmEventDeactivation())) return false;
 
   saving.value = true;
   errorMessage.value = "";
@@ -275,6 +310,7 @@ async function saveChanges(options: { confirmDeletion?: boolean } = {}) {
         values: changedValues(row),
       })),
       deletes: deletedRows.value.map((row) => ({ key: rowKey(row) })),
+      confirm_deactivation: deactivatedEventRows.value.length > 0,
     };
     const response = await apiClient.post(
       `/api/auth/admin/catalogs/${encodeURIComponent(selectedCatalogName.value)}/changes`,

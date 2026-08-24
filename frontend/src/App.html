@@ -82,6 +82,7 @@
             v-if="pendingLogin && canPendingViewProcedures"
             class="btn-secondary login-manage-users-btn login-manage-users-btn-primary"
             type="button"
+            :disabled="managementSessionLoading"
             @click="openAnmeldeverfahren"
           >
             Zum Anmeldeverfahren
@@ -91,9 +92,10 @@
             v-if="pendingLogin && canPendingManageApp"
             class="btn-secondary login-manage-users-btn"
             type="button"
-            @click="showAppManagement = true"
+            :disabled="managementSessionLoading"
+            @click="openAppManagement"
           >
-            App-Verwaltung
+            {{ managementSessionLoading ? "Öffne Verwaltung..." : "App-Verwaltung" }}
           </button>
         </div>
 

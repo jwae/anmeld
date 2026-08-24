@@ -5,6 +5,7 @@ import apiClient from "../services/apiClient";
 import SchoolManagement from "./SchoolManagement.vue";
 import SchoolGroupManagement from "./SchoolGroupManagement.vue";
 import CatalogManagement from "./CatalogManagement.vue";
+import AppProtocol from "./AppProtocol.vue";
 import type { User } from "../types";
 
 const props = defineProps<{
@@ -83,12 +84,35 @@ const canManageProcedure = computed<boolean>(() => (
   Array.isArray(effectiveManagementUser.value?.permissions)
   && effectiveManagementUser.value.permissions.includes("verfahren.bearbeiten")
 ));
+const canViewCatalogs = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && (
+    effectiveManagementUser.value.permissions.includes("kataloge.anzeigen")
+    || effectiveManagementUser.value.permissions.includes("kataloge.bearbeiten")
+  )
+));
+const canEditCatalogs = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && effectiveManagementUser.value.permissions.includes("kataloge.bearbeiten")
+));
+const canViewProtocol = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && (
+    effectiveManagementUser.value.permissions.includes("protokoll.anzeigen")
+    || effectiveManagementUser.value.permissions.includes("protokoll.bearbeiten")
+  )
+));
+const needsManagementBootstrap = computed<boolean>(() => (
+  canManageUsers.value || canManageGroups.value || canManageProcedure.value
+));
 
-watch([canManageUsers, canManageGroups, canManageProcedure], ([users, groups, procedures]) => {
+watch([canManageUsers, canManageGroups, canManageProcedure, canViewCatalogs, canViewProtocol], ([users, groups, procedures, catalogs, protocol]) => {
   const allowedTabs = [
     ...(users ? ["users"] : []),
     ...(groups ? ["groups"] : []),
-    ...(procedures ? ["schools", "school-groups", "catalogs"] : []),
+    ...(procedures ? ["schools", "school-groups"] : []),
+    ...(catalogs ? ["catalogs"] : []),
+    ...(protocol ? ["protocol"] : []),
   ];
   if (!allowedTabs.includes(activeManagementTab.value)) {
     activeManagementTab.value = allowedTabs[0] || "users";
@@ -364,6 +388,7 @@ onBeforeUnmount(() => {
 
 async function loadUserManagementData() {
   if (!effectiveManagementToken.value) return;
+  if (!needsManagementBootstrap.value) return;
 
   managementLoading.value = true;
   managementError.value = "";
@@ -401,7 +426,14 @@ async function authenticateUserManagement() {
     });
     const user = resp.data?.user || {};
     const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-    if (!permissions.includes("benutzer.bearbeiten") && !permissions.includes("gruppen.bearbeiten")) {
+    if (
+      !permissions.includes("benutzer.bearbeiten")
+      && !permissions.includes("gruppen.bearbeiten")
+      && !permissions.includes("kataloge.anzeigen")
+      && !permissions.includes("kataloge.bearbeiten")
+      && !permissions.includes("protokoll.anzeigen")
+      && !permissions.includes("protokoll.bearbeiten")
+    ) {
       managementToken.value = "";
       managementSessionUser.value = null;
       managementError.value = "Fuer die Verwaltung fehlt die erforderliche Berechtigung.";
@@ -410,7 +442,7 @@ async function authenticateUserManagement() {
 
     managementToken.value = String(resp.data?.token || "");
     managementSessionUser.value = user;
-    await loadUserManagementData();
+    if (needsManagementBootstrap.value) await loadUserManagementData();
     managementNotice.value = "Benutzerverwaltung geladen.";
   } catch (e: any) {
     managementError.value =

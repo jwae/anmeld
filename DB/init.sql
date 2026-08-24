@@ -73,6 +73,20 @@ CREATE TABLE `anm_kat_sf` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anm_kat_ereignisse` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `beschreibung` varchar(500) DEFAULT NULL,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_kat_ereignisse_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Katalog der protokollierbaren Ereignisse';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `anm_schulgruppe` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -244,6 +258,32 @@ CREATE TABLE `app_user` (
   KEY `fk_user_group` (`group_id`),
   CONSTRAINT `fk_user_group` FOREIGN KEY (`group_id`) REFERENCES `app_group` (`group_id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `app_protokoll` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `ereignis_id` bigint(20) NOT NULL,
+  `zeitpunkt` datetime(3) NOT NULL DEFAULT current_timestamp(3),
+  `ergebnis` enum('ERFOLG','FEHLER') NOT NULL,
+  `benutzer_id` int(10) unsigned DEFAULT NULL,
+  `benutzername` varchar(255) DEFAULT NULL,
+  `verfahren_id` bigint(20) DEFAULT NULL,
+  `runde_id` bigint(20) DEFAULT NULL,
+  `objekt_typ` varchar(50) DEFAULT NULL,
+  `objekt_id` varchar(100) DEFAULT NULL,
+  `aenderungen` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`aenderungen`)),
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`details`)),
+  `ip_adresse` varchar(45) DEFAULT NULL,
+  `korrelation_id` char(36) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_app_protokoll_zeitpunkt` (`zeitpunkt`),
+  KEY `idx_app_protokoll_ereignis_zeitpunkt` (`ereignis_id`,`zeitpunkt`),
+  KEY `idx_app_protokoll_benutzer_zeitpunkt` (`benutzer_id`,`zeitpunkt`),
+  KEY `idx_app_protokoll_verfahren_zeitpunkt` (`verfahren_id`,`zeitpunkt`),
+  CONSTRAINT `fk_app_protokoll_ereignis` FOREIGN KEY (`ereignis_id`) REFERENCES `anm_kat_ereignisse` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_app_protokoll_benutzer` FOREIGN KEY (`benutzer_id`) REFERENCES `app_user` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Unveraenderliches Anwendungsprotokoll';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -512,6 +552,26 @@ CREATE TABLE `anm_schueler_abgleich` (
 
 -- Stamm- und Katalogdaten
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
+INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `aktiv`) VALUES
+(1,'LOGIN','Login','Anmeldung an der Anwendung',1),
+(2,'LOGOUT','Logout','Abmeldung von der Anwendung',1),
+(3,'VERFAHREN_ERSTELLT','Verfahren erstellt','Ein Anmeldeverfahren wurde erstellt.',1),
+(4,'VERFAHREN_GEAENDERT','Verfahren geaendert','Ein Anmeldeverfahren wurde geaendert.',1),
+(5,'VERFAHREN_GESTARTET','Verfahren gestartet','Ein Anmeldeverfahren wurde gestartet.',1),
+(6,'VERFAHREN_BEENDET','Verfahren beendet','Ein Anmeldeverfahren wurde beendet.',1),
+(7,'RUNDE_ERSTELLT','Runde erstellt','Eine Anmelderunde wurde erstellt.',1),
+(8,'RUNDE_GEAENDERT','Runde geaendert','Eine Anmelderunde wurde geaendert.',1),
+(9,'RUNDE_GESTARTET','Runde gestartet','Eine Anmelderunde wurde gestartet.',1),
+(10,'IMPORT_GESTARTET','Import gestartet','Ein Import wurde gestartet.',1),
+(11,'IMPORT_BEENDET','Import beendet','Ein Import wurde erfolgreich beendet.',1),
+(12,'IMPORT_FEHLGESCHLAGEN','Import fehlgeschlagen','Ein Import wurde mit einem Fehler beendet.',1),
+(13,'LOGIN_VERWALTUNGSBEREICH','Login Verwaltungsbereich','Anmeldung am geschuetzten Verwaltungsbereich.',1),
+(14,'LOGOUT_VERWALTUNGSBEREICH','Logout Verwaltungsbereich','Abmeldung vom geschuetzten Verwaltungsbereich.',1),
+(15,'BENUTZER_ERSTELLT','Benutzer erstellt','Ein Benutzerkonto wurde in der App-Verwaltung erstellt.',1),
+(16,'BENUTZER_GELOESCHT','Benutzer gelöscht','Ein Benutzerkonto wurde in der App-Verwaltung gelöscht.',1);
+COMMIT;
+SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
+SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 INSERT INTO `app_group` (`group_id`, `group_name`, `group_description`, `is_active`, `created_at`) VALUES (1,'Administrator','Systemadministrator',1,'2026-03-06 17:45:14'),
 (17,'Sachbearbeitung','Fachliche Bearbeitung von Anmeldeverfahren',1,'2026-08-22 12:16:21'),
 (18,'Gast','Lesender Zugriff auf Anmeldeverfahren',1,'2026-08-22 12:16:21');
@@ -521,7 +581,11 @@ SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 INSERT INTO `app_permission` (`permission_id`, `permission_key`, `permission_name`, `description`, `is_active`, `created_at`) VALUES (1,'verfahren.anzeigen','Verfahren anzeigen','Verfahren und zugehoerige Daten anzeigen',1,'2026-08-22 12:16:21'),
 (2,'verfahren.bearbeiten','Verfahren bearbeiten','Fachliche Daten innerhalb eines Verfahrens bearbeiten; umfasst Verfahren, Runden, Schueler, Import, Abgleich, Kapazitaeten und Koordination',1,'2026-08-22 12:16:21'),
 (3,'benutzer.bearbeiten','Benutzer bearbeiten','Benutzer verwalten',1,'2026-08-22 12:16:21'),
-(4,'gruppen.bearbeiten','Gruppen bearbeiten','Gruppen und deren Berechtigungen verwalten',1,'2026-08-22 12:16:21');
+(4,'gruppen.bearbeiten','Gruppen bearbeiten','Gruppen und deren Berechtigungen verwalten',1,'2026-08-22 12:16:21'),
+(5,'kataloge.anzeigen','Kataloge anzeigen','Kataloge in der App-Verwaltung anzeigen',1,'2026-08-22 12:16:21'),
+(6,'kataloge.bearbeiten','Kataloge bearbeiten','Katalogeintraege in der App-Verwaltung bearbeiten',1,'2026-08-22 12:16:21'),
+(7,'protokoll.anzeigen','Protokoll anzeigen','Eintraege des Anwendungsprotokolls anzeigen',1,'2026-08-22 12:16:21'),
+(8,'protokoll.bearbeiten','Protokoll verwalten','Einstellungen des Anwendungsprotokolls verwalten; bestehende Protokolleintraege bleiben unveraenderlich',1,'2026-08-22 12:16:21');
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
@@ -632,6 +696,10 @@ INSERT INTO `app_group_permission` (`group_id`, `permission_id`, `created_at`) V
 (1,2,'2026-08-22 12:16:21'),
 (1,3,'2026-08-22 12:16:21'),
 (1,4,'2026-08-22 12:16:21'),
+(1,5,'2026-08-22 12:16:21'),
+(1,6,'2026-08-22 12:16:21'),
+(1,7,'2026-08-22 12:16:21'),
+(1,8,'2026-08-22 12:16:21'),
 (17,1,'2026-08-22 12:16:21'),
 (17,2,'2026-08-22 12:16:21'),
 (18,1,'2026-08-22 12:16:21');

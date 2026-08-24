@@ -34,7 +34,12 @@ export function useAuth() {
       const permissions = Array.isArray(pendingLoginUser.value?.permissions)
         ? pendingLoginUser.value.permissions
         : [];
-      return permissions.includes("benutzer.bearbeiten") || permissions.includes("gruppen.bearbeiten");
+      return permissions.includes("benutzer.bearbeiten")
+        || permissions.includes("gruppen.bearbeiten")
+        || permissions.includes("kataloge.anzeigen")
+        || permissions.includes("kataloge.bearbeiten")
+        || permissions.includes("protokoll.anzeigen")
+        || permissions.includes("protokoll.bearbeiten");
     },
   );
   const canPendingViewProcedures = computed<boolean>(() => (

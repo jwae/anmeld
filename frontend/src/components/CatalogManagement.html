@@ -26,16 +26,26 @@
           <p v-if="selectedCatalog" :title="selectedCatalog.name">{{ selectedCatalog.name }}</p>
         </div>
         <div class="catalog-toolbar-actions">
-          <button class="btn-secondary" type="button" :disabled="loading || saving || !columns.length" @click="addRow">
+          <button
+            class="btn-secondary"
+            type="button"
+            :disabled="loading || saving || !columns.length || !canInsertRows"
+            :title="canInsertRows ? '' : (!canEditCatalogs ? 'Berechtigung zum Bearbeiten von Katalogen fehlt.' : 'Technische Ereignisse werden nur per Migration angelegt.')"
+            @click="addRow"
+          >
             Neuer Eintrag
           </button>
-          <button class="btn-secondary" type="button" :disabled="saving || !hasChanges" @click="discardChanges">
+          <button class="btn-secondary" type="button" :disabled="saving || !hasChanges || !canEditCatalogs" @click="discardChanges">
             Änderungen verwerfen
           </button>
-          <button class="btn-primary" type="button" :disabled="loading || saving || !hasChanges" @click="saveChanges()">
+          <button class="btn-primary" type="button" :disabled="loading || saving || !hasChanges || !canEditCatalogs" @click="saveChanges()">
             {{ saving ? "Speichere..." : "Änderungen speichern" }}
           </button>
         </div>
+      </div>
+
+      <div v-if="selectedCatalog?.notice" class="feedback-panel catalog-system-notice">
+        <p>{{ selectedCatalog.notice }}</p>
       </div>
 
       <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
@@ -67,7 +77,7 @@
               }"
             >
               <td v-for="column in columns" :key="`${row.localId}-${column.name}`">
-                <span v-if="column.readonly" class="catalog-readonly-value">
+                <span v-if="column.readonly || !canEditCatalogs" class="catalog-readonly-value">
                   {{ row.isNew && column.primary ? "Neu" : (row.values[column.name] ?? "-") }}
                 </span>
                 <label v-else-if="column.input_kind === 'boolean'" class="catalog-checkbox">
@@ -98,8 +108,14 @@
                 />
               </td>
               <td class="catalog-row-actions">
-                <button class="btn-secondary" type="button" :disabled="saving" @click="toggleDeleted(row)">
-                  {{ row.deleted ? "Löschen rückgängig" : "Löschen" }}
+                <button
+                  class="btn-secondary"
+                  type="button"
+                  :disabled="saving || !canDeleteRows"
+                  :title="canDeleteRows ? '' : (!canEditCatalogs ? 'Berechtigung zum Bearbeiten von Katalogen fehlt.' : 'Technische Ereignisse können nicht gelöscht werden.')"
+                  @click="toggleDeleted(row)"
+                >
+                  {{ canDeleteRows ? (row.deleted ? "Löschen rückgängig" : "Löschen") : "Geschützt" }}
                 </button>
                 <span v-if="row.isNew && !row.deleted" class="catalog-row-state">Neu</span>
                 <span v-else-if="rowChanged(row) && !row.deleted" class="catalog-row-state">Geändert</span>
@@ -141,6 +157,24 @@
         <button class="btn-secondary" type="button" @click="finishDeleteDialog(false)">Abbrechen</button>
         <button class="btn-primary catalog-danger-button" type="button" @click="finishDeleteDialog(true)">
           Endgültig löschen
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div v-if="deactivateDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
+    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Ereignisse deaktivieren">
+      <h3>Protokollereignisse deaktivieren?</h3>
+      <p>
+        Für die folgenden Ereignisse werden nach der Deaktivierung keine neuen Protokolleinträge mehr geschrieben:
+      </p>
+      <ul>
+        <li v-for="row in deactivatedEventRows" :key="`deactivate-${row.localId}`">{{ rowDisplayName(row) }}</li>
+      </ul>
+      <div class="catalog-modal-actions">
+        <button class="btn-secondary" type="button" @click="finishDeactivateDialog(false)">Abbrechen</button>
+        <button class="btn-primary catalog-danger-button" type="button" @click="finishDeactivateDialog(true)">
+          Trotzdem deaktivieren
         </button>
       </div>
     </section>

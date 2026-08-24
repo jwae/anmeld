@@ -19,7 +19,12 @@ const props = defineProps<{
 
 const canManageApp = computed<boolean>(() => {
   const permissions = Array.isArray(props.user?.permissions) ? props.user.permissions : [];
-  return permissions.includes("benutzer.bearbeiten") || permissions.includes("gruppen.bearbeiten");
+  return permissions.includes("benutzer.bearbeiten")
+    || permissions.includes("gruppen.bearbeiten")
+    || permissions.includes("kataloge.anzeigen")
+    || permissions.includes("kataloge.bearbeiten")
+    || permissions.includes("protokoll.anzeigen")
+    || permissions.includes("protokoll.bearbeiten");
 });
 
 const userManagementRef = ref<{ requestLeave: () => Promise<boolean> } | null>(null);

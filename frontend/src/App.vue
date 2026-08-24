@@ -4,6 +4,7 @@ import { loadToken, authStore, can } from "./authStore";
 import { APP_PATHS, isAnmRoutePath, navigateTo, replaceRoute, routeState } from "./router";
 import { useDatabaseLogin } from "./composables/useDatabaseLogin";
 import { useAuth } from "./composables/useAuth";
+import { authService } from "./services/apiService";
 
 import DatabaseConnectPanel from "./components/DatabaseConnectPanel.vue";
 import APPManagement from "./components/APPManagement.vue";
@@ -25,6 +26,7 @@ const {
 
 const databaseConnectionConfirmed = ref<boolean>(false);
 const showAppManagement = ref<boolean>(false);
+const managementSessionLoading = ref<boolean>(false);
 
 const isDatabaseConfigured = computed<boolean>(() => isDbConfigured.value);
 const showDatabaseConnectStep = computed<boolean>(
@@ -43,11 +45,28 @@ async function login() {
 }
 
 function openAnmeldeverfahren() {
+  if (managementSessionLoading.value) return;
   const activatedSession = performContinueAfterLogin();
   if (!activatedSession) return;
 
   showAppManagement.value = false;
   navigateTo(APP_PATHS.anmVerfahren);
+}
+
+async function openAppManagement() {
+  const token = String(pendingLogin.value?.token || "").trim();
+  if (!token || managementSessionLoading.value) return;
+
+  managementSessionLoading.value = true;
+  loginError.value = "";
+  try {
+    await authService.loginManagementArea(token);
+    showAppManagement.value = true;
+  } catch (error: any) {
+    loginError.value = error?.response?.data?.error || error?.message || "Verwaltungsbereich konnte nicht geoeffnet werden.";
+  } finally {
+    managementSessionLoading.value = false;
+  }
 }
 
 async function connectDatabase() {
@@ -74,11 +93,21 @@ function backToDatabaseConnect() {
   navigateTo(APP_PATHS.home);
 }
 
-function logoutPendingManagementSession() {
-  showAppManagement.value = false;
-  pendingLogin.value = null;
-  loginPassword.value = testLoginPassword;
+async function logoutPendingManagementSession() {
+  if (managementSessionLoading.value) return;
+  const token = String(pendingLogin.value?.token || "").trim();
+  managementSessionLoading.value = true;
   loginError.value = "";
+  try {
+    if (token) await authService.logoutManagementArea(token);
+  } catch (error: any) {
+    loginError.value = error?.response?.data?.error || error?.message || "Abmeldung vom Verwaltungsbereich fehlgeschlagen.";
+  } finally {
+    managementSessionLoading.value = false;
+    showAppManagement.value = false;
+    pendingLogin.value = null;
+    loginPassword.value = testLoginPassword;
+  }
 }
 
 async function logout() {

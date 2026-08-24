@@ -1571,6 +1571,21 @@ async function loadTableColumns(pool, tableName) {
   return columns;
 }
 
+async function loadSchuelerFieldComments(pool) {
+  const [rows] = await pool.query(`
+    SELECT COLUMN_NAME, COALESCE(COLUMN_COMMENT, '') AS column_comment
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'anm_schueler'
+      AND COLUMN_NAME IN ('herkunft', 'anmeldestatus', 'abgleich_status')
+  `);
+
+  return Object.fromEntries((rows || []).map((row) => [
+    normalizeTextLower(row?.COLUMN_NAME),
+    normalizeText(row?.column_comment),
+  ]).filter(([columnName]) => columnName));
+}
+
 async function loadProcedureSchoolLookup(pool, verfahrenId) {
   return loadProcedureSchoolLookupByRole(pool, verfahrenId, "Zielschulen");
 }
@@ -4101,7 +4116,8 @@ function createImporteController({ getPool }) {
 
         const pool = getPool();
         const rows = await loadPoolSchuelerRows(pool, verfahrenId, rundeId);
-        return res.json({ rows });
+        const fieldComments = await loadSchuelerFieldComments(pool);
+        return res.json({ rows, fieldComments });
       } catch (error) {
         console.error(error);
         return sendError(res, error?.statusCode || 500, error?.message || "Die Pool-Schuelerliste konnte nicht geladen werden.");

@@ -2,7 +2,7 @@ const { after, before, describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const express = require("express");
-const { can, requirePermission } = require("../lib/permissions");
+const { can, requirePermission, requireAnyPermission } = require("../lib/permissions");
 
 const roles = {
   gast: ["verfahren.anzeigen"],
@@ -12,7 +12,13 @@ const roles = {
     "verfahren.bearbeiten",
     "benutzer.bearbeiten",
     "gruppen.bearbeiten",
+    "kataloge.anzeigen",
+    "kataloge.bearbeiten",
+    "protokoll.anzeigen",
+    "protokoll.bearbeiten",
   ],
+  katalogleser: ["kataloge.anzeigen"],
+  katalogpflege: ["kataloge.anzeigen", "kataloge.bearbeiten"],
 };
 
 describe("Permission-System", () => {
@@ -30,6 +36,12 @@ describe("Permission-System", () => {
     app.delete("/verfahren", requirePermission("verfahren.bearbeiten"), (_req, res) => res.sendStatus(200));
     app.patch("/benutzer", requirePermission("benutzer.bearbeiten"), (_req, res) => res.sendStatus(200));
     app.patch("/gruppen", requirePermission("gruppen.bearbeiten"), (_req, res) => res.sendStatus(200));
+    app.get(
+      "/kataloge",
+      requireAnyPermission(["kataloge.anzeigen", "kataloge.bearbeiten"]),
+      (_req, res) => res.sendStatus(200),
+    );
+    app.post("/kataloge", requirePermission("kataloge.bearbeiten"), (_req, res) => res.sendStatus(200));
 
     server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -61,6 +73,7 @@ describe("Permission-System", () => {
     assert.equal(await status("gast", "/verfahren", "DELETE"), 403);
     assert.equal(await status("gast", "/benutzer", "PATCH"), 403);
     assert.equal(await status("gast", "/gruppen", "PATCH"), 403);
+    assert.equal(await status("gast", "/kataloge"), 403);
   });
 
   test("Sachbearbeitung darf fachlich bearbeiten, aber keine Verwaltung", async () => {
@@ -69,6 +82,7 @@ describe("Permission-System", () => {
     assert.equal(await status("sachbearbeitung", "/verfahren", "DELETE"), 200);
     assert.equal(await status("sachbearbeitung", "/benutzer", "PATCH"), 403);
     assert.equal(await status("sachbearbeitung", "/gruppen", "PATCH"), 403);
+    assert.equal(await status("sachbearbeitung", "/kataloge"), 403);
   });
 
   test("Administrator hat Vollzugriff", async () => {
@@ -77,5 +91,14 @@ describe("Permission-System", () => {
     assert.equal(await status("administrator", "/verfahren", "DELETE"), 200);
     assert.equal(await status("administrator", "/benutzer", "PATCH"), 200);
     assert.equal(await status("administrator", "/gruppen", "PATCH"), 200);
+    assert.equal(await status("administrator", "/kataloge"), 200);
+    assert.equal(await status("administrator", "/kataloge", "POST"), 200);
+  });
+
+  test("Katalogrechte trennen Anzeigen und Bearbeiten", async () => {
+    assert.equal(await status("katalogleser", "/kataloge"), 200);
+    assert.equal(await status("katalogleser", "/kataloge", "POST"), 403);
+    assert.equal(await status("katalogpflege", "/kataloge"), 200);
+    assert.equal(await status("katalogpflege", "/kataloge", "POST"), 200);
   });
 });

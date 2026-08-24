@@ -7,8 +7,16 @@ const net = require("net");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { can, requirePermission, requireAnyPermission } = require("./lib/permissions");
+const { PROTOKOLL_ERGEBNIS, getClientIp, writeProtokoll } = require("./lib/protokollService");
 
 const ADMINISTRATION_PERMISSION_KEYS = ["benutzer.bearbeiten", "gruppen.bearbeiten"];
+const CATALOG_VIEW_PERMISSION_KEYS = ["kataloge.anzeigen", "kataloge.bearbeiten"];
+const PROTOCOL_VIEW_PERMISSION_KEYS = ["protokoll.anzeigen", "protokoll.bearbeiten"];
+const MANAGEMENT_PERMISSION_KEYS = [
+  ...ADMINISTRATION_PERMISSION_KEYS,
+  ...CATALOG_VIEW_PERMISSION_KEYS,
+  ...PROTOCOL_VIEW_PERMISSION_KEYS,
+];
 
 let svwsConnectionModulePromise = null;
 
@@ -1027,6 +1035,17 @@ function createAuthModule(poolProvider) {
     return pool;
   }
 
+  async function writeAuthProtokoll(req, payload) {
+    try {
+      await writeProtokoll(getPool(), {
+        ...payload,
+        ipAdresse: getClientIp(req),
+      });
+    } catch (error) {
+      console.error("[PROTOKOLL] Eintrag konnte nicht gespeichert werden:", error?.message || error);
+    }
+  }
+
   const jwtSecret = process.env.JWT_SECRET || "change-me-in-production";
   const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "8h";
 
@@ -1877,6 +1896,8 @@ function createAuthModule(poolProvider) {
 
   async function fetchCatalogDefinition(conn, tableName) {
     const table = await requireCatalogTable(conn, tableName);
+    const isEventCatalog = String(table.table_name || "") === "anm_kat_ereignisse";
+    const protectedEventColumns = new Set(["id", "code", "created_at", "updated_at"]);
     const [columnRows] = await conn.query(
       `
       SELECT
@@ -1904,8 +1925,9 @@ function createAuthModule(poolProvider) {
       const extra = String(column.extra || "").toLowerCase();
       const generated = !!String(column.generation_expression || "").trim() || extra.includes("generated");
       const autoIncrement = extra.includes("auto_increment");
+      const columnName = String(column.column_name);
       return {
-        name: String(column.column_name),
+        name: columnName,
         comment: String(column.column_comment || ""),
         data_type: String(column.data_type || ""),
         column_type: String(column.column_type || ""),
@@ -1917,7 +1939,10 @@ function createAuthModule(poolProvider) {
         primary: String(column.column_key || "").toUpperCase() === "PRI",
         auto_increment: autoIncrement,
         generated,
-        readonly: autoIncrement || generated || String(column.column_key || "").toUpperCase() === "PRI",
+        readonly: autoIncrement
+          || generated
+          || String(column.column_key || "").toUpperCase() === "PRI"
+          || (isEventCatalog && protectedEventColumns.has(columnName)),
         input_kind: catalogInputKind(column),
         enum_values: catalogEnumValues(column.column_type),
       };
@@ -1932,6 +1957,11 @@ function createAuthModule(poolProvider) {
       table: {
         name: String(table.table_name),
         comment: String(table.table_comment || ""),
+        allow_insert: !isEventCatalog,
+        allow_delete: !isEventCatalog,
+        notice: isEventCatalog
+          ? "Systemkatalog: Technische Ereigniscodes koennen nicht angelegt, umbenannt oder geloescht werden. Beim Deaktivieren wird fuer dieses Ereignis nicht mehr protokolliert."
+          : "",
       },
       columns,
       primary_key: primaryKey,
@@ -2077,32 +2107,60 @@ function createAuthModule(poolProvider) {
   }
 
   router.post("/login", async (req, res) => {
+    const username = String(req.body?.username || "").trim();
+    let user = null;
     try {
-      const username = String(req.body?.username || "").trim();
       const password = String(req.body?.password || "");
 
       if (!username || !password) {
+        await writeAuthProtokoll(req, {
+          ereignisCode: "LOGIN",
+          ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+          benutzername: username,
+          details: { grund: "UNVOLLSTAENDIGE_ZUGANGSDATEN" },
+        });
         return res.status(400).json({ error: "Username und Passwort sind erforderlich." });
       }
 
-      const user = await loadUser(username);
+      user = await loadUser(username);
       if (
         !user ||
         Number(user.is_active) !== 1 ||
         Number(user.group_is_active) !== 1
       ) {
         console.warn(`[AUTH] login denied: user not found or inactive for "${username}"`);
+        await writeAuthProtokoll(req, {
+          ereignisCode: "LOGIN",
+          ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+          benutzerId: user?.user_id,
+          benutzername: user?.username || username,
+          details: { grund: "UNGUELTIGE_ZUGANGSDATEN" },
+        });
         return res.status(401).json({ error: "Ungültige Zugangsdaten." });
       }
 
       const ok = await bcrypt.compare(password, String(user.password_hash || ""));
       if (!ok) {
         console.warn(`[AUTH] login denied: invalid password for "${username}"`);
+        await writeAuthProtokoll(req, {
+          ereignisCode: "LOGIN",
+          ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+          benutzerId: user.user_id,
+          benutzername: user.username,
+          details: { grund: "UNGUELTIGE_ZUGANGSDATEN" },
+        });
         return res.status(401).json({ error: "Ungültige Zugangsdaten." });
       }
 
       const permissions = await loadPermissionsForUser(user.user_id);
       if (!permissions.length) {
+        await writeAuthProtokoll(req, {
+          ereignisCode: "LOGIN",
+          ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+          benutzerId: user.user_id,
+          benutzername: user.username,
+          details: { grund: "KEINE_AKTIVEN_BERECHTIGUNGEN" },
+        });
         return res.status(403).json({
           error: "Keine aktiven Berechtigungen fuer diese Gruppe.",
         });
@@ -2112,6 +2170,12 @@ function createAuthModule(poolProvider) {
       await updateLastLogin(user.user_id);
 
       const token = signToken(user);
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGIN",
+        ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+        benutzerId: user.user_id,
+        benutzername: user.username,
+      });
       return res.json({
         token,
         user: {
@@ -2126,6 +2190,13 @@ function createAuthModule(poolProvider) {
       });
     } catch (e) {
       console.error(e);
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGIN",
+        ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+        benutzerId: user?.user_id,
+        benutzername: user?.username || username,
+        details: { grund: "TECHNISCHER_FEHLER" },
+      });
       if (String(e?.message || "").includes("Keine Datenbankverbindung konfiguriert")) {
         return res.status(503).json({ error: e.message });
       }
@@ -2139,6 +2210,50 @@ function createAuthModule(poolProvider) {
 
   router.get("/me", authenticateToken, (req, res) => {
     res.json({ user: req.user });
+  });
+
+  router.post("/verwaltungsbereich/login", authenticateToken, async (req, res) => {
+    const hasManagementPermission = MANAGEMENT_PERMISSION_KEYS.some((permissionKey) => can(req.user, permissionKey));
+    if (!hasManagementPermission) {
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGIN_VERWALTUNGSBEREICH",
+        ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+        details: { grund: "KEINE_VERWALTUNGSBERECHTIGUNG" },
+      });
+      return res.status(403).json({ error: "Fuer den Verwaltungsbereich fehlt die erforderliche Berechtigung." });
+    }
+
+    await writeAuthProtokoll(req, {
+      ereignisCode: "LOGIN_VERWALTUNGSBEREICH",
+      ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+      benutzerId: req.user?.sub,
+      benutzername: req.user?.username,
+    });
+    return res.json({ success: true });
+  });
+
+  router.post("/verwaltungsbereich/logout", authenticateToken, async (req, res) => {
+    try {
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGOUT_VERWALTUNGSBEREICH",
+        ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+      });
+      revokeToken(req.token || "");
+      return res.json({ success: true });
+    } catch (error) {
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGOUT_VERWALTUNGSBEREICH",
+        ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+        details: { grund: "TECHNISCHER_FEHLER" },
+      });
+      return res.status(500).json({ error: "Der Verwaltungsbereich konnte nicht abgemeldet werden." });
+    }
   });
 
   router.get("/fachdaten/bootstrap", authenticateToken, requirePermission("verfahren.anzeigen"), async (_req, res) => {
@@ -2157,7 +2272,75 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.get("/admin/catalogs", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
+  router.get("/admin/protokoll", authenticateToken, requireAnyPermission(PROTOCOL_VIEW_PERMISSION_KEYS), async (req, res) => {
+    try {
+      const requestedLimit = Number(req.query?.limit || 200);
+      const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 200;
+      const pool = getPool();
+      const [[countRows], [rows]] = await Promise.all([
+        pool.query("SELECT COUNT(*) AS total FROM app_protokoll"),
+        pool.query(
+          `
+          SELECT
+            p.id,
+            DATE_FORMAT(p.zeitpunkt, '%Y-%m-%d %H:%i:%s') AS zeitpunkt,
+            p.ergebnis,
+            p.benutzer_id,
+            p.benutzername,
+            u.user_fullname,
+            p.verfahren_id,
+            v.bezeichnung AS verfahren_bezeichnung,
+            p.runde_id,
+            r.bezeichnung AS runde_bezeichnung,
+            p.objekt_typ,
+            p.objekt_id,
+            p.aenderungen,
+            p.details,
+            p.ip_adresse,
+            p.korrelation_id,
+            e.code AS ereignis_code,
+            e.bezeichnung AS ereignis_bezeichnung
+          FROM app_protokoll p
+          JOIN anm_kat_ereignisse e ON e.id = p.ereignis_id
+          LEFT JOIN app_user u ON u.user_id = p.benutzer_id
+          LEFT JOIN anm_verfahren v ON v.id = p.verfahren_id
+          LEFT JOIN anm_runde r ON r.id = p.runde_id
+          ORDER BY p.zeitpunkt DESC, p.id DESC
+          LIMIT ?
+          `,
+          [limit],
+        ),
+      ]);
+
+      const parseJson = (value) => {
+        if (value === null || value === undefined || value === "") return null;
+        if (typeof value === "object") return value;
+        try {
+          return JSON.parse(String(value));
+        } catch {
+          return String(value);
+        }
+      };
+
+      return res.json({
+        total: Number(countRows?.[0]?.total || 0),
+        limit,
+        rows: (rows || []).map((row) => ({
+          ...row,
+          id: Number(row.id),
+          benutzer_id: row.benutzer_id === null ? null : Number(row.benutzer_id),
+          verfahren_id: row.verfahren_id === null ? null : Number(row.verfahren_id),
+          runde_id: row.runde_id === null ? null : Number(row.runde_id),
+          aenderungen: parseJson(row.aenderungen),
+          details: parseJson(row.details),
+        })),
+      });
+    } catch (error) {
+      return adminErrorResponse(res, error, "Das App-Protokoll konnte nicht geladen werden.");
+    }
+  });
+
+  router.get("/admin/catalogs", authenticateToken, requireAnyPermission(CATALOG_VIEW_PERMISSION_KEYS), async (req, res) => {
     try {
       const tables = await fetchCatalogTables(getPool());
       return res.json({
@@ -2171,7 +2354,7 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.get("/admin/catalogs/:tableName", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
+  router.get("/admin/catalogs/:tableName", authenticateToken, requireAnyPermission(CATALOG_VIEW_PERMISSION_KEYS), async (req, res) => {
     try {
       return res.json(await fetchCatalogContents(getPool(), req.params.tableName));
     } catch (error) {
@@ -2179,16 +2362,28 @@ function createAuthModule(poolProvider) {
     }
   });
 
-  router.post("/admin/catalogs/:tableName/changes", authenticateToken, requirePermission("verfahren.bearbeiten"), async (req, res) => {
+  router.post("/admin/catalogs/:tableName/changes", authenticateToken, requirePermission("kataloge.bearbeiten"), async (req, res) => {
     const conn = await getPool().getConnection();
     try {
       const definition = await fetchCatalogDefinition(conn, req.params.tableName);
       const inserts = Array.isArray(req.body?.inserts) ? req.body.inserts : [];
       const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
       const deletes = Array.isArray(req.body?.deletes) ? req.body.deletes : [];
+      const isEventCatalog = definition.table.name === "anm_kat_ereignisse";
       if (inserts.length + updates.length + deletes.length > 1000) {
         const error = new Error("Ein Speichervorgang darf hoechstens 1000 Aenderungen enthalten.");
         error.statusCode = 400;
+        throw error;
+      }
+      if (isEventCatalog && (inserts.length || deletes.length)) {
+        const error = new Error("Technische Ereignisse koennen in der Katalogverwaltung weder angelegt noch geloescht werden.");
+        error.statusCode = 409;
+        throw error;
+      }
+      const deactivatesEvent = isEventCatalog && updates.some((entry) => Number(entry?.values?.aktiv) === 0);
+      if (deactivatesEvent && req.body?.confirm_deactivation !== true) {
+        const error = new Error("Die Deaktivierung eines Protokollereignisses muss ausdruecklich bestaetigt werden.");
+        error.statusCode = 409;
         throw error;
       }
 
@@ -2313,7 +2508,8 @@ function createAuthModule(poolProvider) {
       validateEmailAddress(email);
       await ensureUniqueUserData(conn, { username, email });
       const passwordHash = await bcrypt.hash(password, 10);
-      await conn.query(
+      await conn.beginTransaction();
+      const [result] = await conn.query(
         `
         INSERT INTO app_user (
           group_id,
@@ -2327,9 +2523,27 @@ function createAuthModule(poolProvider) {
         `,
         [groupId, userFullname, username, email, passwordHash, isActive],
       );
+      const userId = Number(result.insertId);
+      await writeProtokoll(conn, {
+        ereignisCode: "BENUTZER_ERSTELLT",
+        ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+        objektTyp: "BENUTZER",
+        objektId: userId,
+        details: {
+          benutzername: username,
+          voller_name: userFullname,
+          gruppen_id: groupId,
+          aktiv: isActive === 1,
+        },
+        ipAdresse: getClientIp(req),
+      });
+      await conn.commit();
 
       res.status(201).json(await fetchAdminBootstrap());
     } catch (error) {
+      await conn.rollback().catch(() => {});
       return adminErrorResponse(res, error, "Der Benutzer konnte nicht angelegt werden.");
     } finally {
       conn.release();
@@ -2404,11 +2618,29 @@ function createAuthModule(poolProvider) {
         error.statusCode = 409;
         throw error;
       }
-      await ensureAdministrationUserMutationAllowed(conn, userId, (await loadUserById(conn, userId)).group_id, 0);
+      const targetUser = await loadUserById(conn, userId);
+      await ensureAdministrationUserMutationAllowed(conn, userId, targetUser.group_id, 0);
 
+      await conn.beginTransaction();
       await conn.query("DELETE FROM app_user WHERE user_id = ?", [userId]);
+      await writeProtokoll(conn, {
+        ereignisCode: "BENUTZER_GELOESCHT",
+        ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+        objektTyp: "BENUTZER",
+        objektId: userId,
+        details: {
+          benutzername: targetUser.username,
+          gruppen_id: Number(targetUser.group_id),
+          war_aktiv: Number(targetUser.is_active) === 1,
+        },
+        ipAdresse: getClientIp(req),
+      });
+      await conn.commit();
       res.json(await fetchAdminBootstrap());
     } catch (error) {
+      await conn.rollback().catch(() => {});
       return adminErrorResponse(res, error, "Der Benutzer konnte nicht geloescht werden.");
     } finally {
       conn.release();
@@ -3706,8 +3938,21 @@ function createAuthModule(poolProvider) {
   router.post("/logout", authenticateToken, async (req, res) => {
     try {
       revokeToken(req.token || "");
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGOUT",
+        ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+      });
       res.json({ success: true });
     } catch (e) {
+      await writeAuthProtokoll(req, {
+        ereignisCode: "LOGOUT",
+        ergebnis: PROTOKOLL_ERGEBNIS.FEHLER,
+        benutzerId: req.user?.sub,
+        benutzername: req.user?.username,
+        details: { grund: "TECHNISCHER_FEHLER" },
+      });
       return res.status(500).json({ error: "Logout fehlgeschlagen." });
     }
   });

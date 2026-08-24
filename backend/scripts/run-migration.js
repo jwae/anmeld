@@ -38,7 +38,11 @@ async function main() {
         'verfahren.anzeigen',
         'verfahren.bearbeiten',
         'benutzer.bearbeiten',
-        'gruppen.bearbeiten'
+        'gruppen.bearbeiten',
+        'kataloge.anzeigen',
+        'kataloge.bearbeiten',
+        'protokoll.anzeigen',
+        'protokoll.bearbeiten'
       )
       GROUP BY g.group_id, g.group_name
       ORDER BY g.group_name

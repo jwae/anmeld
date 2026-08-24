@@ -18,6 +18,18 @@ export const authService = {
 
   async logout() {
     return apiClient.post("/api/auth/logout");
+  },
+
+  async loginManagementArea(token: string) {
+    return apiClient.post("/api/auth/verwaltungsbereich/login", {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  async logoutManagementArea(token: string) {
+    return apiClient.post("/api/auth/verwaltungsbereich/logout", {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   }
 };
 
