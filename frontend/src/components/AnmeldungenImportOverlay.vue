@@ -70,7 +70,13 @@ const canProceed = computed(() => {
   if (currentStep.value === 1) return csvRows.value.length > 0;
   if (currentStep.value === 2) return csvRows.value.length > 0;
   if (currentStep.value === 3) {
-    return Boolean(mapping.value.schueler_id && mapping.value.anmeldestatus && (mapping.value.anmeldeschule_snr || globalSchulNr.value));
+    return Boolean(
+      mapping.value.anmeldestatus
+      && mapping.value.vorname
+      && mapping.value.nachname
+      && mapping.value.geburtsdatum
+      && (mapping.value.anmeldeschule_snr || globalSchulNr.value),
+    );
   }
   if (currentStep.value === 4) return selectedImportRows.value.length > 0;
   return true;

@@ -579,7 +579,11 @@ async function saveEditPoolRow() {
     savingEditPool.value = true;
     errorMessage.value = "";
     successMessage.value = "";
-    await importService.updatePoolSchueler(rowId, editPoolForm.value, props.token);
+    await importService.updatePoolSchueler(rowId, {
+      ...editPoolForm.value,
+      verfahren_id: props.verfahrenId,
+      runde_id: props.rundeId,
+    }, props.token);
     showEditPoolOverlay.value = false;
     successMessage.value = "Datensatz wurde gespeichert.";
     await loadPoolSchueler();
@@ -1092,7 +1096,7 @@ onUnmounted(() => {
           <h3 id="pool-import-duplicate-conflicts-title"><span class="warning-icon" aria-hidden="true">!</span>Doppelte Schueler-IDs</h3>
         </div>
         <div class="pool-import-overlay-copy">
-          <p>Diese Datensaetze wurden nicht importiert, weil die `schueler_id` bereits in `anm_schueler` vorhanden ist.</p>
+          <p>Diese Datensaetze wurden wegen eines mehrdeutigen Identitaetskonflikts nicht importiert.</p>
           <div class="pool-import-updates-list">
             <div
               v-for="(entry, index) in duplicateConflicts"

@@ -59,21 +59,13 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
     };
   }
 
-  const studentIdColumn = studentColumns.has("schueler_id")
-    ? "s.schueler_id"
-    : (studentColumns.has("schueler_nr") ? "s.schueler_nr" : "''");
+  const studentIdColumn = "COALESCE(x.externe_id, s.schueler_id, '')";
   const sourceSchoolColumn = studentColumns.has("herkunftsschule_snr")
     ? "s.herkunftsschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
-  const targetSchoolColumn = studentColumns.has("anmeldeschule_snr")
-    ? "s.anmeldeschule_snr"
-    : (studentColumns.has("snr") ? "s.snr" : "''");
-  const assignedSchoolColumn = studentColumns.has("zugewiesene_schule_snr")
-    ? "s.zugewiesene_schule_snr"
-    : (studentColumns.has("koordinierte_snr") ? "s.koordinierte_snr" : "NULL");
-  const noteColumn = studentColumns.has("bemerkung")
-    ? "COALESCE(NULLIF(TRIM(s.bemerkung), ''), '')"
-    : "''";
+  const targetSchoolColumn = "sr.schul_nr";
+  const assignedSchoolColumn = "sr.koordinierte_snr";
+  const noteColumn = "COALESCE(NULLIF(TRIM(s.notiz), ''), '')";
 
   const [rows] = await pool.query(
     `
@@ -84,17 +76,21 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
       COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS abgebende_schule_nr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS abgebende_schule_name,
-      COALESCE(NULLIF(TRIM(s.anmeldestatus), ''), '') AS anmeldestatus,
+      COALESCE(NULLIF(TRIM(sr.anmeldestatus), ''), '') AS anmeldestatus,
       COALESCE(NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), ''), '') AS schule_nr,
       COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schule_name,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
+    LEFT JOIN anm_schueler_externe_id x ON x.id = (
+      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
+    )
     LEFT JOIN anm_schulen src
       ON src.snr = NULLIF(TRIM(${sourceSchoolColumn}), '')
     LEFT JOIN anm_schulen dst
       ON dst.snr = NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), '')
     WHERE s.verfahren_id = ?
-      AND s.runde_id = ?
+      AND sr.runde_id = ?
     `,
     [verfahrenId, rundeId],
   );

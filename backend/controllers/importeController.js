@@ -1,9 +1,16 @@
 ﻿const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const crypto = require("node:crypto");
 
 const { assertWritableContext, assertStudentWritable } = require("../lib/anmeldeWriteGuard");
 const { normalizeImportRecommendation, importRecommendationDiffers } = require("../lib/importRecommendation");
+const {
+  findStudentByExternalId,
+  findStudentsByPersonData,
+  normalizeExternalIdentity,
+  resolveStudent,
+  updateStudentMaster,
+  upsertRoundState,
+} = require("../lib/schuelerIdentityService");
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
@@ -219,15 +226,15 @@ function getPoolImportFieldDefinitions(schuelerColumns, verfahrenstyp) {
     {
       key: "schueler_id",
       label: "Import-ID",
-      description: "Wird in schueler_id und herkunftsschueler_nr geschrieben.",
-      required: true,
+      description: "Optional. Wird als externe Identitaet gespeichert; ohne ID erfolgt der Abgleich ueber Name und Geburtsdatum.",
+      required: false,
       warning: false,
     },
     {
       key: "herkunftsschueler_nr",
       label: "Quell-Schueler-Nr",
-      description: "Wird automatisch aus der Import-ID uebernommen.",
-      required: true,
+      description: "Wird bei vorhandener Import-ID nur zur kompatiblen Anzeige uebernommen.",
+      required: false,
       warning: false,
       readOnly: true,
       systemValue: "Automatisch aus Import-ID",
@@ -287,15 +294,15 @@ function getAnmeldungenImportFieldDefinitions(schuelerColumns) {
     {
       key: "schueler_id",
       label: "Import-ID",
-      description: "Wird in schueler_id und herkunftsschueler_nr geschrieben.",
-      required: true,
+      description: "Optional. Wird als externe Identitaet gespeichert; ohne ID erfolgt der Abgleich ueber Name und Geburtsdatum.",
+      required: false,
       warning: false,
     },
     {
       key: "herkunftsschueler_nr",
       label: "Quell-Schueler-Nr",
-      description: "Wird automatisch aus der Import-ID uebernommen.",
-      required: true,
+      description: "Wird bei vorhandener Import-ID nur zur kompatiblen Anzeige uebernommen.",
+      required: false,
       warning: false,
       readOnly: true,
       systemValue: "Automatisch aus Import-ID",
@@ -437,17 +444,6 @@ function buildMgMatchKey(nachname, vorname, geburtsdatum) {
   return `${normalizeText(nachname)}\u0000${normalizeText(vorname)}\u0000${normalizeText(geburtsdatum)}`;
 }
 
-function buildMgTechnicalStudentId(verfahrenId, rundeId, data) {
-  const fingerprint = [
-    verfahrenId,
-    rundeId,
-    normalizeTextLower(data?.nachname),
-    normalizeTextLower(data?.vorname),
-    normalizeText(data?.geburtsdatum),
-  ].join("|");
-  return `MG-${crypto.createHash("sha256").update(fingerprint).digest("hex").slice(0, 14)}`;
-}
-
 function getMgMatchingFields(student, data) {
   return [
     ["Nachname", normalizeText(student?.nachname) === normalizeText(data?.nachname)],
@@ -480,11 +476,13 @@ async function validateRueckmeldungenMgRows(pool, payload) {
   }
 
   const [students] = await pool.query(
-    `SELECT id, nachname, vorname, DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
-            anmeldeschule_snr, anmeldestatus, foerderbedarf, empfehlung,
-            herkunft, abgleich_status, herkunftsschule_snr, strasse, plz, ort, bemerkung
-       FROM anm_schueler
-      WHERE verfahren_id = ? AND runde_id = ?`,
+    `SELECT s.id, s.nachname, s.vorname, DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+            sr.schul_nr AS anmeldeschule_snr, sr.anmeldestatus, s.foerderbedarf, s.empfehlung,
+            s.herkunft, sr.abgleich_status, s.herkunftsschule_snr, s.strasse, s.plz, s.ort,
+            s.notiz AS bemerkung
+       FROM anm_schueler s
+       JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
+      WHERE s.verfahren_id = ? AND sr.runde_id = ?`,
     [verfahrenId, rundeId],
   );
   const studentLookup = new Map();
@@ -569,7 +567,6 @@ async function validateRueckmeldungenMgRows(pool, payload) {
       warnings.push(`Moeglicher Schreibfehler bei ${differingFields.join(", ")}. Datensatz wird nicht importiert.`);
     } else if (matches.length === 0 && nearMatches.length === 0 && errors.length === 0) {
       classification = "NEU";
-      data.schueler_id = buildMgTechnicalStudentId(verfahrenId, rundeId, data);
     } else if (errors.length === 0) {
       classification = "OK";
     }
@@ -642,61 +639,45 @@ async function validateRueckmeldungenMgRows(pool, payload) {
 
 async function updateRueckmeldungMgStudent(connection, row) {
   const data = row.data;
-  const assignments = [
-    "anmeldeschule_snr = ?", "anmeldestatus = ?", "foerderbedarf = ?", "abgleich_status = ?",
-    "herkunft = CASE WHEN TRIM(COALESCE(herkunft, '')) = '' THEN ? ELSE herkunft END",
-    "nachname = ?", "vorname = ?", "geburtsdatum = ?", "strasse = ?", "plz = ?", "ort = ?", "bemerkung = ?",
-  ];
-  const values = [
-    data.anmeldeschule_snr, data.anmeldestatus, data.foerderbedarf, row.abgleich_status, "Anmeldung",
-    data.nachname, data.vorname, data.geburtsdatum, data.strasse || null, data.plz || null, data.ort || null, data.bemerkung || null,
-  ];
-  if (data.has_empfehlung && !row.recommendation_mismatch) {
-    assignments.push("empfehlung = ?");
-    values.push(data.empfehlung);
-  }
-  if (data.has_herkunftsschule && data.herkunftsschule_snr && !row.invalid_source_school_number) {
-    assignments.push("herkunftsschule_snr = ?");
-    values.push(data.herkunftsschule_snr || null);
-  }
-  values.push(Number(row.matched_student.id));
-  const [result] = await connection.query(
-    `UPDATE anm_schueler SET ${assignments.join(", ")}, updated_at = NOW() WHERE id = ?`,
-    values,
-  );
-  if (Number(result?.affectedRows || 0) !== 1) throw new Error(`Zeile ${row.row_number}: Schuelerdatensatz konnte nicht aktualisiert werden.`);
-  return { action: "UPDATE", id: Number(row.matched_student.id) };
+  const studentId = Number(row.matched_student.id);
+  await updateStudentMaster(connection, studentId, {
+    nachname: data.nachname, vorname: data.vorname, geburtsdatum: data.geburtsdatum,
+    strasse: data.strasse, plz: data.plz, ort: data.ort, bemerkung: data.bemerkung,
+    foerderbedarf: data.foerderbedarf,
+    ...(data.has_empfehlung && !row.recommendation_mismatch ? { empfehlung: data.empfehlung } : {}),
+    ...(data.has_herkunftsschule && data.herkunftsschule_snr && !row.invalid_source_school_number
+      ? { herkunftsschule_snr: data.herkunftsschule_snr } : {}),
+  });
+  await upsertRoundState(connection, {
+    verfahren_id: row.verfahren_id,
+    schueler_id: studentId,
+    runde_id: row.runde_id,
+    schul_nr: data.anmeldeschule_snr,
+    anmeldestatus: data.anmeldestatus,
+    abgleich_status: row.abgleich_status,
+  });
+  return { action: "UPDATE", id: studentId };
 }
 
 async function insertRueckmeldungMgStudent(connection, verfahrenId, rundeId, row) {
   const data = row.data;
-  const columns = [
-    "verfahren_id", "runde_id", "schueler_id", "schueler_nr", "anmeldeschule_snr",
-    "herkunft", "abgleich_status", "anmeldestatus", "vorname", "nachname", "geburtsdatum",
-    "foerderbedarf", "strasse", "plz", "ort", "bemerkung",
-  ];
-  const values = [
-    verfahrenId, rundeId, data.schueler_id, data.schueler_id, data.anmeldeschule_snr,
-    "Anmeldung", row.abgleich_status, data.anmeldestatus, data.vorname, data.nachname, data.geburtsdatum,
-    data.foerderbedarf, data.strasse || null, data.plz || null, data.ort || null, data.bemerkung || null,
-  ];
-  if (data.has_empfehlung) {
-    columns.push("empfehlung");
-    values.push(data.empfehlung);
-  }
-  if (data.has_herkunftsschule && data.herkunftsschule_snr && !row.invalid_source_school_number) {
-    columns.push("herkunftsschule_snr");
-    values.push(data.herkunftsschule_snr);
-  }
-  const placeholders = columns.map(() => "?");
-  const [result] = await connection.query(
-    `INSERT INTO anm_schueler (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
-    values,
-  );
-  return { action: "INSERT", id: Number(result?.insertId || 0) };
+  const resolved = await resolveStudent(connection, {
+    verfahren_id: verfahrenId, herkunft: "Anmeldung", ...data,
+    notiz: data.bemerkung,
+    ...(data.has_herkunftsschule && !row.invalid_source_school_number
+      ? { herkunftsschule_snr: data.herkunftsschule_snr } : {}),
+  });
+  await upsertRoundState(connection, {
+    verfahren_id: verfahrenId, schueler_id: resolved.student.id, runde_id: rundeId,
+    schul_nr: data.anmeldeschule_snr, anmeldestatus: data.anmeldestatus,
+    teilnahmestatus: "Aktiv", abgleich_status: row.abgleich_status,
+  });
+  return { action: resolved.created ? "INSERT" : "UPDATE", id: Number(resolved.student.id) };
 }
 
 async function importRueckmeldungMgStudent(connection, verfahrenId, rundeId, row) {
+  row.verfahren_id = verfahrenId;
+  row.runde_id = rundeId;
   if (row.classification === "NEU") {
     return insertRueckmeldungMgStudent(connection, verfahrenId, rundeId, row);
   }
@@ -739,6 +720,7 @@ function getPoolImportComparisonFieldKeys(fieldDefinitions, mapping) {
 async function validatePoolImportRows(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
+  const sourceArt = normalizeText(payload?.source_art || payload?.herkunft_art).toUpperCase() || "POOL";
   const csvRows = Array.isArray(payload?.csv_rows) ? payload.csv_rows : [];
   const mapping = payload?.mapping || {};
   const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
@@ -747,9 +729,7 @@ async function validatePoolImportRows(pool, payload) {
   const comparisonFieldKeys = new Set(getPoolImportComparisonFieldKeys(fieldDefinitions, mapping));
   const schoolRole = verfahrenstyp === "SEK1" ? "Quellschulen" : "Zielschulen";
   const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, schoolRole);
-  const existingSourceSchoolSelect = verfahrenstyp === "SEK1" && schuelerColumns.has("herkunftsschule_snr")
-    ? "COALESCE(NULLIF(TRIM(herkunftsschule_snr), ''), '') AS source_school_snr"
-    : "COALESCE(NULLIF(TRIM(herkunftsschule_snr), ''), NULLIF(TRIM(anmeldeschule_snr), ''), '') AS source_school_snr";
+  const existingSourceSchoolSelect = "COALESCE(NULLIF(TRIM(s.herkunftsschule_snr), ''), NULLIF(TRIM(sr.schul_nr), ''), '') AS source_school_snr";
   const empfehlungByCode = schuelerColumns.has("empfehlung")
     ? await loadCatalogByCode(pool, "anm_kat_empfehlung")
     : new Map();
@@ -761,32 +741,39 @@ async function validatePoolImportRows(pool, payload) {
     ? await pool.query(
       `
       SELECT
-        id,
-        schueler_id,
-        COALESCE(vorname, '') AS vorname,
-        COALESCE(nachname, '') AS nachname,
-        DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+        s.id,
+        x.externe_id AS schueler_id,
+        x.herkunft_snr_norm,
+        COALESCE(s.vorname, '') AS vorname,
+        COALESCE(s.nachname, '') AS nachname,
+        DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
         ${existingSourceSchoolSelect},
-        COALESCE(herkunftsschueler_nr, '') AS herkunftsschueler_nr,
-        COALESCE(strasse, '') AS strasse,
-        COALESCE(plz, '') AS plz,
-        COALESCE(ort, '') AS ort,
-        COALESCE(foerderbedarf, '') AS foerderbedarf,
-        COALESCE(zieldifferent, 0) AS zieldifferent,
-        COALESCE(ef, 0) AS ef,
-        COALESCE(empfehlung, '') AS empfehlung,
-        COALESCE(teilnahmestatus, '') AS teilnahmestatus,
-        COALESCE(quell_jahrgang, '') AS quell_jahrgang,
-        COALESCE(bemerkung, '') AS bemerkung
-      FROM anm_schueler
-      WHERE verfahren_id = ?
-        AND runde_id = ?
-        AND schueler_id IN (?)
+        COALESCE(x.externe_id, '') AS herkunftsschueler_nr,
+        COALESCE(s.strasse, '') AS strasse,
+        COALESCE(s.plz, '') AS plz,
+        COALESCE(s.ort, '') AS ort,
+        COALESCE(s.foerderbedarf, '') AS foerderbedarf,
+        COALESCE(s.zieldifferent, 0) AS zieldifferent,
+        COALESCE(s.ef, 0) AS ef,
+        COALESCE(s.empfehlung, '') AS empfehlung,
+        COALESCE(sr.teilnahmestatus, '') AS teilnahmestatus,
+        COALESCE(s.quell_jahrgang, '') AS quell_jahrgang,
+        COALESCE(s.notiz, '') AS bemerkung
+      FROM anm_schueler_externe_id x
+      JOIN anm_schueler s ON s.id = x.schueler_id
+      LEFT JOIN anm_schueler_runde sr
+        ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id AND sr.runde_id = ?
+      WHERE s.verfahren_id = ?
+        AND x.herkunft_art = ?
+        AND x.externe_id IN (?)
       `,
-      [verfahrenId, rundeId, ids],
+      [rundeId, verfahrenId, sourceArt, ids],
     )
     : [[]];
-  const existingById = new Map((existingRows || []).map((row) => [normalizeText(row?.schueler_id), row]));
+  const existingByIdentity = new Map((existingRows || []).map((row) => [
+    `${normalizeText(row?.herkunft_snr_norm)}\u0000${normalizeText(row?.schueler_id)}`,
+    row,
+  ]));
 
   const duplicateCountById = new Map();
   for (const id of ids) {
@@ -824,7 +811,6 @@ async function validatePoolImportRows(pool, payload) {
     if (data.source_school_snr && !schoolBySnr.has(data.source_school_snr)) {
       errors.push("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
     }
-    if (!data.schueler_id) errors.push("Import-ID fehlt.");
     if (data.schueler_id && Number(duplicateCountById.get(data.schueler_id) || 0) > 1) {
       errors.push("Import-ID ist in der CSV doppelt.");
     }
@@ -843,7 +829,19 @@ async function validatePoolImportRows(pool, payload) {
     if (!recommendation.valid || (data.empfehlung && empfehlungByCode.size > 0 && !empfehlungByCode.has(normalizeTextLower(data.empfehlung)))) {
       errors.push("Empfehlung ist unbekannt.");
     }
-    const existing = existingById.get(data.schueler_id);
+    let existing = null;
+    if (data.schueler_id) {
+      try {
+        const identity = normalizeExternalIdentity({
+          herkunft_art: sourceArt,
+          herkunft_snr: data.source_school_snr,
+          externe_id: data.schueler_id,
+        });
+        existing = existingByIdentity.get(`${normalizeText(identity?.herkunft_snr)}\u0000${data.schueler_id}`) || null;
+      } catch (error) {
+        errors.push(error?.message || "Externe Identitaet ist ungueltig.");
+      }
+    }
     const hasUnknownSchoolError = errors.includes("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
     if (existing && hasUnknownSchoolError) {
       const index = errors.indexOf("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
@@ -916,6 +914,7 @@ async function validatePoolImportRows(pool, payload) {
   };
 }
 
+// Phase 4: inaktiver Legacy-Upsert; kein produktiver Handler ruft diese Funktion auf.
 async function upsertAnmSchuelerCsvImport(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
@@ -1138,7 +1137,6 @@ async function validateAnmeldungenImportRows(pool, payload) {
 
     const errors = [];
     const warnings = [];
-    if (!data.schueler_id) errors.push("Import-ID fehlt.");
     if (data.schueler_id && Number(duplicateCountById.get(data.schueler_id) || 0) > 1) errors.push("Import-ID ist in der CSV doppelt.");
     if (!data.anmeldeschule_snr) errors.push("anmeldeschule_snr fehlt.");
     if (data.anmeldeschule_snr && !schoolBySnr.has(data.anmeldeschule_snr)) errors.push("anmeldeschule_snr existiert nicht im Verfahren.");
@@ -1153,7 +1151,7 @@ async function validateAnmeldungenImportRows(pool, payload) {
     if (!isValidImportBoolean(data.zieldifferent)) errors.push("Zieldifferent ist ungueltig.");
 
     const existing = data.schueler_id
-      ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.schueler_id)
+      ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.schueler_id, data.anmeldeschule_snr)
       : null;
     const hasUnknownSchoolError = errors.includes("anmeldeschule_snr existiert nicht im Verfahren.");
     if (existing && hasUnknownSchoolError) {
@@ -1225,6 +1223,7 @@ async function validateAnmeldungenImportRows(pool, payload) {
   };
 }
 
+// Phase 4: inaktiver Legacy-Upsert; kein produktiver Handler ruft diese Funktion auf.
 async function upsertAnmeldungenWizardImport(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
@@ -1235,7 +1234,7 @@ async function upsertAnmeldungenWizardImport(pool, payload) {
       .filter(([, value]) => normalizeText(value))
       .map(([key]) => key),
   );
-  const existing = await findExistingSchuelerRecord(pool, verfahrenId, rundeId, row.schueler_id);
+  const existing = await findExistingSchuelerRecord(pool, verfahrenId, rundeId, row.schueler_id, row.anmeldeschule_snr);
   const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
   const poolMatch = hasPoolAbgleich(existing);
   const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
@@ -1385,28 +1384,103 @@ async function upsertAnmeldungenWizardImport(pool, payload) {
   };
 }
 
+async function upsertAnmeldungenWizardImportV3(connection, payload) {
+  const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
+  const row = payload?.row || {};
+  const schoolSnr = normalizeText(row?.anmeldeschule_snr || row?.snr || row?.source_school_snr);
+  const externalId = normalizeText(row?.schueler_id || row?.schueler_schul_id);
+  const existingByIdentity = externalId
+    ? await findStudentByExternalId(connection, {
+      herkunft_art: "SCHULE", herkunft_snr: schoolSnr || null, externe_id: externalId,
+    })
+    : null;
+  const resolved = await resolveStudent(connection, {
+    verfahren_id: verfahrenId,
+    herkunft: normalizeText(payload?.herkunft) || "Anmeldung",
+    vorname: row.vorname,
+    nachname: row.nachname,
+    geburtsdatum: row.geburtsdatum,
+    strasse: row.strasse,
+    plz: row.plz,
+    ort: row.ort,
+    foerderbedarf: normalizeBoolean(row.foerderbedarf),
+    zieldifferent: normalizeBoolean(row.zieldifferent),
+    empfehlung: row.empfehlung,
+    foerder_id: row.foerder_id,
+    notiz: row.bemerkung ?? row.notiz,
+    external_identity: externalId ? {
+      herkunft_art: "SCHULE", herkunft_snr: schoolSnr || null, externe_id: externalId,
+    } : null,
+  });
+  await updateStudentMaster(connection, resolved.student.id, {
+    vorname: row.vorname, nachname: row.nachname, geburtsdatum: row.geburtsdatum,
+    strasse: row.strasse, plz: row.plz, ort: row.ort,
+    foerderbedarf: normalizeBoolean(row.foerderbedarf),
+    zieldifferent: normalizeBoolean(row.zieldifferent), empfehlung: row.empfehlung,
+    foerder_id: row.foerder_id, notiz: row.bemerkung ?? row.notiz,
+  });
+  const [roundRows] = await connection.query(
+    `SELECT abgleich_status FROM anm_schueler_runde
+      WHERE verfahren_id = ? AND schueler_id = ? AND runde_id = ? LIMIT 1`,
+    [verfahrenId, resolved.student.id, rundeId],
+  );
+  const poolMatch = hasPoolAbgleich(roundRows?.[0]) || normalizeTextLower(resolved.student.herkunft) === "pool";
+  await upsertRoundState(connection, {
+    verfahren_id: verfahrenId, schueler_id: resolved.student.id, runde_id: rundeId,
+    schul_nr: schoolSnr || null,
+    anmeldestatus: normalizeText(row.anmeldestatus) || "Ohne",
+    teilnahmestatus: normalizeText(row.teilnahmestatus) || "Aktiv",
+    abgleich_status: poolMatch ? "Pool + Anm" : "Nur Anmeldung",
+  });
+  const schoolBySnr = await loadProcedureSchoolLookup(connection, verfahrenId);
+  const unknownProcedureSchool = Boolean(schoolSnr) && !schoolBySnr.has(schoolSnr);
+  const unknownSchoolCase = unknownProcedureSchool
+    ? await ensureOpenCaseForUnknownProcedureSchool(connection, {
+      verfahren_id: verfahrenId, schueler_id: Number(resolved.student.id),
+    })
+    : { created: false, updated: false };
+  return {
+    action: resolved.created ? "INSERT" : "UPDATE",
+    pool_match: poolMatch,
+    id: Number(resolved.student.id),
+    school_change_case: false,
+    unknown_school_case: Boolean(unknownSchoolCase.created || unknownSchoolCase.updated),
+    matched_by: existingByIdentity ? "EXTERNAL_ID" : resolved.matchedBy,
+  };
+}
+
+async function upsertAnmSchuelerCsvImportV3(connection, payload) {
+  const row = payload?.row || {};
+  const importArt = normalizeTextLower(payload?.import_art) || "pool";
+  const normalizedRow = {
+    ...row,
+    snr: row.source_school_snr || row.snr,
+    notiz: row.bemerkung ?? row.notiz,
+  };
+  if (importArt !== "pool") {
+    return upsertAnmeldungenWizardImportV3(connection, {
+      ...payload, row: normalizedRow, herkunft: "Anmeldung",
+    });
+  }
+  const result = await upsertStudent(connection, {
+    ...payload,
+    source_art: normalizeText(payload?.source_art || payload?.herkunft_art).toUpperCase() || "POOL",
+    row: normalizedRow,
+  });
+  if (result.conflict) {
+    const error = new Error("Mehrdeutiger Treffer bei den Personendaten.");
+    error.statusCode = 409;
+    throw error;
+  }
+  return { action: result.updated ? "UPDATE" : "INSERT", id: result.id, unknown_school_case: false };
+}
+
 async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
-  const schuelerCols = await loadTableColumns(pool, "anm_schueler");
-  if (!schuelerCols.size) return [];
-
-  const studentIdColumn = schuelerCols.has("schueler_id")
-    ? "s.schueler_id"
-    : (schuelerCols.has("schueler_nr") ? "s.schueler_nr" : "''");
-
-  const filters = [];
-  const params = [];
-  if (schuelerCols.has("verfahren_id")) {
-    filters.push("s.verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (rundeId && schuelerCols.has("runde_id")) {
-    filters.push("s.runde_id = ?");
-    params.push(rundeId);
-  }
-  if (schuelerCols.has("abgleich_status")) {
-    filters.push("TRIM(COALESCE(s.abgleich_status, '')) IN ('Nur Pool', 'Pool + Anm')");
-  }
-  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const filters = ["s.verfahren_id = ?", "sr.abgleich_status IN ('Nur Pool', 'Pool + Anm')"];
+  const params = [verfahrenId];
+  if (rundeId) { filters.push("sr.runde_id = ?"); params.push(rundeId); }
+  const whereClause = `WHERE ${filters.join(" AND ")}`;
   const [rows] = await pool.query(
     `
     SELECT
@@ -1415,29 +1489,30 @@ async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
       COALESCE(s.nachname, '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
       COALESCE(s.foerderbedarf, '') AS foerderbedarf,
-      '' AS foerder_id,
+      COALESCE(s.foerder_id, '') AS foerder_id,
       '' AS foerder_label,
       COALESCE(s.zieldifferent, 0) AS zieldifferent,
-      ${schuelerCols.has("ef") ? "COALESCE(s.ef, 0)" : "0"} AS ef,
-      ${schuelerCols.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "''"} AS herkunftsschule_snr,
-      ${schuelerCols.has("herkunftsschueler_nr") ? "NULLIF(TRIM(s.herkunftsschueler_nr), '')" : "''"} AS herkunftsschueler_nr,
+      COALESCE(s.ef, 0) AS ef,
+      NULLIF(TRIM(s.herkunftsschule_snr), '') AS herkunftsschule_snr,
+      COALESCE(x.externe_id, '') AS herkunftsschueler_nr,
       COALESCE(s.herkunft, '') AS herkunft,
-      COALESCE(s.abgleich_status, '') AS abgleich_status,
-      COALESCE(s.anmeldestatus, '') AS anmeldestatus,
-      ${schuelerCols.has("teilnahmestatus") ? "COALESCE(s.teilnahmestatus, '')" : "''"} AS teilnahmestatus,
-      ${schuelerCols.has("anmeldeschule_snr") ? "NULLIF(TRIM(s.anmeldeschule_snr), '')" : "''"} AS schulnummer,
-      ${schuelerCols.has("strasse") ? "COALESCE(s.strasse, '')" : "''"} AS strasse,
-      ${schuelerCols.has("plz") ? "COALESCE(s.plz, '')" : "''"} AS plz,
-      ${schuelerCols.has("ort") ? "COALESCE(s.ort, '')" : "''"} AS ort,
-      ${schuelerCols.has("bemerkung") ? "COALESCE(s.bemerkung, '')" : "''"} AS bemerkung,
-      NULLIF(TRIM(${studentIdColumn}), '') AS schueler_schul_id,
+      COALESCE(sr.abgleich_status, '') AS abgleich_status,
+      COALESCE(sr.anmeldestatus, '') AS anmeldestatus,
+      COALESCE(sr.teilnahmestatus, '') AS teilnahmestatus,
+      NULLIF(TRIM(sr.schul_nr), '') AS schulnummer,
+      COALESCE(s.strasse, '') AS strasse,
+      COALESCE(s.plz, '') AS plz,
+      COALESCE(s.ort, '') AS ort,
+      COALESCE(s.notiz, '') AS bemerkung,
+      COALESCE(x.externe_id, s.schueler_id, '') AS schueler_schul_id,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS schule
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
+    LEFT JOIN anm_schueler_externe_id x ON x.id = (
+      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
+    )
     LEFT JOIN anm_schulen src
-      ON src.snr = COALESCE(
-        ${schuelerCols.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "NULL"},
-        ${schuelerCols.has("anmeldeschule_snr") ? "NULLIF(TRIM(s.anmeldeschule_snr), '')" : "NULL"}
-      )
+      ON src.snr = COALESCE(NULLIF(TRIM(s.herkunftsschule_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))
     ${whereClause}
     ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC
     `,
@@ -1471,50 +1546,21 @@ async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
 }
 
 async function updatePoolSchuelerRow(pool, rowId, payload) {
-  const columns = await loadTableColumns(pool, "anm_schueler");
-  const assignments = [];
-  const values = [];
-  const add = (column, value) => {
-    if (!columns.has(column)) return;
-    assignments.push(`${column} = ?`);
-    values.push(value);
-  };
-
-  add("schueler_id", normalizeText(payload?.schueler_id) || null);
-  add("schueler_nr", normalizeText(payload?.herkunftsschueler_nr || payload?.schueler_schul_id) || null);
-  add("vorname", normalizeText(payload?.vorname) || null);
-  add("nachname", normalizeText(payload?.nachname) || null);
-  add("geburtsdatum", normalizeDate(payload?.geburtsdatum));
-  add("foerderbedarf", normalizeBoolean(payload?.foerderbedarf));
-  add("zieldifferent", normalizeBoolean(payload?.zieldifferent));
-  add("ef", normalizeBoolean(payload?.ef));
-  add("herkunftsschule_snr", normalizeText(payload?.herkunftsschule_snr) || null);
-  add("herkunftsschueler_nr", normalizeText(payload?.herkunftsschueler_nr || payload?.schueler_schul_id) || null);
-  add("anmeldeschule_snr", normalizeText(payload?.anmeldeschule_snr || payload?.schulnummer || payload?.herkunftsschule_snr) || null);
-  add("herkunft", normalizeText(payload?.herkunft) || null);
-  add("abgleich_status", normalizeText(payload?.abgleich_status) || null);
-  add("anmeldestatus", normalizeText(payload?.anmeldestatus) || null);
-  add("teilnahmestatus", normalizeText(payload?.teilnahmestatus) || null);
-  add("strasse", normalizeText(payload?.strasse) || null);
-  add("plz", normalizeText(payload?.plz) || null);
-  add("ort", normalizeText(payload?.ort) || null);
-  add("bemerkung", normalizeText(payload?.bemerkung) || null);
-
-  if (!assignments.length) {
-    const error = new Error("Es wurden keine aktualisierbaren Felder uebergeben.");
-    error.statusCode = 400;
-    throw error;
+  await updateStudentMaster(pool, rowId, {
+    vorname: payload?.vorname, nachname: payload?.nachname, geburtsdatum: payload?.geburtsdatum,
+    foerderbedarf: normalizeBoolean(payload?.foerderbedarf), zieldifferent: normalizeBoolean(payload?.zieldifferent),
+    ef: normalizeBoolean(payload?.ef), herkunftsschule_snr: payload?.herkunftsschule_snr,
+    strasse: payload?.strasse, plz: payload?.plz, ort: payload?.ort, notiz: payload?.bemerkung,
+  });
+  if (payload?.runde_id && payload?.verfahren_id) {
+    await upsertRoundState(pool, {
+      verfahren_id: payload.verfahren_id, schueler_id: rowId, runde_id: payload.runde_id,
+      schul_nr: normalizeText(payload?.anmeldeschule_snr || payload?.schulnummer) || null,
+      abgleich_status: normalizeText(payload?.abgleich_status) || "Nur Pool",
+      anmeldestatus: normalizeText(payload?.anmeldestatus) || "Ohne",
+      teilnahmestatus: normalizeText(payload?.teilnahmestatus) || "Aktiv",
+    });
   }
-
-  values.push(Number(rowId));
-  await pool.query(
-    `
-    UPDATE anm_schueler
-    SET ${assignments.join(", ")}, updated_at = NOW()
-    WHERE id = ?
-    `,
-    values,
-  );
 }
 
 async function deletePoolSchuelerRow(pool, rowId) {
@@ -2081,45 +2127,52 @@ async function findApplicationBySchuelerNr(pool, verfahrenId, rundeId, schuelerN
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
-async function findExistingSchuelerRecord(pool, verfahrenId, rundeId, schuelerId) {
+async function findExistingSchuelerRecord(pool, verfahrenId, rundeId, schuelerId, herkunftSnr = "") {
   const normalizedSchuelerId = normalizeText(schuelerId);
   if (!verfahrenId || !rundeId || !normalizedSchuelerId) return null;
-  const columns = await loadTableColumns(pool, "anm_schueler");
-  const erwarteteSnrSelect = columns.has("erwartete_snr")
-    ? "COALESCE(TRIM(erwartete_snr), '') AS erwartete_snr"
-    : "'' AS erwartete_snr";
-
   const [rows] = await pool.query(
     `
     SELECT
-      id,
-      COALESCE(TRIM(schueler_id), '') AS schueler_id,
-      COALESCE(TRIM(schueler_nr), '') AS schueler_nr,
-      COALESCE(TRIM(herkunftsschueler_nr), '') AS herkunftsschueler_nr,
-      COALESCE(TRIM(anmeldeschule_snr), '') AS anmeldeschule_snr,
-      COALESCE(TRIM(vorname), '') AS vorname,
-      COALESCE(TRIM(nachname), '') AS nachname,
-      DATE_FORMAT(geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
-      COALESCE(TRIM(foerderbedarf), '') AS foerderbedarf,
-      COALESCE(TRIM(foerder_id), '') AS foerder_id,
-      COALESCE(zieldifferent, 0) AS zieldifferent,
-      COALESCE(TRIM(empfehlung), '') AS empfehlung,
-      COALESCE(TRIM(bemerkung), '') AS bemerkung,
-      COALESCE(TRIM(strasse), '') AS strasse,
-      COALESCE(TRIM(plz), '') AS plz,
-      COALESCE(TRIM(ort), '') AS ort,
-      COALESCE(TRIM(herkunft), '') AS herkunft,
-      COALESCE(TRIM(abgleich_status), '') AS abgleich_status,
-      COALESCE(TRIM(anmeldestatus), '') AS anmeldestatus,
-      ${erwarteteSnrSelect}
-    FROM anm_schueler
-    WHERE verfahren_id = ?
-      AND runde_id = ?
-      AND TRIM(schueler_id) = ?
-    ORDER BY id DESC
+      s.id,
+      COALESCE(TRIM(x.externe_id), TRIM(s.schueler_id), '') AS schueler_id,
+      COALESCE(TRIM(x.externe_id), '') AS schueler_nr,
+      COALESCE(TRIM(x.externe_id), '') AS herkunftsschueler_nr,
+      COALESCE(TRIM(sr.schul_nr), '') AS anmeldeschule_snr,
+      COALESCE(TRIM(s.vorname), '') AS vorname,
+      COALESCE(TRIM(s.nachname), '') AS nachname,
+      DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+      COALESCE(TRIM(s.foerderbedarf), '') AS foerderbedarf,
+      COALESCE(TRIM(s.foerder_id), '') AS foerder_id,
+      COALESCE(s.zieldifferent, 0) AS zieldifferent,
+      COALESCE(TRIM(s.empfehlung), '') AS empfehlung,
+      COALESCE(TRIM(s.notiz), '') AS bemerkung,
+      COALESCE(TRIM(s.strasse), '') AS strasse,
+      COALESCE(TRIM(s.plz), '') AS plz,
+      COALESCE(TRIM(s.ort), '') AS ort,
+      COALESCE(TRIM(s.herkunft), '') AS herkunft,
+      COALESCE(TRIM(sr.abgleich_status), '') AS abgleich_status,
+      COALESCE(TRIM(sr.anmeldestatus), '') AS anmeldestatus,
+      COALESCE((SELECT TRIM(prev.koordinierte_snr)
+                  FROM anm_schueler_runde prev
+                 WHERE prev.verfahren_id = s.verfahren_id
+                   AND prev.schueler_id = s.id
+                   AND prev.runde_id <> ?
+                   AND prev.koordinierte_snr IS NOT NULL
+                 ORDER BY prev.runde_id DESC LIMIT 1), '') AS erwartete_snr
+    FROM anm_schueler s
+    LEFT JOIN anm_schueler_runde sr
+      ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id AND sr.runde_id = ?
+    LEFT JOIN anm_schueler_externe_id x
+      ON x.schueler_id = s.id
+     AND x.herkunft_art = 'SCHULE'
+     AND x.externe_id = ?
+     AND (? = '' OR x.herkunft_snr_norm = ?)
+    WHERE s.verfahren_id = ?
+      AND (x.id IS NOT NULL OR TRIM(COALESCE(s.schueler_id, '')) = ?)
+    ORDER BY x.id IS NOT NULL DESC, s.id DESC
     LIMIT 1
     `,
-    [verfahrenId, rundeId, normalizedSchuelerId],
+    [rundeId, rundeId, normalizedSchuelerId, normalizeText(herkunftSnr), normalizeText(herkunftSnr), verfahrenId, normalizedSchuelerId],
   );
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
@@ -2358,108 +2411,71 @@ async function upsertSchuelerForAnmeldungImport(pool, payload) {
   const schuelerNr = normalizeText(payload?.schueler_schul_id);
   const importierteSchulnummer = normalizeText(payload?.snr);
   const anmeldestatus = mapAnmeldestatusToSchuelerStatus(payload?.anmeldestatus_code);
-  const existing = await findExistingSchuelerRecord(pool, verfahrenId, rundeId, schuelerNr);
-  const abgleichStatus = hasPoolAbgleich(existing) ? "Pool + Anm" : "Nur Anmeldung";
-  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
-
-  if (existing) {
-    const erwarteteSchulnummer = normalizeText(existing?.erwartete_snr);
-    const assignments = [
-      "schueler_id = ?",
-      "schueler_nr = ?",
-      "anmeldeschule_snr = ?",
-      "abgleich_status = ?",
-      "anmeldestatus = ?",
-      "vorname = ?",
-      "nachname = ?",
-      "geburtsdatum = ?",
-      "foerderbedarf = ?",
-      "zieldifferent = ?",
-    ];
-    const values = [
-      schuelerNr,
-      schuelerNr,
-      normalizeText(payload?.snr) || null,
-      abgleichStatus,
-      anmeldestatus,
-      normalizeText(payload?.vorname) || null,
-      normalizeText(payload?.nachname) || null,
-      normalizeDate(payload?.geburtsdatum),
-      normalizeText(payload?.foerderbedarf) || null,
-      normalizeBoolean(payload?.zieldifferent),
-    ];
-    if (schuelerColumns.has("herkunft")) {
-      assignments.push("herkunft = ?");
-      values.push("Anmeldung");
-    }
-    values.push(Number(existing.id));
-    await pool.query(
-      `
-      UPDATE anm_schueler
-      SET ${assignments.join(", ")}, updated_at = NOW()
-      WHERE id = ?
-      `,
-      values,
+  const identity = schuelerNr ? {
+    herkunft_art: "SCHULE",
+    herkunft_snr: importierteSchulnummer || null,
+    externe_id: schuelerNr,
+  } : null;
+  const resolved = await resolveStudent(pool, {
+    verfahren_id: verfahrenId,
+    herkunft: "Anmeldung",
+    vorname: payload?.vorname,
+    nachname: payload?.nachname,
+    geburtsdatum: payload?.geburtsdatum,
+    foerderbedarf: normalizeBoolean(payload?.foerderbedarf),
+    zieldifferent: normalizeBoolean(payload?.zieldifferent),
+    external_identity: identity,
+  });
+  await updateStudentMaster(pool, resolved.student.id, {
+    vorname: payload?.vorname,
+    nachname: payload?.nachname,
+    geburtsdatum: payload?.geburtsdatum,
+    foerderbedarf: normalizeBoolean(payload?.foerderbedarf),
+    zieldifferent: normalizeBoolean(payload?.zieldifferent),
+  });
+  const previousRound = await (async () => {
+    const [rows] = await pool.query(
+      `SELECT schul_nr AS erwartete_snr FROM anm_schueler_runde
+        WHERE verfahren_id = ? AND schueler_id = ? AND runde_id <> ?
+          AND schul_nr IS NOT NULL
+        ORDER BY runde_id DESC LIMIT 1`,
+      [verfahrenId, resolved.student.id, rundeId],
     );
-    let schoolChangeCase = false;
-    if (
-      erwarteteSchulnummer
-      && importierteSchulnummer
-      && normalizeTextLower(erwarteteSchulnummer) !== normalizeTextLower(importierteSchulnummer)
-    ) {
-      const openCaseResult = await ensureOpenCaseForSchoolChange(pool, {
-        verfahren_id: verfahrenId,
-        schueler_id: Number(existing.id),
-        erwartete_schulnummer: erwarteteSchulnummer,
-        importierte_schulnummer: importierteSchulnummer,
-      });
-      schoolChangeCase = Boolean(openCaseResult.created || openCaseResult.updated);
-    }
-    return { id: Number(existing.id), created: false, abgleich_status: abgleichStatus, school_change_case: schoolChangeCase };
-  }
-
-  const insertColumns = [
-    "verfahren_id",
-    "runde_id",
-    "schueler_id",
-    "schueler_nr",
-    "anmeldeschule_snr",
-    "abgleich_status",
-    "anmeldestatus",
-    "vorname",
-    "nachname",
-    "geburtsdatum",
-    "foerderbedarf",
-    "zieldifferent",
-  ];
-  const placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"];
-  const values = [
-    verfahrenId,
-    rundeId,
-    schuelerNr,
-    schuelerNr,
-    normalizeText(payload?.snr) || null,
-    "Nur Anmeldung",
-    anmeldestatus,
-    normalizeText(payload?.vorname) || null,
-    normalizeText(payload?.nachname) || null,
-    normalizeDate(payload?.geburtsdatum),
-    normalizeText(payload?.foerderbedarf) || null,
-    normalizeBoolean(payload?.zieldifferent),
-  ];
-  if (schuelerColumns.has("herkunft")) {
-    insertColumns.push("herkunft");
-    placeholders.push("?");
-    values.push("Anmeldung");
-  }
-  const [result] = await pool.query(
-    `
-    INSERT INTO anm_schueler (${insertColumns.join(", ")})
-    VALUES (${placeholders.join(", ")})
-    `,
-    values,
+    return rows?.[0] || null;
+  })();
+  const [currentRows] = await pool.query(
+    `SELECT abgleich_status FROM anm_schueler_runde
+      WHERE verfahren_id = ? AND schueler_id = ? AND runde_id = ? LIMIT 1`,
+    [verfahrenId, resolved.student.id, rundeId],
   );
-  return { id: Number(result.insertId || 0), created: true, abgleich_status: "Nur Anmeldung", school_change_case: false };
+  const abgleichStatus = hasPoolAbgleich(currentRows?.[0]) ? "Pool + Anm" : "Nur Anmeldung";
+  await upsertRoundState(pool, {
+    verfahren_id: verfahrenId,
+    schueler_id: resolved.student.id,
+    runde_id: rundeId,
+    schul_nr: importierteSchulnummer || null,
+    abgleich_status: abgleichStatus,
+    anmeldestatus,
+    teilnahmestatus: "Aktiv",
+  });
+  const erwarteteSchulnummer = normalizeText(previousRound?.erwartete_snr);
+  let schoolChangeCase = false;
+  if (erwarteteSchulnummer && importierteSchulnummer
+    && normalizeTextLower(erwarteteSchulnummer) !== normalizeTextLower(importierteSchulnummer)) {
+    const openCaseResult = await ensureOpenCaseForSchoolChange(pool, {
+      verfahren_id: verfahrenId,
+      schueler_id: Number(resolved.student.id),
+      erwartete_schulnummer: erwarteteSchulnummer,
+      importierte_schulnummer: importierteSchulnummer,
+    });
+    schoolChangeCase = Boolean(openCaseResult.created || openCaseResult.updated);
+  }
+  return {
+    id: Number(resolved.student.id),
+    created: resolved.created,
+    abgleich_status: abgleichStatus,
+    school_change_case: schoolChangeCase,
+  };
 }
 
 async function rebuildSchuelerAbgleichForRound(connection, { verfahrenId, rundeId }) {
@@ -2656,199 +2672,61 @@ async function upsertStudent(pool, payload) {
   const zieldifferent = normalizeBoolean(row?.zieldifferent);
   const ef = normalizeBoolean(row?.ef);
   const empfehlung = normalizeText(row?.empfehlung) || normalizeText(row?.empfehlung_code) || "KEINE";
-  const verfahrenstyp = await loadProcedureType(pool, verfahrenId);
-  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
-
+  const sourceArt = normalizeText(payload?.source_art || payload?.herkunft_art).toUpperCase() || "POOL";
   const anmeldungsTreffer = await findApplicationBySchuelerNr(pool, verfahrenId, rundeId, csvId);
   const hasAnmeldung = Boolean(anmeldungsTreffer);
   const abgleichStatus = hasAnmeldung ? "Pool + Anm" : "Nur Pool";
   const anmeldestatus = hasAnmeldung
     ? mapAnmeldestatusToSchuelerStatus(anmeldungsTreffer?.anmeldestatus_text)
     : "Ohne";
-
-  const [existingRows] = await pool.query(
-    `
-    SELECT
-      id,
-      anmeldestatus,
-      COALESCE(NULLIF(TRIM(anmeldeschule_snr), ''), NULLIF(TRIM(herkunftsschule_snr), ''), '') AS existing_school_snr
-    FROM anm_schueler
-    WHERE verfahren_id = ?
-      AND runde_id = ?
-      AND TRIM(schueler_id) = ?
-    ORDER BY id DESC
-    `,
-    [verfahrenId, rundeId, csvId],
-  );
-  const existing = Array.isArray(existingRows)
-    ? existingRows.find((candidate) => normalizeText(candidate?.existing_school_snr) === snr) || null
-    : null;
-  const duplicateIdConflict = Array.isArray(existingRows) && existingRows.length > 0 && !existing;
-  if (duplicateIdConflict) {
+  const identity = csvId ? {
+    herkunft_art: sourceArt,
+    herkunft_snr: ["SCHULE", "KITA", "SONST"].includes(sourceArt) ? (snr || null) : null,
+    externe_id: csvId,
+  } : null;
+  let resolved;
+  try {
+    resolved = await resolveStudent(pool, {
+      verfahren_id: verfahrenId,
+      herkunft: "Pool",
+      vorname,
+      nachname,
+      geburtsdatum,
+      strasse,
+      plz,
+      ort,
+      foerderbedarf,
+      zieldifferent,
+      ef,
+      empfehlung,
+      notiz: normalizeText(row?.notiz) || null,
+      herkunftsschule_snr: snr || null,
+      external_identity: identity,
+    });
+  } catch (error) {
+    if (error?.code !== "AMBIGUOUS_STUDENT_MATCH") throw error;
     return {
       conflict: true,
       updated: false,
       hasAnmeldung,
-      conflict_detail: {
-        schueler_id: csvId,
-        nachname,
-        vorname,
-        anmeldeschule_snr: snr,
-      },
+      conflict_detail: { schueler_id: csvId, nachname, vorname, anmeldeschule_snr: snr },
     };
   }
-
-  if (existing) {
-    const nextAnmeldestatus = hasAnmeldung
-      ? normalizeText(existing.anmeldestatus) || anmeldestatus
-      : "Ohne";
-    const assignments = [
-      "schueler_nr = ?",
-      "abgleich_status = ?",
-      "anmeldestatus = ?",
-      "empfehlung = ?",
-      "vorname = ?",
-      "nachname = ?",
-      "geburtsdatum = ?",
-      "foerderbedarf = ?",
-      "zieldifferent = ?",
-      "bemerkung = ?",
-    ];
-    const values = [
-      csvId,
-      abgleichStatus,
-      nextAnmeldestatus,
-      empfehlung,
-      vorname,
-      nachname,
-      geburtsdatum,
-      foerderbedarf || null,
-      zieldifferent,
-      normalizeText(row?.notiz) || null,
-    ];
-    if (schuelerColumns.has("ef")) {
-      assignments.push("ef = ?");
-      values.push(ef);
-    }
-    if (schuelerColumns.has("anmeldeschule_snr")) {
-      assignments.push("anmeldeschule_snr = ?");
-      values.push(snr || null);
-    }
-    if (schuelerColumns.has("herkunftsschule_snr")) {
-      assignments.push("herkunftsschule_snr = ?");
-      values.push(snr || null);
-    }
-    if (schuelerColumns.has("herkunftsschueler_nr")) {
-      assignments.push("herkunftsschueler_nr = ?");
-      values.push(csvId || null);
-    }
-    if (schuelerColumns.has("strasse")) {
-      assignments.push("strasse = ?");
-      values.push(strasse || null);
-    }
-    if (schuelerColumns.has("plz")) {
-      assignments.push("plz = ?");
-      values.push(plz || null);
-    }
-    if (schuelerColumns.has("ort")) {
-      assignments.push("ort = ?");
-      values.push(ort || null);
-    }
-    if (schuelerColumns.has("herkunft")) {
-      assignments.push("herkunft = ?");
-      values.push("Pool");
-    }
-    values.push(Number(existing.id));
-    await pool.query(
-      `
-      UPDATE anm_schueler
-      SET ${assignments.join(", ")}, updated_at = NOW()
-      WHERE id = ?
-      `,
-      values,
-    );
-    return { id: Number(existing.id), updated: true, hasAnmeldung };
-  }
-
-  const insertColumns = [
-    "verfahren_id",
-    "runde_id",
-    "schueler_id",
-    "schueler_nr",
-    "abgleich_status",
-    "anmeldestatus",
-    "empfehlung",
-    "vorname",
-    "nachname",
-    "geburtsdatum",
-    "foerderbedarf",
-    "zieldifferent",
-    "bemerkung",
-  ];
-  const placeholders = ["?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"];
-  const values = [
-    verfahrenId,
-    rundeId,
-    csvId,
-    csvId,
-    "Nur Pool",
-    "Ohne",
-    empfehlung,
-    vorname,
-    nachname,
-    geburtsdatum,
-    foerderbedarf || null,
-    zieldifferent,
-    normalizeText(row?.notiz) || null,
-  ];
-  if (schuelerColumns.has("ef")) {
-    insertColumns.push("ef");
-    placeholders.push("?");
-    values.push(ef);
-  }
-  if (schuelerColumns.has("anmeldeschule_snr")) {
-    insertColumns.push("anmeldeschule_snr");
-    placeholders.push("?");
-    values.push(snr || null);
-  }
-  if (schuelerColumns.has("herkunftsschule_snr")) {
-    insertColumns.push("herkunftsschule_snr");
-    placeholders.push("?");
-    values.push(snr || null);
-  }
-  if (schuelerColumns.has("herkunftsschueler_nr")) {
-    insertColumns.push("herkunftsschueler_nr");
-    placeholders.push("?");
-    values.push(csvId || null);
-  }
-  if (schuelerColumns.has("strasse")) {
-    insertColumns.push("strasse");
-    placeholders.push("?");
-    values.push(strasse || null);
-  }
-  if (schuelerColumns.has("plz")) {
-    insertColumns.push("plz");
-    placeholders.push("?");
-    values.push(plz || null);
-  }
-  if (schuelerColumns.has("ort")) {
-    insertColumns.push("ort");
-    placeholders.push("?");
-    values.push(ort || null);
-  }
-  if (schuelerColumns.has("herkunft")) {
-    insertColumns.push("herkunft");
-    placeholders.push("?");
-    values.push("Pool");
-  }
-  const [result] = await pool.query(
-    `
-    INSERT INTO anm_schueler (${insertColumns.join(", ")})
-    VALUES (${placeholders.join(", ")})
-    `,
-    values,
-  );
-  return { id: Number(result.insertId), updated: false, hasAnmeldung };
+  await updateStudentMaster(pool, resolved.student.id, {
+    vorname, nachname, geburtsdatum, strasse, plz, ort, foerderbedarf,
+    zieldifferent, ef, empfehlung, notiz: normalizeText(row?.notiz) || null,
+    herkunftsschule_snr: snr || null,
+  });
+  const existingRound = await upsertRoundState(pool, {
+    verfahren_id: verfahrenId,
+    schueler_id: resolved.student.id,
+    runde_id: rundeId,
+    schul_nr: snr || null,
+    abgleich_status: abgleichStatus,
+    anmeldestatus,
+    teilnahmestatus: normalizeText(row?.teilnahmestatus) || "Aktiv",
+  });
+  return { id: Number(resolved.student.id), updated: !resolved.created, hasAnmeldung, round_created: existingRound.created };
 }
 
 async function ensureOpenCase(pool, payload) {
@@ -3099,8 +2977,6 @@ function buildPoolPreviewRow(parsedRow, schoolBySnr, empfehlungByCode) {
   const school = schoolBySnr.get(data.snr) || null;
   if (!data.snr) errors.push("snr fehlt.");
   if (!school && data.snr) errors.push("snr gehoert nicht zu einer Schule im Verfahren.");
-  if (data.schueler_id && !normalizeInteger(data.schueler_id)) errors.push("schueler_id ist ungueltig.");
-  if (!data.schueler_id) errors.push("schueler_id fehlt.");
   if (!data.vorname) errors.push("vorname fehlt.");
   if (!data.nachname) errors.push("nachname fehlt.");
   if (!data.geburtsdatum) errors.push("geburtsdatum fehlt.");
@@ -3126,16 +3002,16 @@ async function buildAnmeldungPreviewRowFromData(rowNumber, data, schoolBySnr, st
   const school = schoolBySnr.get(data.snr) || null;
   if (!data.snr) errors.push("anmeldeschule_snr fehlt.");
   if (!school && data.snr) errors.push("anmeldeschule_snr gehoert nicht zu einer Schule im Verfahren.");
-  if (!data.schueler_schul_id) errors.push("schueler_schul_id fehlt.");
   if (!data.vorname) errors.push("vorname fehlt.");
   if (!data.nachname) errors.push("nachname fehlt.");
+  if (!data.geburtsdatum) errors.push("geburtsdatum fehlt.");
   if (!data.anmeldestatus_code) errors.push("anmeldestatus_code fehlt.");
   if (data.anmeldestatus_code && !statusByCode.has(normalizeTextLower(data.anmeldestatus_code))) {
     errors.push("anmeldestatus_code ist unbekannt.");
   }
 
   const existingStudent = data.schueler_schul_id
-    ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.schueler_schul_id)
+    ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.schueler_schul_id, data.snr)
     : null;
   if (existingStudent && errors.includes("anmeldeschule_snr gehoert nicht zu einer Schule im Verfahren.")) {
     const index = errors.indexOf("anmeldeschule_snr gehoert nicht zu einer Schule im Verfahren.");
@@ -3298,8 +3174,6 @@ function buildPoolImportRowFromData(rowNumber, data, schoolBySnr) {
   const school = schoolBySnr.get(data.snr) || null;
   if (!data.snr) errors.push("snr fehlt.");
   if (!school && data.snr) errors.push("snr gehoert nicht zu einer Schule im Verfahren.");
-  if (!data.schueler_id) errors.push("schueler_id fehlt.");
-  if (data.schueler_id && !normalizeInteger(data.schueler_id)) errors.push("schueler_id ist ungueltig.");
   if (!data.vorname) errors.push("vorname fehlt.");
   if (!data.nachname) errors.push("nachname fehlt.");
 
@@ -3573,6 +3447,8 @@ async function importAnmeldungenForSchool(connection, payload) {
   await connection.beginTransaction();
   try {
     for (const row of schoolRows) {
+      const counterSnapshot = { insertedApplications, updatedApplications, createdStudents, createdOpenCases };
+      await connection.query("SAVEPOINT phase3a_import_row");
       try {
         const status = statusByCode.get(normalizeTextLower(row.data.anmeldestatus_code));
         if (!status?.id) throw new Error("Anmeldestatus konnte nicht aufgeloest werden.");
@@ -3595,6 +3471,14 @@ async function importAnmeldungenForSchool(connection, payload) {
         }
         if (schuelerResult.school_change_case) {
           createdOpenCases += 1;
+        }
+
+        // Ohne echte externe ID ist der zentrale Schueler-/Rundendatensatz vollstaendig.
+        // Die Legacy-Tabellen koennen diesen Fall nicht eindeutig abbilden und werden daher ausgelassen.
+        if (!schuelerSchulId) {
+          insertedApplications += 1;
+          await connection.query("RELEASE SAVEPOINT phase3a_import_row");
+          continue;
         }
 
         // 1. Check if student already exists in anm_schueler_anmeldung
@@ -3733,7 +3617,11 @@ async function importAnmeldungenForSchool(connection, payload) {
           verfahrenId,
           rundeId,
         });
+        await connection.query("RELEASE SAVEPOINT phase3a_import_row");
       } catch (error) {
+        await connection.query("ROLLBACK TO SAVEPOINT phase3a_import_row");
+        await connection.query("RELEASE SAVEPOINT phase3a_import_row");
+        ({ insertedApplications, updatedApplications, createdStudents, createdOpenCases } = counterSnapshot);
         errorRows += 1;
         rowErrors.push({
           row_number: Number(row?.row_number || 0),
@@ -3817,6 +3705,7 @@ function createImporteController({ getPool }) {
           verfahren_id: verfahrenId,
           runde_id: rundeId,
           import_art: req.body?.import_art || "pool",
+          source_art: normalizeText(req.body?.source_art || req.body?.herkunft_art).toUpperCase() || "POOL",
           mapping: req.body?.mapping || {},
           rows: validation.rows,
         });
@@ -3869,11 +3758,13 @@ function createImporteController({ getPool }) {
         const rowResults = [];
 
         for (const row of rows) {
+          await connection.query("SAVEPOINT phase3a_import_row");
           try {
-            const result = await upsertAnmSchuelerCsvImport(connection, {
+            const result = await upsertAnmSchuelerCsvImportV3(connection, {
               verfahren_id: verfahrenId,
               runde_id: rundeId,
               import_art: validation.import_art || "pool",
+              source_art: validation.source_art || "POOL",
               row: row.data,
               mapping: validation.mapping || {},
             });
@@ -3886,7 +3777,10 @@ function createImporteController({ getPool }) {
                 ? "Datensatz importiert. Offener Fall wegen unbekannter anmeldeschule_snr erzeugt."
                 : result.action === "INSERT" ? "Datensatz neu angelegt." : "Datensatz aktualisiert.",
             });
+            await connection.query("RELEASE SAVEPOINT phase3a_import_row");
           } catch (error) {
+            await connection.query("ROLLBACK TO SAVEPOINT phase3a_import_row");
+            await connection.query("RELEASE SAVEPOINT phase3a_import_row");
             errors += 1;
             rowResults.push({
               row_number: Number(row.row_number || 0),
@@ -3973,6 +3867,9 @@ function createImporteController({ getPool }) {
         await assertProcedureType(connection, verfahrenId, ["GS", "SEK1"], "Der CSV-Anmeldungsimport ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
         const validation = getPreview(anmSchuelerAnmeldungenImportSessions, req.body?.validation_token);
         if (!validation) return sendError(res, 409, "Die Validierung ist abgelaufen oder nicht mehr vorhanden.");
+        if (Number(validation?.verfahren_id || 0) !== verfahrenId || Number(validation?.runde_id || 0) !== rundeId) {
+          return sendError(res, 409, "Die Validierung passt nicht mehr zur aktuellen Runde.");
+        }
         const selectedRowNumbers = Array.isArray(req.body?.selected_row_numbers)
           ? req.body.selected_row_numbers.map((value) => Number(value || 0)).filter((value) => value > 0)
           : [];
@@ -3995,7 +3892,7 @@ function createImporteController({ getPool }) {
         const errorRows = validationRows.filter((row) => row?.status === "fehler");
         for (const row of errorRows) {
           const existingForError = row?.data?.schueler_id
-            ? await findExistingSchuelerRecord(connection, verfahrenId, rundeId, row.data.schueler_id)
+            ? await findExistingSchuelerRecord(connection, verfahrenId, rundeId, row.data.schueler_id, row.data.anmeldeschule_snr)
             : null;
           const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
             verfahren_id: verfahrenId,
@@ -4006,8 +3903,10 @@ function createImporteController({ getPool }) {
           if (openCaseResult.created || openCaseResult.updated) openCases += 1;
         }
         for (const row of rows) {
+          const counterSnapshot = { inserted, updated, openCases, poolAnmeldung, nurAnmeldung };
+          await connection.query("SAVEPOINT phase3a_import_row");
           try {
-            const result = await upsertAnmeldungenWizardImport(connection, {
+            const result = await upsertAnmeldungenWizardImportV3(connection, {
               verfahren_id: verfahrenId,
               runde_id: rundeId,
               row: row.data,
@@ -4037,7 +3936,11 @@ function createImporteController({ getPool }) {
                 ? "Datensatz importiert. Offener Fall wegen unbekannter anmeldeschule_snr erzeugt."
                 : result.action === "INSERT" ? "Datensatz neu angelegt." : "Datensatz aktualisiert.",
             });
+            await connection.query("RELEASE SAVEPOINT phase3a_import_row");
           } catch (error) {
+            await connection.query("ROLLBACK TO SAVEPOINT phase3a_import_row");
+            await connection.query("RELEASE SAVEPOINT phase3a_import_row");
+            ({ inserted, updated, openCases, poolAnmeldung, nurAnmeldung } = counterSnapshot);
             errors += 1;
             row_results.push({
               row_number: Number(row.row_number || 0),
@@ -4075,27 +3978,14 @@ function createImporteController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
 
         const pool = getPool();
-        const schuelerCols = await loadTableColumns(pool, "anm_schueler");
-        const filters = [];
-        const params = [];
-
-        if (schuelerCols.has("verfahren_id")) {
-          filters.push("verfahren_id = ?");
-          params.push(verfahrenId);
-        }
-        if (rundeId && schuelerCols.has("runde_id")) {
-          filters.push("runde_id = ?");
-          params.push(rundeId);
-        }
-        if (schuelerCols.has("herkunft")) {
-          filters.push("LOWER(TRIM(COALESCE(herkunft, ''))) = 'pool'");
-        } else {
-          return res.json({ pool_count: 0 });
-        }
-
-        const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+        const filters = ["s.verfahren_id = ?", "LOWER(TRIM(COALESCE(s.herkunft, ''))) = 'pool'"];
+        const params = [verfahrenId];
+        if (rundeId) { filters.push("sr.runde_id = ?"); params.push(rundeId); }
         const [rows] = await pool.query(
-          `SELECT COUNT(*) AS pool_count FROM anm_schueler ${whereClause}`,
+          `SELECT COUNT(DISTINCT s.id) AS pool_count
+             FROM anm_schueler s
+             JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
+            WHERE ${filters.join(" AND ")}`,
           params,
         );
 
@@ -4135,7 +4025,6 @@ function createImporteController({ getPool }) {
         await assertProcedureType(pool, verfahrenId, ["GS", "SEK1"], "Die Pool-Vorschau ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
         const parsedRows = parseCsvText(csvText, [
           ["snr", "anmeldeschule_snr", "herkunftsschule_snr", "herkunftsschule_snr_nr"],
-          ["schueler_id", "schueler_nr"],
           "vorname",
           "nachname",
           "geburtsdatum",
@@ -4147,42 +4036,27 @@ function createImporteController({ getPool }) {
         const requiredSchoolRole = verfahrenstyp === "SEK1" ? "Quellschulen" : "Zielschulen";
         const schoolBySnr = await loadProcedureSchoolLookupByRole(pool, verfahrenId, requiredSchoolRole);
         const empfehlungByCode = await loadCatalogByCode(pool, "anm_kat_empfehlung");
-        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
-        const schoolSnrColumn = verfahrenstyp === "SEK1" && schuelerColumns.has("herkunftsschule_snr")
-          ? "herkunftsschule_snr"
-          : (schuelerColumns.has("anmeldeschule_snr") ? "anmeldeschule_snr" : "");
-
         const ids = parsedRows
-          .map((row) => normalizeInteger(row.getValue(["schueler_id", "schueler_nr"])))
+          .map((row) => normalizeText(row.getValue(["schueler_id", "schueler_nr"])))
           .filter(Boolean);
 
         let existingStudents = [];
         if (ids.length > 0) {
-          const existingSelect = [
-            "id",
-            "schueler_id",
-            "schueler_nr",
-            "vorname",
-            "nachname",
-            "geburtsdatum",
-            "foerderbedarf",
-            "zieldifferent",
-            "bemerkung",
-            "anmeldestatus",
-            "abgleich_status",
-            schuelerColumns.has("empfehlung") ? "empfehlung" : "'' AS empfehlung",
-            schoolSnrColumn ? `${schoolSnrColumn} AS source_school_snr` : "'' AS source_school_snr",
-            schuelerColumns.has("strasse") ? "strasse" : "'' AS strasse",
-            schuelerColumns.has("plz") ? "plz" : "'' AS plz",
-            schuelerColumns.has("ort") ? "ort" : "'' AS ort",
-          ];
           const [dbRows] = await pool.query(
-            `SELECT ${existingSelect.join(", ")}
-             FROM anm_schueler
-             WHERE verfahren_id = ?
-               AND runde_id = ?
-               AND schueler_id IN (?)`,
-            [verfahrenId, rundeId, ids],
+            `SELECT s.id, x.externe_id AS schueler_id, x.externe_id AS schueler_nr,
+                    s.vorname, s.nachname, s.geburtsdatum, s.foerderbedarf, s.zieldifferent,
+                    s.notiz AS bemerkung, sr.anmeldestatus, sr.abgleich_status, s.empfehlung,
+                    COALESCE(s.herkunftsschule_snr, sr.schul_nr, '') AS source_school_snr,
+                    s.strasse, s.plz, s.ort
+               FROM anm_schueler_externe_id x
+               JOIN anm_schueler s ON s.id = x.schueler_id
+               LEFT JOIN anm_schueler_runde sr
+                 ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id AND sr.runde_id = ?
+              WHERE s.verfahren_id = ?
+                AND x.herkunft_art = 'POOL'
+                AND x.herkunft_snr_norm = ''
+                AND x.externe_id IN (?)`,
+            [rundeId, verfahrenId, ids],
           );
           existingStudents = dbRows || [];
         }
@@ -4259,6 +4133,7 @@ function createImporteController({ getPool }) {
           const studentResult = await upsertStudent(connection, {
             verfahren_id: verfahrenId,
             runde_id: rundeId,
+            source_art: "POOL",
             row: row.data,
           });
           if (studentResult.updated) updatedStudents += 1;
@@ -4446,6 +4321,7 @@ function createImporteController({ getPool }) {
                 const studentResult = await upsertStudent(connection, {
                   verfahren_id: verfahrenId,
                   runde_id: rundeId,
+                  source_art: "SCHILD",
                   row: row.data,
                 });
                 if (studentResult?.conflict) {
@@ -4579,42 +4455,29 @@ function createImporteController({ getPool }) {
         await assertProcedureType(pool, verfahrenId, ["GS", "SEK1"], "Der Anmeldungsimport ist nur fuer GS- oder SEK1-Verfahren verfuegbar.");
         const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
         const latestBySnr = await loadLatestImportProtocolBySchool(pool, verfahrenId);
-        const schuelerCols = await loadTableColumns(pool, "anm_schueler");
-        const schuelerSchoolColumn = schuelerCols.has("anmeldeschule_snr")
-          ? "anmeldeschule_snr"
-          : (schuelerCols.has("snr") ? "snr" : "");
         const schuelerFilters = [];
         const schuelerParams = [];
 
-        if (schuelerCols.has("verfahren_id")) {
-          schuelerFilters.push("s.verfahren_id = ?");
-          schuelerParams.push(verfahrenId);
-        }
-        if (rundeId && schuelerCols.has("runde_id")) {
-          schuelerFilters.push("s.runde_id = ?");
+        schuelerFilters.push("sr.verfahren_id = ?");
+        schuelerParams.push(verfahrenId);
+        if (rundeId) {
+          schuelerFilters.push("sr.runde_id = ?");
           schuelerParams.push(rundeId);
         }
         const schuelerWhereClause = schuelerFilters.length
           ? `WHERE ${schuelerFilters.join(" AND ")}`
           : "";
-        const schuelerStatJoin = schuelerSchoolColumn
-          ? `
+        const schuelerStatJoin = `
           LEFT JOIN (
             SELECT
-              s.${schuelerSchoolColumn} AS snr,
-              SUM(CASE WHEN LOWER(TRIM(COALESCE(s.anmeldestatus, ''))) = 'neuaufnahme' THEN 1 ELSE 0 END) AS neuaufnahme,
-              SUM(CASE WHEN LOWER(TRIM(COALESCE(s.anmeldestatus, ''))) = 'warteliste' THEN 1 ELSE 0 END) AS warteliste
-            FROM anm_schueler s
+              sr.schul_nr AS snr,
+              SUM(CASE WHEN LOWER(TRIM(COALESCE(sr.anmeldestatus, ''))) = 'neuaufnahme' THEN 1 ELSE 0 END) AS neuaufnahme,
+              SUM(CASE WHEN LOWER(TRIM(COALESCE(sr.anmeldestatus, ''))) = 'warteliste' THEN 1 ELSE 0 END) AS warteliste
+            FROM anm_schueler_runde sr
             ${schuelerWhereClause}
-            GROUP BY s.${schuelerSchoolColumn}
+            GROUP BY sr.schul_nr
           ) stat
             ON stat.snr = vzs.snr
-          `
-          : `
-          LEFT JOIN (
-            SELECT NULL AS snr, 0 AS neuaufnahme, 0 AS warteliste
-          ) stat
-            ON 1 = 0
           `;
         const [capacityRows] = await pool.query(
           `
@@ -4696,7 +4559,6 @@ function createImporteController({ getPool }) {
         const csvText = String(req.body?.csv_text || "");
         const parsedRows = parseCsvText(csvText, [
           ["anmeldeschule_snr", "snr"],
-          ["schueler_id", "schueler_schul_id"],
           "vorname",
           "nachname",
           ["anmeldestatus_code", "anmeldestatus"],

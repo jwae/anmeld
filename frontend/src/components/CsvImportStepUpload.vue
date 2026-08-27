@@ -132,12 +132,12 @@ function downloadGsPoolExample() {
             <tbody>
               <tr>
                 <td><code>Snr</code></td>
-                <td><span class="required-chip">Ja</span></td>
+                <td><span class="required-chip">Ja*</span></td>
                 <td>Schulnummer einer Herkunftsschule des aktuellen Verfahrens.</td>
               </tr>
               <tr>
                 <td><code>schueler_id</code></td>
-                <td><span class="required-chip">Ja</span></td>
+                <td>Nein</td>
                 <td>Eindeutige, dauerhaft gleichbleibende Schüler-ID.</td>
               </tr>
               <tr>

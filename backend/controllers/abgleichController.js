@@ -1,6 +1,7 @@
 ﻿const tableColumnCache = new Map();
 
 const { assertWritableContext } = require("../lib/anmeldeWriteGuard");
+const { updateStudentMaster, upsertRoundState } = require("../lib/schuelerIdentityService");
 
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
@@ -59,7 +60,7 @@ async function loadSchuelerFieldComments(pool) {
     SELECT COLUMN_NAME, COALESCE(COLUMN_COMMENT, '') AS column_comment
     FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'anm_schueler'
+      AND TABLE_NAME IN ('anm_schueler', 'anm_schueler_runde')
       AND COLUMN_NAME IN ('herkunft', 'anmeldestatus', 'abgleich_status')
   `);
 
@@ -149,51 +150,24 @@ async function loadFallstatusOpenId(pool) {
 }
 
 async function updateAbgleichSchuelerRow(pool, rowId, payload) {
-  const columns = await loadTableColumns(pool, "anm_schueler");
-  const assignments = [];
-  const values = [];
-  const add = (column, value) => {
-    if (!columns.has(column)) return;
-    assignments.push(`${column} = ?`);
-    values.push(value);
-  };
-
   const normalizeBooleanValue = (value) => {
     const text = normalizeText(value).toLowerCase();
     if (["1", "true", "ja", "yes"].includes(text)) return 1;
     return 0;
   };
 
-  add("schueler_id", normalizeText(payload?.schueler_schul_id || payload?.schueler_id) || null);
-  add("vorname", normalizeText(payload?.vorname) || null);
-  add("nachname", normalizeText(payload?.nachname) || null);
-  add("geburtsdatum", normalizeText(payload?.geburtsdatum) || null);
-  add("foerderbedarf", normalizeBooleanValue(payload?.foerderbedarf));
-  add("zieldifferent", normalizeBooleanValue(payload?.zieldifferent));
-  add("herkunft", normalizeText(payload?.herkunft) || null);
-  add("abgleich_status", normalizeText(payload?.abgleich_status) || null);
-  add("anmeldestatus", normalizeText(payload?.anmeldestatus) || null);
-  add("anmeldeschule_snr", normalizeText(payload?.schulnummer || payload?.anmeldeschule_snr) || null);
-  add("strasse", normalizeText(payload?.strasse) || null);
-  add("plz", normalizeText(payload?.plz) || null);
-  add("ort", normalizeText(payload?.ort) || null);
-  add("bemerkung", normalizeText(payload?.bemerkung) || null);
-
-  if (!assignments.length) {
-    const error = new Error("Es wurden keine aktualisierbaren Felder uebergeben.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  values.push(Number(rowId));
-  await pool.query(
-    `
-    UPDATE anm_schueler
-    SET ${assignments.join(", ")}, updated_at = NOW()
-    WHERE id = ?
-    `,
-    values,
-  );
+  await updateStudentMaster(pool, rowId, {
+    vorname: payload?.vorname, nachname: payload?.nachname, geburtsdatum: payload?.geburtsdatum,
+    foerderbedarf: normalizeBooleanValue(payload?.foerderbedarf),
+    zieldifferent: normalizeBooleanValue(payload?.zieldifferent),
+    strasse: payload?.strasse, plz: payload?.plz, ort: payload?.ort, notiz: payload?.bemerkung,
+  });
+  await upsertRoundState(pool, {
+    verfahren_id: payload?.verfahren_id, schueler_id: rowId, runde_id: payload?.runde_id,
+    abgleich_status: normalizeText(payload?.abgleich_status) || "Nur Pool",
+    anmeldestatus: normalizeText(payload?.anmeldestatus) || "Ohne",
+    schul_nr: normalizeText(payload?.schulnummer || payload?.anmeldeschule_snr) || null,
+  });
 }
 
 function createAddressLabel(row) {
@@ -534,10 +508,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     ? await loadTableColumns(pool, "anm_kat_foerderbedarf")
     : new Set();
 
-  const schoolColumn = buildAssignedSchoolExpr("s", columns);
-  const studentIdColumn = columns.has("schueler_id")
-    ? "s.schueler_id"
-    : (columns.has("schueler_nr") ? "s.schueler_nr" : "''");
+  const schoolColumn = "COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))";
+  const studentIdColumn = "COALESCE(x.externe_id, s.schueler_id, '')";
   const foerderCatalogKey = foerderbedarfColumns.has("foerder_id")
     ? "foerder_id"
     : (foerderbedarfColumns.has("id") ? "id" : "");
@@ -549,17 +521,8 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     : (foerderJoin && foerderbedarfColumns.has("name")
       ? "COALESCE(fbd.name, '')"
       : (foerderJoin && foerderbedarfColumns.has("code") ? "COALESCE(fbd.code, '')" : "''"));
-  const whereParts = [];
-  const params = [];
-
-  if (columns.has("verfahren_id")) {
-    whereParts.push("s.verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (columns.has("runde_id")) {
-    whereParts.push("s.runde_id = ?");
-    params.push(rundeId);
-  }
+  const whereParts = ["s.verfahren_id = ?", "sr.runde_id = ?"];
+  const params = [verfahrenId, rundeId];
 
   const openCaseCounts = await loadOpenCaseCountsByStudent(pool, verfahrenId);
 
@@ -581,12 +544,16 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
       COALESCE(sch.ort, '') AS ort,
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
       NULLIF(TRIM(${studentIdColumn}), '') AS schueler_schul_id,
-      COALESCE(s.abgleich_status, '') AS abgleich_status,
-      COALESCE(s.anmeldestatus, '') AS anmeldestatus,
+      COALESCE(sr.abgleich_status, '') AS abgleich_status,
+      COALESCE(sr.anmeldestatus, '') AS anmeldestatus,
       ${columns.has("strasse") ? "COALESCE(s.strasse, '')" : "''"} AS strasse,
       ${columns.has("plz") ? "COALESCE(s.plz, '')" : "''"} AS plz,
-      ${columns.has("bemerkung") ? "COALESCE(s.bemerkung, '')" : "''"} AS bemerkung
+      COALESCE(s.notiz, '') AS bemerkung
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
+    LEFT JOIN anm_schueler_externe_id x ON x.id = (
+      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
+    )
     LEFT JOIN anm_schulen src
       ON src.snr = ${columns.has("herkunftsschule_snr") ? "NULLIF(TRIM(s.herkunftsschule_snr), '')" : "NULL"}
     LEFT JOIN anm_schulen sch
@@ -627,30 +594,22 @@ async function loadStudentsForGeocoding(pool, verfahrenId, rundeId) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) return { rows: [], columns };
 
-  const whereParts = [];
-  const params = [];
-
-  if (columns.has("verfahren_id")) {
-    whereParts.push("verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (columns.has("runde_id")) {
-    whereParts.push("runde_id = ?");
-    params.push(rundeId);
-  }
+  const whereParts = ["s.verfahren_id = ?", "sr.runde_id = ?"];
+  const params = [verfahrenId, rundeId];
 
   const [rows] = await pool.query(
     `
     SELECT
-      id,
-      COALESCE(vorname, '') AS vorname,
-      COALESCE(nachname, '') AS nachname,
-      ${columns.has("strasse") ? "COALESCE(strasse, '')" : "''"} AS strasse,
-      ${columns.has("plz") ? "COALESCE(plz, '')" : "''"} AS plz,
-      ${columns.has("ort") ? "COALESCE(ort, '')" : "''"} AS ort
-    FROM anm_schueler
+      s.id,
+      COALESCE(s.vorname, '') AS vorname,
+      COALESCE(s.nachname, '') AS nachname,
+      COALESCE(s.strasse, '') AS strasse,
+      COALESCE(s.plz, '') AS plz,
+      COALESCE(s.ort, '') AS ort
+    FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
     ${whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : ""}
-    ORDER BY COALESCE(nachname, '') ASC, COALESCE(vorname, '') ASC, COALESCE(id, 0) ASC
+    ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC
     `,
     params,
   );
@@ -720,31 +679,16 @@ async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
     };
   }
 
-  const filters = [];
-  const params = [];
+  const filters = ["s.verfahren_id = ?", "sr.runde_id = ?"];
+  const params = [verfahrenId, rundeId];
 
-  if (columns.has("verfahren_id")) {
-    filters.push("verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (columns.has("runde_id")) {
-    filters.push("runde_id = ?");
-    params.push(rundeId);
-  }
-
-  const schoolColumn = columns.has("zugewiesene_schule_snr")
-    ? "COALESCE(NULLIF(TRIM(zugewiesene_schule_snr), ''), NULLIF(TRIM(anmeldeschule_snr), ''))"
-    : (columns.has("koordinierte_snr")
-      ? "COALESCE(NULLIF(TRIM(koordinierte_snr), ''), NULLIF(TRIM(anmeldeschule_snr), ''))"
-      : (columns.has("anmeldeschule_snr") ? "anmeldeschule_snr" : (columns.has("snr") ? "snr" : "")));
-  const anmeldestatusExpr = columns.has("anmeldestatus")
-    ? "LOWER(TRIM(COALESCE(anmeldestatus, '')))"
-    : "''";
+  const schoolColumn = "COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))";
+  const anmeldestatusExpr = "LOWER(TRIM(COALESCE(sr.anmeldestatus, '')))";
   const foerderbedarfExpr = columns.has("foerderbedarf")
     ? `
       CASE
-        WHEN TRIM(COALESCE(foerderbedarf, '')) = '' THEN 0
-        WHEN LOWER(TRIM(COALESCE(foerderbedarf, ''))) IN ('0', 'false', 'nein', 'no') THEN 0
+        WHEN TRIM(COALESCE(s.foerderbedarf, '')) = '' THEN 0
+        WHEN LOWER(TRIM(COALESCE(s.foerderbedarf, ''))) IN ('0', 'false', 'nein', 'no') THEN 0
         ELSE 1
       END
     `
@@ -752,7 +696,7 @@ async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
   const zieldifferentExpr = columns.has("zieldifferent")
     ? `
       CASE
-        WHEN LOWER(TRIM(COALESCE(zieldifferent, '0'))) IN ('1', 'true', 'ja', 'yes') THEN 1
+        WHEN LOWER(TRIM(COALESCE(s.zieldifferent, '0'))) IN ('1', 'true', 'ja', 'yes') THEN 1
         ELSE 0
       END
     `
@@ -772,7 +716,8 @@ async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
       COALESCE(SUM(CASE WHEN ${anmeldestatusExpr} IN ('', 'ohne') THEN 1 ELSE 0 END), 0) AS ohne,
       COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
       COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
-    FROM anm_schueler
+    FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
     ${whereClause}
     `,
     params,
@@ -795,22 +740,11 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
   if (!columns.size) return [];
   const kapazitaetColumns = await loadTableColumns(pool, "anm_kapazitaet");
 
-  const filters = [];
-  const params = [];
+  const filters = ["s.verfahren_id = ?", "sr.runde_id = ?"];
+  const params = [verfahrenId, rundeId];
 
-  if (columns.has("verfahren_id")) {
-    filters.push("s.verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (columns.has("runde_id")) {
-    filters.push("s.runde_id = ?");
-    params.push(rundeId);
-  }
-
-  const schoolColumn = buildAssignedSchoolExpr("s", columns);
-  const statusExpr = columns.has("anmeldestatus")
-    ? "LOWER(TRIM(COALESCE(s.anmeldestatus, '')))"
-    : "''";
+  const schoolColumn = "COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))";
+  const statusExpr = "LOWER(TRIM(COALESCE(sr.anmeldestatus, '')))";
   const foerderbedarfExpr = columns.has("foerderbedarf")
     ? `
       CASE
@@ -865,6 +799,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
       COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
     LEFT JOIN anm_schulen sch
       ON sch.snr = ${schoolColumn}
     ${capacityJoin}
@@ -882,6 +817,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
       COALESCE(SUM(${zieldifferentExpr}), 0) AS zieldifferent
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
     ${ohneWhereClause}
     `,
     params,
@@ -994,7 +930,6 @@ function createAbgleichController({ getPool }) {
         const pool = getPool();
         await assertWritableContext(pool, verfahrenId, rundeId);
         const offenerFallColumns = await loadTableColumns(pool, "anm_offener_fall");
-        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
         if (!offenerFallColumns.has("schueler_id")) {
           return sendError(res, 500, "Die Tabelle anm_offener_fall unterstuetzt noch keinen direkten Schuelerbezug.");
         }
@@ -1009,14 +944,14 @@ function createAbgleichController({ getPool }) {
           SELECT id, COALESCE(vorname, '') AS vorname, COALESCE(nachname, '') AS nachname
           FROM anm_schueler
           WHERE id = ?
-            ${schuelerColumns.has("verfahren_id") ? "AND verfahren_id = ?" : ""}
-            ${schuelerColumns.has("runde_id") ? "AND runde_id = ?" : ""}
+            AND verfahren_id = ?
+            AND EXISTS (SELECT 1 FROM anm_schueler_runde sr WHERE sr.schueler_id = anm_schueler.id AND sr.runde_id = ?)
           LIMIT 1
           `,
           [
             schuelerId,
-            ...(schuelerColumns.has("verfahren_id") ? [verfahrenId] : []),
-            ...(schuelerColumns.has("runde_id") ? [rundeId] : []),
+            verfahrenId,
+            rundeId,
           ],
         );
         if (!Array.isArray(studentRows) || !studentRows.length) {
@@ -1084,20 +1019,19 @@ function createAbgleichController({ getPool }) {
             return sendError(res, 400, "Die ausgewaehlte aufnehmende Schule gehoert nicht zum Verfahren.");
           }
         }
-        const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
         const [rows] = await pool.query(
           `
           SELECT id
           FROM anm_schueler
           WHERE id = ?
-            ${schuelerColumns.has("verfahren_id") ? "AND verfahren_id = ?" : ""}
-            ${schuelerColumns.has("runde_id") ? "AND runde_id = ?" : ""}
+            AND verfahren_id = ?
+            AND EXISTS (SELECT 1 FROM anm_schueler_runde sr WHERE sr.schueler_id = anm_schueler.id AND sr.runde_id = ?)
           LIMIT 1
           `,
           [
             rowId,
-            ...(schuelerColumns.has("verfahren_id") ? [verfahrenId] : []),
-            ...(schuelerColumns.has("runde_id") ? [rundeId] : []),
+            verfahrenId,
+            rundeId,
           ],
         );
         if (!Array.isArray(rows) || !rows.length) {

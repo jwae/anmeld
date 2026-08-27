@@ -27,6 +27,18 @@ CREATE TABLE `anm_kat_empfehlung` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anm_kat_quelle` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `bezeichnung` varchar(255) NOT NULL,
+  `sortierung` int(11) NOT NULL DEFAULT 0,
+  `aktiv` tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_kat_quelle_code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Arten externer Quellen von Schüleridentitäten';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `anm_kat_fallgrund` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `code` varchar(50) NOT NULL,
@@ -181,7 +193,7 @@ CREATE TABLE `anm_schueler_pool` (
   KEY `fk_anm_schueler_empfehlung` (`empfehlung_id`),
   KEY `idx_anm_schueler_name` (`nachname`,`vorname`),
   KEY `idx_anm_schueler_geburtsdatum` (`geburtsdatum`),
-  CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
+  CONSTRAINT `fk_anm_schueler_pool_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=900023 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -329,21 +341,9 @@ CREATE TABLE `anm_kapazitaet` (
 CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
-  `runde_id` bigint(20) NOT NULL,
-  `schueler_id` varchar(50) NOT NULL,
-  `schueler_nr` varchar(50) DEFAULT NULL,
+  `schueler_id` varchar(50) DEFAULT NULL,
   `herkunftsschule_snr` varchar(50) DEFAULT NULL COMMENT 'SNR der Herkunftsschule / abgebende Grundschule',
-  `herkunftsschueler_nr` varchar(50) DEFAULT NULL COMMENT 'Schueler-Nr',
-  `anmeldeschule_snr` varchar(50) DEFAULT NULL COMMENT 'SNR an der das Kind sich angemeldet hat',
-  `zugewiesene_schule_snr` varchar(50) DEFAULT NULL COMMENT 'SNR der zugewiesenen Schule',
-  `zugewiesen_am` datetime DEFAULT NULL COMMENT 'Datum der Zuweisung',
-  `zugewiesen_von` varchar(255) DEFAULT NULL COMMENT 'Wer hat zugewiesen',
-  `zugewiesen_bemerkung` text DEFAULT NULL COMMENT 'Bemerkung zu der Zuweisung',
   `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
-  `erwartete_snr` varchar(50) DEFAULT NULL COMMENT 'Erwartete Schule aus vorheriger Runde / Zuweisung',
-  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL COMMENT 'Aus welchen Importquellen der Schüler in der aktuellen Runde bekannt ist.',
-  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne' COMMENT 'Beschreibt den aktuellen Status der Anmeldung an einer Schule.',
-  `teilnahmestatus` enum('Aktiv','Wegzug','Abgemeldet','Verstorben') NOT NULL DEFAULT 'Aktiv',
   `empfehlung` varchar(50) DEFAULT NULL,
   `vorname` varchar(100) DEFAULT NULL,
   `nachname` varchar(100) DEFAULT NULL,
@@ -352,7 +352,7 @@ CREATE TABLE `anm_schueler` (
   `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
   `foerder_id` smallint(6) DEFAULT NULL,
   `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
-  `bemerkung` text DEFAULT NULL,
+  `notiz` text DEFAULT NULL COMMENT 'Allgemeine Notiz zum Kind',
   `strasse` varchar(255) DEFAULT NULL,
   `plz` varchar(10) DEFAULT NULL,
   `ort` varchar(100) DEFAULT NULL,
@@ -361,29 +361,69 @@ CREATE TABLE `anm_schueler` (
   `geocoding_status` enum('Offen','OK','Fehler') NOT NULL DEFAULT 'Offen',
   `geocoding_fehler` text DEFAULT NULL,
   `geocoded_at` datetime DEFAULT NULL,
-  `koordiniert_am` datetime DEFAULT NULL,
-  `koordiniert_von` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `quell_jahrgang` varchar(10) DEFAULT NULL COMMENT 'Jahrgang an der Herkunftsschule',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_anm_schueler` (`verfahren_id`,`runde_id`,`schueler_id`),
-  KEY `idx_verfahren_runde` (`verfahren_id`,`runde_id`),
+  UNIQUE KEY `uq_anm_schueler_verfahren_legacy_id` (`verfahren_id`,`schueler_id`),
   KEY `idx_schueler_id` (`schueler_id`),
-  KEY `idx_schul_nr` (`anmeldeschule_snr`),
-  KEY `idx_abgleich_status` (`abgleich_status`),
-  KEY `idx_anmeldestatus` (`anmeldestatus`),
   KEY `idx_empfehlung` (`empfehlung`),
   KEY `idx_anm_schueler_geo` (`latitude`,`longitude`),
   KEY `idx_anm_schueler_foerder_id` (`foerder_id`),
   KEY `idx_anm_schueler_quell_snr` (`herkunftsschule_snr`),
-  KEY `idx_anm_schueler_erwartete_snr` (`erwartete_snr`),
   CONSTRAINT `fk_anm_schueler_empfehlung` FOREIGN KEY (`empfehlung`) REFERENCES `anm_kat_empfehlung` (`code`),
-  CONSTRAINT `fk_anm_schueler_erwartete_schule` FOREIGN KEY (`erwartete_snr`) REFERENCES `anm_schulen` (`snr`),
   CONSTRAINT `fk_anm_schueler_foerder` FOREIGN KEY (`foerder_id`) REFERENCES `anm_kat_foerderbedarf` (`foerder_id`),
   CONSTRAINT `fk_anm_schueler_quell_schule` FOREIGN KEY (`herkunftsschule_snr`) REFERENCES `anm_schulen` (`snr`),
-  CONSTRAINT `fk_anm_schueler_ziel_schule` FOREIGN KEY (`anmeldeschule_snr`) REFERENCES `anm_schulen` (`snr`)
+  CONSTRAINT `fk_anm_schueler_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=6008 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anm_schueler_externe_id` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `schueler_id` bigint(20) NOT NULL,
+  `herkunft_art` varchar(50) NOT NULL,
+  `herkunft_snr` varchar(50) DEFAULT NULL,
+  `externe_id` varchar(50) NOT NULL,
+  `herkunft_snr_norm` varchar(50) GENERATED ALWAYS AS (ifnull(nullif(trim(`herkunft_snr`),''),'')) STORED,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_schueler_externe_identitaet` (`herkunft_art`,`herkunft_snr_norm`,`externe_id`),
+  KEY `idx_anm_schueler_externe_id_schueler` (`schueler_id`),
+  CONSTRAINT `fk_anm_schueler_externe_id_quelle` FOREIGN KEY (`herkunft_art`) REFERENCES `anm_kat_quelle` (`code`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_externe_id_schueler` FOREIGN KEY (`schueler_id`) REFERENCES `anm_schueler` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Externe Identitäten eines Schülers';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anm_schueler_runde` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
+  `schueler_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
+  `anmeldestatus` enum('Neuaufnahme','Warteliste','Zugeordnet','Abgelehnt','Ohne') NOT NULL DEFAULT 'Ohne' COMMENT 'Beschreibt den aktuellen Status der Anmeldung an einer Schule.',
+  `teilnahmestatus` enum('Aktiv','Wegzug','Abgemeldet','Verstorben') NOT NULL DEFAULT 'Aktiv',
+  `schul_nr` varchar(50) DEFAULT NULL COMMENT 'Schule, an der der Schüler in dieser Runde angemeldet ist',
+  `koordinierte_snr` varchar(50) DEFAULT NULL COMMENT 'Schule, der der Schüler im Rahmen der Koordination zugewiesen wurde',
+  `koordiniert_am` datetime DEFAULT NULL,
+  `koordiniert_von` varchar(100) DEFAULT NULL,
+  `abgleich_status` enum('Nur Pool','Nur Anmeldung','Pool + Anm') NOT NULL COMMENT 'Aus welchen Importquellen der Schüler in der aktuellen Runde bekannt ist.',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_anm_schueler_runde` (`verfahren_id`,`schueler_id`,`runde_id`),
+  KEY `idx_anm_schueler_runde_verfahren` (`verfahren_id`),
+  KEY `idx_anm_schueler_runde_schueler` (`schueler_id`),
+  KEY `idx_anm_schueler_runde_runde` (`runde_id`),
+  KEY `idx_anm_schueler_runde_schul_nr` (`schul_nr`),
+  KEY `idx_anm_schueler_runde_koordinierte_snr` (`koordinierte_snr`),
+  CONSTRAINT `fk_anm_schueler_runde_koordinierte_snr` FOREIGN KEY (`koordinierte_snr`) REFERENCES `anm_schulen` (`snr`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_runde_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_runde_schueler` FOREIGN KEY (`schueler_id`) REFERENCES `anm_schueler` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_runde_schul_nr` FOREIGN KEY (`schul_nr`) REFERENCES `anm_schulen` (`snr`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_runde_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Rundenabhängige Eigenschaften eines Schülers';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -404,9 +444,9 @@ CREATE TABLE `anm_schueler_anmeldung` (
   UNIQUE KEY `uq_schueler_anmeldung` (`verfahren_id`,`runde_id`,`snr`,`schueler_schul_id`),
   KEY `runde_id` (`runde_id`),
   KEY `snr` (`snr`),
-  CONSTRAINT `1` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `2` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `3` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
+  CONSTRAINT `fk_anm_schueler_anmeldung_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_anm_schueler_anmeldung_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_anm_schueler_anmeldung_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`)
 ) ENGINE=InnoDB AUTO_INCREMENT=773 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -542,11 +582,11 @@ CREATE TABLE `anm_schueler_abgleich` (
   KEY `runde_id` (`runde_id`),
   KEY `schueler_pool_id` (`schueler_pool_id`),
   KEY `schueler_anmeldung_id` (`schueler_anmeldung_id`),
-  CONSTRAINT `1` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `2` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `3` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
-  CONSTRAINT `4` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
-  CONSTRAINT `CONSTRAINT_1` CHECK (`schueler_pool_id` is not null or `schueler_anmeldung_id` is not null)
+  CONSTRAINT `fk_anm_schueler_abgleich_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_anm_schueler_abgleich_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_anm_schueler_abgleich_pool` FOREIGN KEY (`schueler_pool_id`) REFERENCES `anm_schueler_pool` (`id`),
+  CONSTRAINT `fk_anm_schueler_abgleich_anmeldung` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
+  CONSTRAINT `chk_anm_schueler_abgleich_bezug` CHECK (`schueler_pool_id` is not null or `schueler_anmeldung_id` is not null)
 ) ENGINE=InnoDB AUTO_INCREMENT=72445 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -603,6 +643,16 @@ INSERT INTO `anm_kat_empfehlung` (`id`, `code`, `bezeichnung`, `sortierung`, `ak
 (4,'KEINE','Keine Empfehlung',4,1),
 (5,'HS_RS','Hauptschule / Realschule',5,1),
 (6,'RS_GY','Realschule / Gymnasium',6,1);
+COMMIT;
+SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
+SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
+INSERT INTO `anm_kat_quelle` (`id`, `code`, `bezeichnung`, `sortierung`, `aktiv`) VALUES (1,'POOL','Pool',10,1),
+(2,'SCHULE','Schule',20,1),
+(3,'EWO','Einwohnermeldewesen',30,1),
+(4,'SCHILD','Schild',40,1),
+(5,'SCHUELER_ONLINE','Schüler Online',50,1),
+(6,'KITA','Kindertagesstätte',60,1),
+(7,'SONST','Sonstige Quelle',70,1);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;

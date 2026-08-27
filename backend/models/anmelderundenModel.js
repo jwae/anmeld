@@ -161,6 +161,7 @@ async function countRoundWorkingData(pool, rundenId) {
     { table: "anm_schueler_anmeldung", column: "runde_id" },
     { table: "anm_abgleich_protokoll", column: "runde_id" },
     { table: "anm_schueler_abgleich", column: "runde_id" },
+    { table: "anm_schueler_runde", column: "runde_id" },
   ];
 
   let total = 0;
@@ -269,67 +270,28 @@ async function startRound(pool, targetRoundId) {
       [targetRound.id],
     );
 
-    const schuelerColumns = await loadTableColumns(connection, "anm_schueler");
-    const excludedColumns = new Set(["id", "verfahren_id", "runde_id", "created_at", "updated_at"]);
-    const copyColumns = [
-      "schueler_id",
-      "schueler_nr",
-      "herkunftsschule_snr",
-      "herkunftsschueler_nr",
-      "anmeldeschule_snr",
-      "zugewiesene_schule_snr",
-      "zugewiesen_am",
-      "zugewiesen_von",
-      "zugewiesen_bemerkung",
-      "herkunft",
-      "abgleich_status",
-      "anmeldestatus",
-      "teilnahmestatus",
-      "empfehlung",
-      "vorname",
-      "nachname",
-      "geburtsdatum",
-      "ef",
-      "foerderbedarf",
-      "foerder_id",
-      "zieldifferent",
-      "bemerkung",
-      "strasse",
-      "plz",
-      "ort",
-      "latitude",
-      "longitude",
-      "geocoding_status",
-      "geocoding_fehler",
-      "geocoded_at",
-      "koordinierte_snr",
-      "koordiniert_am",
-      "koordiniert_von",
-      "quelle",
-    ].filter((column) => schuelerColumns.has(column) && !excludedColumns.has(column));
-
-    let copiedStudents = 0;
-    if (copyColumns.length) {
-      const insertColumns = ["verfahren_id", "runde_id", ...copyColumns];
-      const selectColumns = ["?", "?", ...copyColumns.map((column) => `s.${column}`)];
-      if (schuelerColumns.has("erwartete_snr") && schuelerColumns.has("anmeldeschule_snr")) {
-        insertColumns.push("erwartete_snr");
-        selectColumns.push("s.anmeldeschule_snr");
-      }
-      insertColumns.push("created_at", "updated_at");
-      selectColumns.push("NOW()", "NOW()");
-
-      const [insertResult] = await connection.query(
-        `INSERT INTO anm_schueler (${insertColumns.join(", ")})
-         SELECT ${selectColumns.join(", ")}
-         FROM anm_schueler s
-         WHERE s.verfahren_id = ?
-           AND s.runde_id = ?
-           AND s.teilnahmestatus = 'Aktiv'`,
-        [targetRound.verfahren_id, targetRound.id, targetRound.verfahren_id, currentRound.id],
-      );
-      copiedStudents = Number(insertResult?.affectedRows || 0);
-    }
+    const [insertResult] = await connection.query(
+      `INSERT INTO anm_schueler_runde
+         (verfahren_id, schueler_id, runde_id, anmeldestatus, teilnahmestatus,
+          schul_nr, koordinierte_snr, koordiniert_am, koordiniert_von,
+          abgleich_status, created_at, updated_at)
+       SELECT sr.verfahren_id, sr.schueler_id, ?, sr.anmeldestatus, sr.teilnahmestatus,
+              sr.schul_nr, sr.koordinierte_snr, sr.koordiniert_am, sr.koordiniert_von,
+              sr.abgleich_status, NOW(), NOW()
+       FROM anm_schueler_runde sr
+       WHERE sr.verfahren_id = ?
+         AND sr.runde_id = ?
+         AND sr.teilnahmestatus = 'Aktiv'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM anm_schueler_runde target_sr
+           WHERE target_sr.verfahren_id = sr.verfahren_id
+             AND target_sr.schueler_id = sr.schueler_id
+             AND target_sr.runde_id = ?
+         )`,
+      [targetRound.id, targetRound.verfahren_id, currentRound.id, targetRound.id],
+    );
+    const copiedStudents = Number(insertResult?.affectedRows || 0);
 
     await connection.commit();
     return {

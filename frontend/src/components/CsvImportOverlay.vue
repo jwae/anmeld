@@ -50,6 +50,7 @@ const error = ref("");
 const schemaFields = ref<SchemaField[]>([]);
 const selectedFile = ref<File | null>(null);
 const selectedFileName = ref("");
+const sourceArt = ref<"POOL" | "EWO">("POOL");
 const csvColumns = ref<string[]>([]);
 const csvRows = ref<ParsedCsvRow[]>([]);
 const csvPreviewRows = ref<string[][]>([]);
@@ -147,6 +148,7 @@ function resetState() {
   error.value = "";
   selectedFile.value = null;
   selectedFileName.value = "";
+  sourceArt.value = "POOL";
   csvColumns.value = [];
   csvRows.value = [];
   csvPreviewRows.value = [];
@@ -167,6 +169,7 @@ async function loadSchema() {
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
       import_art: props.importArt,
+      source_art: sourceArt.value,
     }, props.token);
     schemaFields.value = Array.isArray(response?.fields) ? response.fields : [];
   } catch (loadError: any) {
@@ -249,6 +252,7 @@ async function runValidation() {
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
       import_art: props.importArt,
+      source_art: sourceArt.value,
       csv_columns: csvColumns.value,
       csv_rows: csvRows.value.map((row) => ({
         row_number: row.rowNumber,
@@ -292,6 +296,7 @@ async function executeImport() {
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
       import_art: props.importArt,
+      source_art: sourceArt.value,
       validation_token: validationToken.value,
       selected_row_numbers: selectedImportRows.value.map((row) => row.row_number),
     }, props.token);
@@ -355,6 +360,14 @@ function handleClose() {
           class="hidden-input"
           @change="handlePickedFile"
         />
+
+        <label v-if="currentStep === 1" class="csv-source-field">
+          <span>Quellsystem der externen ID</span>
+          <select v-model="sourceArt" :disabled="busy">
+            <option value="POOL">Pool-/CSV-Datei</option>
+            <option value="EWO">EWO-Datei</option>
+          </select>
+        </label>
 
         <CsvImportStepUpload
           v-if="currentStep === 1"
@@ -434,6 +447,17 @@ function handleClose() {
 </template>
 
 <style scoped>
+.csv-source-field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  max-width: 22rem;
+}
+
+.csv-source-field span {
+  font-weight: 600;
+}
+
 .csv-import-overlay {
   position: fixed;
   inset: 0;

@@ -62,19 +62,6 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     };
   }
 
-  const studentIdColumn = studentColumns.has("schueler_id")
-    ? "s.schueler_id"
-    : (studentColumns.has("schueler_nr") ? "s.schueler_nr" : "''");
-  const sourceSchoolColumn = studentColumns.has("herkunftsschule_snr")
-    ? "s.herkunftsschule_snr"
-    : (studentColumns.has("snr") ? "s.snr" : "''");
-  const targetSchoolColumn = studentColumns.has("anmeldeschule_snr")
-    ? "s.anmeldeschule_snr"
-    : (studentColumns.has("snr") ? "s.snr" : "''");
-  const assignedSchoolColumn = studentColumns.has("zugewiesene_schule_snr")
-    ? "s.zugewiesene_schule_snr"
-    : (studentColumns.has("koordinierte_snr") ? "s.koordinierte_snr" : "NULL");
-
   const filters = [];
   const params = [];
   if (studentColumns.has("verfahren_id")) {
@@ -91,39 +78,52 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     `
     SELECT
       COALESCE(s.id, 0) AS row_id,
-      COALESCE(NULLIF(TRIM(${studentIdColumn}), ''), '') AS schueler_ident,
+      COALESCE(
+        (
+          SELECT NULLIF(TRIM(x.externe_id), '')
+          FROM anm_schueler_externe_id x
+          WHERE x.schueler_id = s.id
+          ORDER BY CASE WHEN x.herkunft_art = 'SCHULE' THEN 0 ELSE 1 END, x.id
+          LIMIT 1
+        ),
+        NULLIF(TRIM(s.schueler_id), ''),
+        CAST(s.id AS CHAR)
+      ) AS schueler_ident,
       COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
       COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
-      COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS herkunftsschule_snr,
+      COALESCE(NULLIF(TRIM(s.herkunftsschule_snr), ''), '') AS herkunftsschule_snr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS quell_schule_name,
-      COALESCE(NULLIF(TRIM(${targetSchoolColumn}), ''), '') AS anmeldeschule_snr,
-      COALESCE(NULLIF(TRIM(${assignedSchoolColumn}), ''), '') AS zugewiesene_schule_snr,
+      COALESCE(NULLIF(TRIM(sr.schul_nr), ''), '') AS anmeldeschule_snr,
+      COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), '') AS zugewiesene_schule_snr,
       COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schul_name,
-      COALESCE(NULLIF(TRIM(s.anmeldestatus), ''), '') AS anmeldestatus,
-      COALESCE(s.runde_id, 0) AS runde_id,
+      COALESCE(NULLIF(TRIM(sr.anmeldestatus), ''), '') AS anmeldestatus,
+      COALESCE(sr.runde_id, 0) AS runde_id,
       COALESCE(r.runden_nummer, 0) AS runden_nummer
     FROM anm_schueler s
+    JOIN anm_schueler_runde sr
+      ON sr.schueler_id = s.id
+     AND sr.verfahren_id = s.verfahren_id
     LEFT JOIN anm_runde r
-      ON r.id = s.runde_id
+      ON r.id = sr.runde_id
     LEFT JOIN anm_schulen src
-      ON src.snr = NULLIF(TRIM(${sourceSchoolColumn}), '')
+      ON src.snr = NULLIF(TRIM(s.herkunftsschule_snr), '')
     LEFT JOIN anm_schulen dst
-      ON dst.snr = COALESCE(NULLIF(TRIM(${assignedSchoolColumn}), ''), NULLIF(TRIM(${targetSchoolColumn}), ''))
+      ON dst.snr = COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))
     WHERE ${filters.join(" AND ")}
-    ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(${studentIdColumn}, '') ASC, COALESCE(s.id, 0) ASC
+    ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC, COALESCE(r.runden_nummer, 0) ASC
     `,
     params,
   );
 
   const grouped = new Map();
   for (const row of studentRows || []) {
-    const studentKey = normalizeText(row?.schueler_ident);
+    const studentKey = String(Number(row?.row_id || 0));
     if (!studentKey) continue;
 
     const currentRoundNumber = Number(row?.runden_nummer || 0);
     const entry = grouped.get(studentKey) || {
-      schueler_id: studentKey,
+      schueler_id: normalizeText(row?.schueler_ident) || studentKey,
       nachname: normalizeText(row?.nachname),
       vorname: normalizeText(row?.vorname),
       geburtsdatum: row?.geburtsdatum || "",
