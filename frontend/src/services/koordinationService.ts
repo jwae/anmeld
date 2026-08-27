@@ -32,7 +32,7 @@ export default {
     payload: {
       verfahren_id: number;
       runde_id: number;
-      row_ids: number[];
+      interne_schueler_ids: number[];
     },
     token?: string,
   ) {
@@ -73,7 +73,7 @@ export default {
     payload: {
       verfahren_id: number;
       runde_id: number;
-      row_ids: number[];
+      interne_schueler_ids: number[];
       zugewiesene_schule_snr: string;
     },
     token?: string,

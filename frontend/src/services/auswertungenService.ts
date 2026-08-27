@@ -43,7 +43,8 @@ export type AuswertungsDownloadResponse = {
 
 export type SchuelerRundenuebersichtRow = {
   lfd_nr: number;
-  schueler_id: string;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   name_vorname: string;
   geburtsdatum: string;
   abgebende_schule_nr: string;
@@ -70,7 +71,8 @@ export type SchuelerRundenuebersichtResponse = {
 
 export type OffeneAnmeldungenRow = {
   lfd_nr: number;
-  schueler_id: string;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   name_vorname: string;
   geburtsdatum: string;
   abgebende_schule_nr: string;

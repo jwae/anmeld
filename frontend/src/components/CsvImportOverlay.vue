@@ -116,8 +116,7 @@ const delimiterLabel = computed(() => {
 
 const validationDisplayFields = computed(() => (
   schemaFields.value.filter((field) => (
-    field.key !== "herkunftsschueler_nr"
-    && (field.readOnly || !!String(mapping.value[field.key] || "").trim())
+    field.readOnly || !!String(mapping.value[field.key] || "").trim()
   ))
 ));
 
@@ -225,7 +224,7 @@ function buildAutoMapping(columns: string[]) {
   const byKey = new Map(columns.map((column) => [normalizeMappingKey(column), column]));
   const aliasByField: Record<string, string[]> = {
     source_school_snr: ["snr", "schulnummer", "anmeldeschule_snr", "herkunftsschule_snr"],
-    schueler_id: ["schueler_id", "schueler_nr", "id", "import_id"],
+    externe_schueler_id: ["externe_schueler_id"],
     vorname: ["vorname"],
     nachname: ["nachname", "name"],
     geburtsdatum: ["geburtsdatum"],

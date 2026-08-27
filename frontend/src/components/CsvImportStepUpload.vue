@@ -28,7 +28,7 @@ function handleDragOver(event: DragEvent) {
 
 function downloadGsPoolExample() {
   const csv = [
-    "Snr;schueler_id;vorname;nachname;geburtsdatum;strasse;plz;ort;foerderbedarf;zieldifferent;empfehlung",
+    "Snr;externe_schueler_id;vorname;nachname;geburtsdatum;strasse;plz;ort;foerderbedarf;zieldifferent;empfehlung",
     "123456;100001;Max;Mustermann;14.03.2012;Musterstraße 12;41061;Musterstadt;0;0;RS",
     "123456;100002;Erika;Musterfrau;22.07.2012;Beispielweg 7;41061;Musterstadt;1;0;GY",
   ].join("\r\n");
@@ -136,7 +136,7 @@ function downloadGsPoolExample() {
                 <td>Schulnummer einer Herkunftsschule des aktuellen Verfahrens.</td>
               </tr>
               <tr>
-                <td><code>schueler_id</code></td>
+                <td><code>externe_schueler_id</code></td>
                 <td>Nein</td>
                 <td>Eindeutige, dauerhaft gleichbleibende Schüler-ID.</td>
               </tr>
@@ -205,7 +205,7 @@ function downloadGsPoolExample() {
             Musterdatei herunterladen
           </button>
         </div>
-        <pre class="guide-code"><code>Snr;schueler_id;vorname;nachname;geburtsdatum;strasse;plz;ort;foerderbedarf;zieldifferent;empfehlung
+        <pre class="guide-code"><code>Snr;externe_schueler_id;vorname;nachname;geburtsdatum;strasse;plz;ort;foerderbedarf;zieldifferent;empfehlung
 123456;100001;Max;Mustermann;14.03.2012;Musterstraße 12;41061;Musterstadt;0;0;RS</code></pre>
         <section class="guide-subsection" aria-labelledby="gs-import-process-heading">
         <div class="guide-heading">
@@ -253,8 +253,8 @@ function downloadGsPoolExample() {
           <div>
             <strong>Wichtig für Aktualisierungen</strong>
             <p>
-              Vorhandene Kinder werden innerhalb des aktuellen Verfahrens und der aktuellen Runde anhand
-              der <code>schueler_id</code> erkannt. Zugeordnete Felder werden aktualisiert; nicht zugeordnete
+              Die Importspalte <code>externe_schueler_id</code> enthält die externe Schüler-ID. Vorhandene Kinder
+              werden innerhalb des aktuellen Verfahrens über diese ID und die bestehenden Identitätsregeln erkannt. Zugeordnete Felder werden aktualisiert; nicht zugeordnete
               optionale Felder bleiben unverändert. Jede Schüler-ID darf in der Importdatei nur einmal vorkommen.
             </p>
           </div>

@@ -14,8 +14,8 @@ type SchoolRow = {
 };
 
 type StudentRow = {
-  row_id: number;
-  schueler_id: string;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   vorname: string;
   nachname: string;
   empfehlung: string;
@@ -64,7 +64,7 @@ const selectedSchool = computed(
 );
 const selectedStudentCount = computed(() => selectedStudentRowIds.value.length);
 const allStudentsSelected = computed(
-  () => students.value.length > 0 && students.value.every((student) => selectedStudentRowIds.value.includes(student.row_id)),
+  () => students.value.length > 0 && students.value.every((student) => selectedStudentRowIds.value.includes(student.interne_schueler_id)),
 );
 const isActiveRound = computed(() => props.rundeStatus === "In Bearbeitung");
 const assignButtonLabel = computed(() => {
@@ -133,11 +133,11 @@ function closeGeocodeInfoOverlay() {
 function getVisibleStudentsMissingCoordinates() {
   return students.value
     .filter((student) =>
-      student.row_id > 0
+      student.interne_schueler_id > 0
       && (student.latitude === null || student.longitude === null)
-      && !attemptedVisibleGeocodingRowIds.has(student.row_id),
+      && !attemptedVisibleGeocodingRowIds.has(student.interne_schueler_id),
     )
-    .map((student) => student.row_id);
+    .map((student) => student.interne_schueler_id);
 }
 
 async function geocodeVisibleStudentsInBackground(loadToken: number) {
@@ -160,7 +160,7 @@ async function geocodeVisibleStudentsInBackground(loadToken: number) {
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
-        row_ids: rowIds,
+        interne_schueler_ids: rowIds,
       },
       props.token,
     );
@@ -208,7 +208,7 @@ async function loadData(nextSelectedSnr = selectedSchoolSnr.value) {
     selectedSchoolSnr.value = normalizeText(response?.selected_snr);
 
     selectedStudentRowIds.value = selectedStudentRowIds.value.filter((rowId) =>
-      students.value.some((student) => student.row_id === rowId),
+      students.value.some((student) => student.interne_schueler_id === rowId),
     );
     loadedSuccessfully = true;
   } catch (error: any) {
@@ -256,7 +256,7 @@ function toggleSelectAllStudents() {
     selectedStudentRowIds.value = [];
     return;
   }
-  selectedStudentRowIds.value = students.value.map((student) => student.row_id);
+  selectedStudentRowIds.value = students.value.map((student) => student.interne_schueler_id);
 }
 
 async function handleAssign() {
@@ -274,7 +274,7 @@ async function handleAssign() {
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
-        row_ids: selectedStudentRowIds.value,
+        interne_schueler_ids: selectedStudentRowIds.value,
         zugewiesene_schule_snr: selectedSchool.value.snr,
       },
       props.token,
@@ -470,20 +470,20 @@ watch(
                 </tr>
                 <tr
                   v-for="student in students"
-                  :key="student.row_id"
+                  :key="student.interne_schueler_id"
                   class="student-row"
-                  :class="{ 'is-selected': isStudentSelected(student.row_id) }"
-                  @click="toggleStudentSelection(student.row_id)"
+                  :class="{ 'is-selected': isStudentSelected(student.interne_schueler_id) }"
+                  @click="toggleStudentSelection(student.interne_schueler_id)"
                 >
                   <td>
                     <input
-                      :checked="isStudentSelected(student.row_id)"
+                      :checked="isStudentSelected(student.interne_schueler_id)"
                       type="checkbox"
                       @click.stop
-                      @change="toggleStudentSelection(student.row_id)"
+                      @change="toggleStudentSelection(student.interne_schueler_id)"
                     />
                   </td>
-                  <td>{{ student.schueler_id || "-" }}</td>
+                  <td>{{ student.externe_schueler_id || "-" }}</td>
                   <td>{{
                     [student.nachname, student.vorname].filter((value) => normalizeText(value)).join(", ") || "-"
                   }}</td>

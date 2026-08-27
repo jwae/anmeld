@@ -57,7 +57,7 @@ function fieldTitle(row: Row, field: string) {
           <tr v-for="row in rows" :key="row.row_number" :class="`status-${row.status}`">
             <td><input :checked="row.selected" type="checkbox" :disabled="busy || row.status === 'fehler'" @change="$emit('toggle-row', row.row_number, ($event.target as HTMLInputElement).checked)" /></td>
             <td>{{ row.row_number }}</td>
-            <td>{{ fieldValue(row, 'schueler_id') }}</td>
+            <td>{{ fieldValue(row, 'externe_schueler_id') }}</td>
             <td :title="fieldTitle(row, 'anmeldeschule_snr')">
               <template v-if="hasFieldChanged(row, 'anmeldeschule_snr')">
                 <span>{{ previousSchulNrLabel(row) }} -> </span>

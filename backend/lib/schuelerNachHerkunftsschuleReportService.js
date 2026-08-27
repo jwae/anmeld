@@ -59,55 +59,68 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
     };
   }
 
-  const studentIdColumn = "COALESCE(x.externe_id, s.schueler_id, '')";
   const sourceSchoolColumn = studentColumns.has("herkunftsschule_snr")
     ? "s.herkunftsschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
-  const targetSchoolColumn = "sr.schul_nr";
-  const assignedSchoolColumn = "sr.koordinierte_snr";
   const noteColumn = "COALESCE(NULLIF(TRIM(s.notiz), ''), '')";
 
   const [rows] = await pool.query(
     `
     SELECT
-      COALESCE(NULLIF(TRIM(${studentIdColumn}), ''), '') AS schueler_id,
+      COALESCE(s.id, 0) AS interne_schueler_id,
+      COALESCE(NULLIF(TRIM(x.externe_id), ''), '') AS externe_schueler_id,
       COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
       COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
       COALESCE(NULLIF(TRIM(${sourceSchoolColumn}), ''), '') AS abgebende_schule_nr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS abgebende_schule_name,
       COALESCE(NULLIF(TRIM(sr.anmeldestatus), ''), '') AS anmeldestatus,
-      COALESCE(NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), ''), '') AS schule_nr,
-      COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schule_name,
+      COALESCE(NULLIF(TRIM(sr.schul_nr), ''), '') AS anmeldeschule_snr,
+      COALESCE(NULLIF(TRIM(reg.name), ''), '') AS anmeldeschule_name,
+      COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), '') AS koordinierte_snr,
+      COALESCE(NULLIF(TRIM(coord.name), ''), '') AS koordinierte_schule_name,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
     JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
-    LEFT JOIN anm_schueler_externe_id x ON x.id = (
-      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
-    )
+    LEFT JOIN (
+      SELECT schueler_id, MIN(NULLIF(TRIM(externe_id), '')) AS externe_id
+      FROM anm_schueler_externe_id
+      WHERE NULLIF(TRIM(externe_id), '') IS NOT NULL
+      GROUP BY schueler_id
+      HAVING COUNT(DISTINCT NULLIF(TRIM(externe_id), '')) = 1
+    ) x ON x.schueler_id = s.id
     LEFT JOIN anm_schulen src
       ON src.snr = NULLIF(TRIM(${sourceSchoolColumn}), '')
-    LEFT JOIN anm_schulen dst
-      ON dst.snr = NULLIF(TRIM(COALESCE(${assignedSchoolColumn}, ${targetSchoolColumn})), '')
-    WHERE s.verfahren_id = ?
+    LEFT JOIN anm_schulen reg
+      ON reg.snr = NULLIF(TRIM(sr.schul_nr), '')
+    LEFT JOIN anm_schulen coord
+      ON coord.snr = NULLIF(TRIM(sr.koordinierte_snr), '')
+    WHERE sr.verfahren_id = ?
       AND sr.runde_id = ?
     `,
     [verfahrenId, rundeId],
   );
 
   const filteredRows = (rows || [])
-    .map((row) => ({
-      schueler_id: normalizeText(row?.schueler_id),
-      nachname: normalizeText(row?.nachname),
-      vorname: normalizeText(row?.vorname),
-      geburtsdatum: formatDisplayDate(row?.geburtsdatum),
-      abgebende_schule_nr: normalizeText(row?.abgebende_schule_nr) || "-",
-      abgebende_schule_name: normalizeText(row?.abgebende_schule_name) || "-",
-      anmeldestatus: normalizeText(row?.anmeldestatus) || "-",
-      schule: normalizeText(row?.schule_name) || normalizeText(row?.schule_nr) || "-",
-      bemerkung: normalizeText(row?.bemerkung) || "-",
-    }))
-    .filter((row) => row.schueler_id)
+    .map((row) => {
+      const status = normalizeText(row?.anmeldestatus);
+      const isAssigned = ["zuordnung", "zugeordnet"].includes(status.toLowerCase());
+      return {
+        interne_schueler_id: Number(row?.interne_schueler_id || 0),
+        externe_schueler_id: normalizeText(row?.externe_schueler_id),
+        nachname: normalizeText(row?.nachname),
+        vorname: normalizeText(row?.vorname),
+        geburtsdatum: formatDisplayDate(row?.geburtsdatum),
+        abgebende_schule_nr: normalizeText(row?.abgebende_schule_nr) || "-",
+        abgebende_schule_name: normalizeText(row?.abgebende_schule_name) || "-",
+        anmeldestatus: status || "-",
+        schule: isAssigned
+          ? (normalizeText(row?.koordinierte_schule_name) || normalizeText(row?.koordinierte_snr) || "-")
+          : (normalizeText(row?.anmeldeschule_name) || normalizeText(row?.anmeldeschule_snr) || "-"),
+        bemerkung: normalizeText(row?.bemerkung) || "-",
+      };
+    })
+    .filter((row) => row.interne_schueler_id > 0)
     .sort((left, right) => {
       const sourceNoCompare = String(left.abgebende_schule_nr || "").localeCompare(String(right.abgebende_schule_nr || ""), "de", { numeric: true });
       if (sourceNoCompare !== 0) return sourceNoCompare;
@@ -119,7 +132,7 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
       if (surnameCompare !== 0) return surnameCompare;
       const firstnameCompare = String(left.vorname || "").localeCompare(String(right.vorname || ""), "de", { numeric: true });
       if (firstnameCompare !== 0) return firstnameCompare;
-      return String(left.schueler_id || "").localeCompare(String(right.schueler_id || ""), "de", { numeric: true });
+      return left.interne_schueler_id - right.interne_schueler_id;
     })
     .map((row, index) => ({
       lfd_nr: index + 1,

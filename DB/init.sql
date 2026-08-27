@@ -341,7 +341,6 @@ CREATE TABLE `anm_kapazitaet` (
 CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
-  `schueler_id` varchar(50) DEFAULT NULL,
   `herkunftsschule_snr` varchar(50) DEFAULT NULL COMMENT 'SNR der Herkunftsschule / abgebende Grundschule',
   `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Wo ist der Datensatz entstanden? Wird beim ersten Import gesetzt und dann icht mehr verändert.',
   `empfehlung` varchar(50) DEFAULT NULL,
@@ -365,8 +364,7 @@ CREATE TABLE `anm_schueler` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `quell_jahrgang` varchar(10) DEFAULT NULL COMMENT 'Jahrgang an der Herkunftsschule',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_anm_schueler_verfahren_legacy_id` (`verfahren_id`,`schueler_id`),
-  KEY `idx_schueler_id` (`schueler_id`),
+  KEY `idx_anm_schueler_verfahren` (`verfahren_id`),
   KEY `idx_empfehlung` (`empfehlung`),
   KEY `idx_anm_schueler_geo` (`latitude`,`longitude`),
   KEY `idx_anm_schueler_foerder_id` (`foerder_id`),

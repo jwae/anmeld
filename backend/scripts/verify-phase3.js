@@ -12,7 +12,7 @@ const { buildSchuelerNachHerkunftsschuleReport } = require("../lib/schuelerNachH
 const { buildSchuelerRundenuebersichtReport } = require("../lib/schuelerRundenuebersichtService");
 
 const removedStudentColumns = [
-  "schueler_nr", "herkunftsschueler_nr", "runde_id", "anmeldestatus", "teilnahmestatus",
+  "schueler_id", "schueler_nr", "herkunftsschueler_nr", "runde_id", "anmeldestatus", "teilnahmestatus",
   "schul_nr", "anmeldeschule_snr", "koordinierte_snr", "koordiniert_am", "koordiniert_von", "abgleich_status",
 ];
 
@@ -42,6 +42,15 @@ async function main() {
     const actualColumns = new Set(columns.map((row) => row.Field));
     const unexpected = removedStudentColumns.filter((column) => actualColumns.has(column));
     if (unexpected.length) throw new Error(`Entfernte Spalten noch vorhanden: ${unexpected.join(", ")}`);
+
+    const [indexes] = await pool.query("SHOW INDEX FROM anm_schueler");
+    const actualIndexes = new Set(indexes.map((row) => row.Key_name));
+    const unexpectedIndexes = ["uq_anm_schueler_verfahren_legacy_id", "idx_schueler_id"]
+      .filter((indexName) => actualIndexes.has(indexName));
+    if (unexpectedIndexes.length) throw new Error(`Legacy-Indizes noch vorhanden: ${unexpectedIndexes.join(", ")}`);
+    if (!actualIndexes.has("idx_anm_schueler_verfahren")) {
+      throw new Error("Index idx_anm_schueler_verfahren fehlt.");
+    }
 
     const [contexts] = await pool.query(
       `SELECT v.id AS verfahren_id, r.id AS runde_id

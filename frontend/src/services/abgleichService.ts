@@ -45,7 +45,7 @@ export default {
     payload: {
       verfahren_id: number;
       runde_id: number;
-      schueler_id: number;
+      interne_schueler_id: number;
       fallgrund_id: number;
       bemerkung: string;
     },

@@ -195,7 +195,7 @@ function createRoundOverviewPreviewState(response: SchuelerRundenuebersichtRespo
     rows: Array.isArray(response.rows) ? response.rows : [],
     columns: [
       { key: "lfd_nr", label: "Lfd. Nr." },
-      { key: "schueler_id", label: "Schueler-ID" },
+      { key: "externe_schueler_id", label: "Externe Schueler-ID" },
       { key: "name_vorname", label: "Name, Vorname" },
       { key: "geburtsdatum", label: "Geb.-Dat." },
       { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
@@ -225,7 +225,7 @@ function createOpenStatusPreviewState(response: OffeneAnmeldungenResponse): Prev
     rows: Array.isArray(response.rows) ? response.rows : [],
     columns: [
       { key: "lfd_nr", label: "Lfd. Nr." },
-      { key: "schueler_id", label: "Schueler-ID" },
+      { key: "externe_schueler_id", label: "Externe Schueler-ID" },
       { key: "name_vorname", label: "Name, Vorname" },
       { key: "geburtsdatum", label: "Geb.-Dat." },
       { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
@@ -252,7 +252,7 @@ function createPoolOriginPreviewState(response: PoolSchuelerAktuelleRundeRespons
     rows: Array.isArray(response.rows) ? response.rows : [],
     columns: [
       { key: "lfd_nr", label: "Lfd. Nr." },
-      { key: "schueler_id", label: "Schueler-ID" },
+      { key: "externe_schueler_id", label: "Externe Schueler-ID" },
       { key: "name_vorname", label: "Name, Vorname" },
       { key: "geburtsdatum", label: "Geb.-Dat." },
       { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
@@ -611,7 +611,7 @@ watch(
               <tbody>
                 <tr
                   v-for="row in previewData?.rows || []"
-                  :key="`${previewData?.key || 'preview'}-${String(row.schueler_id || row.lfd_nr)}`"
+                  :key="`${previewData?.key || 'preview'}-${String(row.interne_schueler_id || row.externe_schueler_id || row.lfd_nr)}`"
                 >
                   <td
                     v-for="column in previewData?.columns || []"

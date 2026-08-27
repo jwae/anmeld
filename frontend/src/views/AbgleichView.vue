@@ -4,7 +4,8 @@ import abgleichService from "../services/abgleichService";
 import type { Anmeldeverfahrenstyp } from "../types";
 
 type SchuelerRow = {
-  schueler_id: number | string;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   vorname: string;
   nachname: string;
   geburtsdatum: string | null;
@@ -17,7 +18,6 @@ type SchuelerRow = {
   quell_schule?: string;
   schule: string;
   schulnummer: string;
-  schueler_schul_id: string;
   abgleich_status: string;
   anmeldestatus: string;
   strasse?: string;
@@ -276,7 +276,7 @@ function openEditDialog(row: SchuelerRow) {
   if (props.isReadonly) return;
   selectedEditRow.value = row;
   editForm.value = {
-    schueler_schul_id: normalizeText(row.schueler_schul_id),
+    externe_schueler_id: normalizeText(row.externe_schueler_id),
     vorname: normalizeText(row.vorname),
     nachname: normalizeText(row.nachname),
     geburtsdatum: normalizeText(row.geburtsdatum),
@@ -316,7 +316,7 @@ function closeDeleteDialog(force = false) {
 
 async function deleteSelectedStudent() {
   if (props.isReadonly || !selectedEditRow.value) return;
-  const rowId = Number(selectedEditRow.value.schueler_id || 0);
+  const rowId = Number(selectedEditRow.value.interne_schueler_id || 0);
   if (!rowId) {
     errorMessage.value = "Der Schuelerdatensatz konnte nicht geloescht werden: ID fehlt.";
     return;
@@ -347,7 +347,7 @@ async function saveEditDialog() {
     errorMessage.value = "";
     successMessage.value = "";
     const response = await abgleichService.updateSchueler(
-      Number(selectedEditRow.value.schueler_id || 0),
+      Number(selectedEditRow.value.interne_schueler_id || 0),
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
@@ -438,9 +438,9 @@ const sortedRows = computed(() => {
 });
 
 function currentEditRowIndex() {
-  const rowId = Number(selectedEditRow.value?.schueler_id || 0);
+  const rowId = Number(selectedEditRow.value?.interne_schueler_id || 0);
   if (!rowId) return -1;
-  return sortedRows.value.findIndex((row) => Number(row.schueler_id) === rowId);
+  return sortedRows.value.findIndex((row) => Number(row.interne_schueler_id) === rowId);
 }
 
 const canEditPreviousRow = computed(() => currentEditRowIndex() > 0);
@@ -576,7 +576,7 @@ async function submitOpenCase() {
     const response = await abgleichService.createOffenerFall({
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
-      schueler_id: Number(selectedCaseRow.value.schueler_id || 0),
+      interne_schueler_id: Number(selectedCaseRow.value.interne_schueler_id || 0),
       fallgrund_id: Number(caseFallgrundId.value || 0),
       bemerkung: caseBemerkung.value || "",
     }, props.token);
@@ -689,7 +689,7 @@ function toggleSchuleFilter(schuleName: string) {
             
             <h3>Schulen mit Anmeldungen</h3>
           </div>
-          <span class="table-count">{{ schoolOverview.length }} Schulen | Datenquelle: anm_schueler</span>
+          <span class="table-count">{{ schoolOverview.length }} Schulen | Datenquelle: Schüler und Rundendaten</span>
         </div>
         <div class="table-wrap">
           <table class="overview-table">
@@ -827,7 +827,7 @@ function toggleSchuleFilter(schuleName: string) {
             <thead>
               <tr>
                 <th>Nr.</th>
-                <th><button type="button" @click="setSort('schueler_schul_id')">Schueler-ID{{ sortMarker('schueler_schul_id') }}</button></th>
+                <th><button type="button" @click="setSort('externe_schueler_id')">Externe Schueler-ID{{ sortMarker('externe_schueler_id') }}</button></th>
                 <th>Bearb.</th>
                 <th>Fall</th>
                 <th><button type="button" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
@@ -849,9 +849,9 @@ function toggleSchuleFilter(schuleName: string) {
               <tr v-else-if="!sortedRows.length">
                 <td :colspan="isSek1Procedure ? 14 : 13" class="table-empty">Keine Schueler fuer die aktuellen Filter gefunden.</td>
               </tr>
-              <tr v-for="(row, index) in sortedRows" :key="`${row.schueler_id}-${row.schueler_schul_id}-${row.schulnummer}-${index}`">
+              <tr v-for="(row, index) in sortedRows" :key="`${row.interne_schueler_id}-${row.schulnummer}-${index}`">
                 <td>{{ index + 1 }}</td>
-                <td>{{ row.schueler_schul_id || "-" }}</td>
+                <td>{{ row.externe_schueler_id || "-" }}</td>
                 <td class="case-action-cell">
                   <button
                     type="button"
@@ -1013,8 +1013,8 @@ function toggleSchuleFilter(schuleName: string) {
             <section class="edit-form-section" aria-labelledby="edit-student-data-title">
               <div class="edit-form-grid">
                 <label>
-                  <span>Schueler-ID</span>
-                  <input v-model="editForm.schueler_schul_id" type="text" />
+                  <span>Externe Schueler-ID</span>
+                  <input v-model="editForm.externe_schueler_id" type="text" disabled title="Externe IDs werden über die Identitäts- und Importlogik verwaltet." />
                 </label>
                 <div class="edit-birthdate-field">
                   <label>

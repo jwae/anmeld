@@ -6,14 +6,12 @@ type OpenCaseRow = {
   fall_id: number;
   verfahren_id: number;
   fallstatus_id: number;
-  schueler_row_id: number;
-  schueler_pool_id: number;
-  schueler_anmeldung_id: number;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   runde_id: number;
   vorname: string;
   nachname: string;
   geburtsdatum: string;
-  schueler_ident: string;
   aktuelle_snr: string;
   aktuelle_schule: string;
   erwartete_snr: string;
@@ -108,7 +106,7 @@ const filteredRows = computed(() => {
     const searchable = [
       row.nachname,
       row.vorname,
-      row.schueler_ident,
+      row.externe_schueler_id || String(row.interne_schueler_id || ""),
       row.aktuelle_snr,
       row.aktuelle_schule,
       row.erwartete_snr,
@@ -344,7 +342,7 @@ watch(
             <tr>
               <th>Nr.</th>
               <th>Fall</th>
-              <th><button type="button" class="table-sort-btn" @click="setSort('schueler_ident')">Schueler-ID{{ sortMarker('schueler_ident') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setSort('externe_schueler_id')">Externe Schueler-ID{{ sortMarker('externe_schueler_id') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('aktuelle_snr')">Aktuelle Schule{{ sortMarker('aktuelle_snr') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('fallgrund')">Fallgrund{{ sortMarker('fallgrund') }}</button></th>
@@ -365,7 +363,7 @@ watch(
               <tr class="open-case-row">
                 <td>{{ index + 1 }}</td>
                 <td>#{{ row.fall_id }}</td>
-                <td>{{ row.schueler_ident || "-" }}</td>
+                <td>{{ row.externe_schueler_id || "-" }}</td>
                 <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
                 <td>
                   {{ row.aktuelle_snr || "-" }}

@@ -29,9 +29,12 @@ function formatTimestampDate(value) {
   return `${day}.${month}.${year}`;
 }
 
-function buildRoundValues(status, schoolName, schoolSnr) {
+function buildRoundValues(status, registeredSchoolName, registeredSchoolSnr, coordinatedSchoolName, coordinatedSchoolSnr) {
   const statusText = normalizeText(status) || "-";
-  const schoolText = normalizeText(schoolName) || normalizeText(schoolSnr) || "-";
+  const isAssigned = ["zuordnung", "zugeordnet"].includes(statusText.toLowerCase());
+  const schoolText = isAssigned
+    ? (normalizeText(coordinatedSchoolName) || normalizeText(coordinatedSchoolSnr) || "-")
+    : (normalizeText(registeredSchoolName) || normalizeText(registeredSchoolSnr) || "-");
   return {
     status: statusText,
     schule: schoolText,
@@ -62,41 +65,36 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     };
   }
 
-  const filters = [];
-  const params = [];
-  if (studentColumns.has("verfahren_id")) {
-    filters.push("s.verfahren_id = ?");
-    params.push(verfahrenId);
-  }
-  if (!filters.length) {
+  if (!studentColumns.has("verfahren_id")) {
     const error = new Error("Die Tabelle anm_schueler enthaelt keine verfahren_id-Spalte.");
     error.statusCode = 500;
     throw error;
   }
+  const filters = ["sr.verfahren_id = ?"];
+  const params = [verfahrenId];
 
   const [studentRows] = await pool.query(
     `
     SELECT
-      COALESCE(s.id, 0) AS row_id,
-      COALESCE(
-        (
-          SELECT NULLIF(TRIM(x.externe_id), '')
-          FROM anm_schueler_externe_id x
-          WHERE x.schueler_id = s.id
-          ORDER BY CASE WHEN x.herkunft_art = 'SCHULE' THEN 0 ELSE 1 END, x.id
-          LIMIT 1
-        ),
-        NULLIF(TRIM(s.schueler_id), ''),
-        CAST(s.id AS CHAR)
-      ) AS schueler_ident,
+      COALESCE(s.id, 0) AS interne_schueler_id,
+      (
+        SELECT CASE
+          WHEN COUNT(DISTINCT NULLIF(TRIM(x.externe_id), '')) = 1
+          THEN MIN(NULLIF(TRIM(x.externe_id), ''))
+          ELSE NULL
+        END
+        FROM anm_schueler_externe_id x
+        WHERE x.schueler_id = s.id
+      ) AS externe_schueler_id,
       COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
       COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
       COALESCE(NULLIF(TRIM(s.herkunftsschule_snr), ''), '') AS herkunftsschule_snr,
       COALESCE(NULLIF(TRIM(src.name), ''), '') AS quell_schule_name,
       COALESCE(NULLIF(TRIM(sr.schul_nr), ''), '') AS anmeldeschule_snr,
+      COALESCE(NULLIF(TRIM(reg.name), ''), '') AS anmeldeschule_name,
       COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), '') AS zugewiesene_schule_snr,
-      COALESCE(NULLIF(TRIM(dst.name), ''), '') AS schul_name,
+      COALESCE(NULLIF(TRIM(coord.name), ''), '') AS zugewiesene_schule_name,
       COALESCE(NULLIF(TRIM(sr.anmeldestatus), ''), '') AS anmeldestatus,
       COALESCE(sr.runde_id, 0) AS runde_id,
       COALESCE(r.runden_nummer, 0) AS runden_nummer
@@ -108,8 +106,10 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
       ON r.id = sr.runde_id
     LEFT JOIN anm_schulen src
       ON src.snr = NULLIF(TRIM(s.herkunftsschule_snr), '')
-    LEFT JOIN anm_schulen dst
-      ON dst.snr = COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))
+    LEFT JOIN anm_schulen reg
+      ON reg.snr = NULLIF(TRIM(sr.schul_nr), '')
+    LEFT JOIN anm_schulen coord
+      ON coord.snr = NULLIF(TRIM(sr.koordinierte_snr), '')
     WHERE ${filters.join(" AND ")}
     ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, COALESCE(s.id, 0) ASC, COALESCE(r.runden_nummer, 0) ASC
     `,
@@ -118,12 +118,13 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
 
   const grouped = new Map();
   for (const row of studentRows || []) {
-    const studentKey = String(Number(row?.row_id || 0));
+    const studentKey = String(Number(row?.interne_schueler_id || 0));
     if (!studentKey) continue;
 
     const currentRoundNumber = Number(row?.runden_nummer || 0);
     const entry = grouped.get(studentKey) || {
-      schueler_id: normalizeText(row?.schueler_ident) || studentKey,
+      interne_schueler_id: Number(row?.interne_schueler_id || 0),
+      externe_schueler_id: normalizeText(row?.externe_schueler_id),
       nachname: normalizeText(row?.nachname),
       vorname: normalizeText(row?.vorname),
       geburtsdatum: row?.geburtsdatum || "",
@@ -134,7 +135,7 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
         2: { status: "-", schule: "-" },
         3: { status: "-", schule: "-" },
       },
-      first_row_id: Number(row?.row_id || 0),
+      first_interne_schueler_id: Number(row?.interne_schueler_id || 0),
     };
 
     if (!entry.nachname) entry.nachname = normalizeText(row?.nachname);
@@ -142,13 +143,15 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
     if (!entry.geburtsdatum) entry.geburtsdatum = row?.geburtsdatum || "";
     if (!entry.abgebende_schule_nr) entry.abgebende_schule_nr = normalizeText(row?.herkunftsschule_snr);
     if (!entry.abgebende_schule_name) entry.abgebende_schule_name = normalizeText(row?.quell_schule_name);
-    if (!entry.first_row_id) entry.first_row_id = Number(row?.row_id || 0);
+    if (!entry.first_interne_schueler_id) entry.first_interne_schueler_id = Number(row?.interne_schueler_id || 0);
 
     if (currentRoundNumber >= 1 && currentRoundNumber <= 3) {
       entry.round_values[currentRoundNumber] = buildRoundValues(
         row?.anmeldestatus,
-        row?.schul_name,
-        row?.zugewiesene_schule_snr || row?.anmeldeschule_snr,
+        row?.anmeldeschule_name,
+        row?.anmeldeschule_snr,
+        row?.zugewiesene_schule_name,
+        row?.zugewiesene_schule_snr,
       );
     }
 
@@ -161,11 +164,12 @@ async function buildSchuelerRundenuebersichtReport(pool, verfahrenId) {
       if (surnameCompare !== 0) return surnameCompare;
       const firstnameCompare = String(left.vorname || "").localeCompare(String(right.vorname || ""), "de", { numeric: true });
       if (firstnameCompare !== 0) return firstnameCompare;
-      return String(left.schueler_id || "").localeCompare(String(right.schueler_id || ""), "de", { numeric: true });
+      return left.interne_schueler_id - right.interne_schueler_id;
     })
     .map((entry, index) => ({
       lfd_nr: index + 1,
-      schueler_id: entry.schueler_id,
+      interne_schueler_id: entry.interne_schueler_id,
+      externe_schueler_id: entry.externe_schueler_id,
       name_vorname: [entry.nachname, entry.vorname].filter(Boolean).join(", ") || "-",
       geburtsdatum: formatDisplayDate(entry.geburtsdatum),
       abgebende_schule_nr: entry.abgebende_schule_nr || "-",
@@ -206,7 +210,7 @@ function buildSchuelerRundenuebersichtCsv(report) {
     header,
     ...report.rows.map((row) => ([
       row.lfd_nr,
-      row.schueler_id,
+      row.externe_schueler_id || row.interne_schueler_id,
       row.name_vorname,
       row.geburtsdatum,
       row.abgebende_schule_nr,
@@ -241,7 +245,7 @@ function buildSchuelerRundenuebersichtPdfLines(report) {
     lines.push(
       [
         row.lfd_nr,
-        row.schueler_id,
+        row.externe_schueler_id || row.interne_schueler_id,
         row.name_vorname,
         row.geburtsdatum,
         `${row.abgebende_schule_nr} ${row.abgebende_schule_name}`.trim(),

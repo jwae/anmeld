@@ -5,8 +5,8 @@ import CsvImportOverlay from "./CsvImportOverlay.vue";
 import type { Anmeldeverfahrenstyp } from "../types";
 
 type PoolSchuelerRow = {
-  schueler_id: number;
-  schueler_schul_id: string;
+  interne_schueler_id: number;
+  externe_schueler_id: string;
   vorname: string;
   nachname: string;
   geburtsdatum: string | null;
@@ -16,7 +16,6 @@ type PoolSchuelerRow = {
   zieldifferent: string;
   ef: string;
   herkunftsschule_snr: string;
-  herkunftsschueler_nr?: string;
   herkunft?: string;
   abgleich_status: string;
   anmeldestatus: string;
@@ -30,7 +29,7 @@ type PoolSchuelerRow = {
 };
 
 type PoolSortKey =
-  | "schueler_schul_id"
+  | "externe_schueler_id"
   | "nachname"
   | "vorname"
   | "von"
@@ -69,7 +68,7 @@ const editPoolForm = ref<Record<string, string | number | null>>({});
 const pendingDeletePoolRow = ref<PoolSchuelerRow | null>(null);
 const showDuplicateConflictsOverlay = ref(false);
 const duplicateConflicts = ref<Array<{
-  schueler_id: string;
+  externe_schueler_id: string;
   nachname: string;
   vorname: string;
   anmeldeschule_snr: string;
@@ -152,7 +151,7 @@ const filteredPoolSchuelerRows = computed(() => {
   const searchText = normalizeText(poolSearch.value).toLowerCase();
   return poolSchuelerRows.value.filter((row) => {
     const fullName = `${normalizeText(row.nachname)} ${normalizeText(row.vorname)}`.toLowerCase();
-    const schoolId = normalizeText(row.schueler_schul_id).toLowerCase();
+    const schoolId = normalizeText(row.externe_schueler_id).toLowerCase();
     const sourceSchoolNo = normalizeText(row.herkunftsschule_snr).toLowerCase();
     const schoolName = normalizeText(row.schule).toLowerCase();
     if (
@@ -194,7 +193,7 @@ const duplicatePoolChildKeys = computed(() => {
 const duplicatePoolStudentIds = computed(() => {
   const counts = new Map<string, number>();
   for (const row of filteredPoolSchuelerRows.value) {
-    const id = normalizeText(row.schueler_id);
+    const id = normalizeText(row.externe_schueler_id);
     if (!id) continue;
     counts.set(id, Number(counts.get(id) || 0) + 1);
   }
@@ -326,7 +325,7 @@ function isDuplicatePoolChild(row: PoolSchuelerRow) {
   const hasDuplicateIdentity = key
     ? Number(duplicatePoolChildKeys.value.get(key) || 0) > 1
     : false;
-  const studentId = normalizeText(row.schueler_id);
+  const studentId = normalizeText(row.externe_schueler_id);
   const hasDuplicateStudentId = studentId
     ? Number(duplicatePoolStudentIds.value.get(studentId) || 0) > 1
     : false;
@@ -422,7 +421,7 @@ async function importJg4ausSchild() {
     showSchildDiagnosticsOverlay.value = schildDiagnostics.value.length > 0;
     showDuplicateConflictsOverlay.value = duplicateConflicts.value.length > 0;
     if (duplicateConflicts.value.length > 0) {
-      errorMessage.value = `${duplicateConflicts.value.length} doppelte schueler_id${duplicateConflicts.value.length === 1 ? "" : "s"} wurden uebersprungen. Details im Hinweisfenster.`;
+      errorMessage.value = `${duplicateConflicts.value.length} doppelte externe Schueler-ID${duplicateConflicts.value.length === 1 ? "" : "s"} wurden uebersprungen. Details im Hinweisfenster.`;
     }
     successMessage.value = "Pooldaten aus Schild wurden importiert.";
     await loadPoolSchueler();
@@ -463,9 +462,7 @@ function handleEditPoolRow(row: PoolSchuelerRow) {
 
 function applyEditPoolRow(row: PoolSchuelerRow) {
   editPoolForm.value = {
-    id: row.schueler_id,
-    schueler_id: row.schueler_schul_id,
-    herkunftsschueler_nr: row.herkunftsschueler_nr || row.schueler_schul_id,
+    id: row.interne_schueler_id,
     vorname: row.vorname || "",
     nachname: row.nachname || "",
     geburtsdatum: row.geburtsdatum || "",
@@ -489,7 +486,7 @@ function applyEditPoolRow(row: PoolSchuelerRow) {
 function currentEditPoolIndex() {
   const currentId = Number(editPoolForm.value.id || 0);
   if (!currentId) return -1;
-  return sortedPoolSchuelerRows.value.findIndex((row) => Number(row.schueler_id) === currentId);
+  return sortedPoolSchuelerRows.value.findIndex((row) => Number(row.interne_schueler_id) === currentId);
 }
 
 const canEditPreviousPoolRow = computed(() => currentEditPoolIndex() > 0);
@@ -536,7 +533,7 @@ async function confirmDeletePoolRow() {
   if (props.isReadonly) return;
   const row = pendingDeletePoolRow.value;
   if (!row) return;
-  const rowId = Number(row.schueler_id || 0);
+  const rowId = Number(row.interne_schueler_id || 0);
   if (!rowId) {
     errorMessage.value = "Der Datensatz konnte nicht geloescht werden: ID fehlt.";
     return;
@@ -751,7 +748,7 @@ onUnmounted(() => {
           <thead>
             <tr>
               <th>Nr.</th>
-              <th><button type="button" class="table-sort-btn" @click="setPoolSort('schueler_schul_id')">Schueler-ID{{ poolSortMarker('schueler_schul_id') }}</button></th>
+              <th><button type="button" class="table-sort-btn" @click="setPoolSort('externe_schueler_id')">Externe Schueler-ID{{ poolSortMarker('externe_schueler_id') }}</button></th>
               <th class="detail-edit-head">Bearb.</th>
               <th><button type="button" class="table-sort-btn" @click="setPoolSort('nachname')">Name + Vorname{{ poolSortMarker('nachname') }}</button></th>
               <th v-if="isSek1Procedure"><button type="button" class="table-sort-btn" @click="setPoolSort('von')">Von{{ poolSortMarker('von') }}</button></th>
@@ -774,11 +771,11 @@ onUnmounted(() => {
             </tr>
             <tr
               v-for="(row, index) in sortedPoolSchuelerRows"
-              :key="`${row.schueler_id}-${row.schueler_schul_id}-${index}`"
+              :key="`${row.interne_schueler_id}-${index}`"
               :class="{ 'is-duplicate-child': isDuplicatePoolChild(row) }"
             >
               <td>{{ index + 1 }}</td>
-              <td>{{ row.schueler_schul_id || "-" }}</td>
+              <td>{{ row.externe_schueler_id || "-" }}</td>
               <td class="detail-edit-cell">
                 <button
                   class="btn-secondary pool-icon-btn"
@@ -925,15 +922,7 @@ onUnmounted(() => {
         </div>
         <div class="pool-edit-overlay-body">
           <div class="pool-edit-form-grid">
-          <label>
-            <span>Schueler-ID</span>
-            <input v-model="editPoolForm.schueler_id" type="text" />
-          </label>
           <div class="pool-edit-delete-field">
-            <label>
-              <span>Quell-Schueler-Nr</span>
-              <input v-model="editPoolForm.herkunftsschueler_nr" type="text" />
-            </label>
             <button
               type="button"
               class="pool-edit-inline-delete-button"
@@ -1067,7 +1056,7 @@ onUnmounted(() => {
         <div class="pool-delete-summary">
           <strong>{{ [pendingDeletePoolRow?.nachname, pendingDeletePoolRow?.vorname].filter(Boolean).join(", ") || "-" }}</strong>
           <span>
-            ID {{ pendingDeletePoolRow?.schueler_schul_id || "-" }}
+            ID {{ pendingDeletePoolRow?.externe_schueler_id || "-" }}
             <template v-if="pendingDeletePoolRow?.herkunftsschule_snr"> | Quell-SNR {{ pendingDeletePoolRow?.herkunftsschule_snr }}</template>
           </span>
         </div>
@@ -1100,10 +1089,10 @@ onUnmounted(() => {
           <div class="pool-import-updates-list">
             <div
               v-for="(entry, index) in duplicateConflicts"
-              :key="`${entry.schueler_id}-${entry.anmeldeschule_snr}-${entry.nachname}-${entry.vorname}`"
+              :key="`${entry.externe_schueler_id}-${entry.anmeldeschule_snr}-${entry.nachname}-${entry.vorname}`"
               class="pool-import-updates-item"
             >
-              {{ index + 1 }}. {{ entry.schueler_id }} | {{ entry.nachname }} | {{ entry.vorname }} | {{ entry.anmeldeschule_snr }} | {{ entry.schulname || "-" }}
+              {{ index + 1 }}. {{ entry.externe_schueler_id }} | {{ entry.nachname }} | {{ entry.vorname }} | {{ entry.anmeldeschule_snr }} | {{ entry.schulname || "-" }}
             </div>
           </div>
         </div>

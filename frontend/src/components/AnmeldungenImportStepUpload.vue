@@ -50,7 +50,7 @@ function handlePickClick() {
 
 function downloadAnmeldungenExample() {
   const csv = [
-    "schul_nr;schueler_id;vorname;nachname;geburtsdatum;foerderbedarf;zieldifferent;anmeldestatus",
+    "schul_nr;externe_schueler_id;vorname;nachname;geburtsdatum;foerderbedarf;zieldifferent;anmeldestatus",
     "123456;100001;Max;Mustermann;14.03.2012;0;0;Neuaufnahme",
     "234567;100002;Erika;Musterfrau;22.07.2012;1;0;Warteliste",
   ].join("\r\n");
@@ -161,7 +161,7 @@ function downloadAnmeldungenExample() {
                   <td>Schulnummer der Aufnahmeschule im aktuellen Verfahren.</td>
                 </tr>
                 <tr>
-                  <td><code>schueler_id</code></td>
+                  <td><code>externe_schueler_id</code></td>
                   <td>Nein</td>
                   <td>Eindeutige, dauerhaft gleichbleibende Schüler-ID.</td>
                 </tr>
@@ -216,7 +216,7 @@ function downloadAnmeldungenExample() {
               Musterdatei herunterladen
             </button>
           </div>
-          <pre class="help-code"><code>schul_nr;schueler_id;vorname;nachname;geburtsdatum;foerderbedarf;zieldifferent;anmeldestatus
+          <pre class="help-code"><code>schul_nr;externe_schueler_id;vorname;nachname;geburtsdatum;foerderbedarf;zieldifferent;anmeldestatus
 123456;100001;Max;Mustermann;14.03.2012;0;0;Neuaufnahme</code></pre>
         </section>
 
@@ -246,8 +246,8 @@ function downloadAnmeldungenExample() {
             <div>
               <strong>Abgleich mit dem Schülerpool</strong>
               <p>
-                Vorhandene Kinder werden innerhalb des aktuellen Verfahrens und der aktuellen Runde anhand
-                der <code>schueler_id</code> erkannt. Ein Treffer ergänzt die vorhandenen Pooldaten um die
+                Die Importspalte <code>externe_schueler_id</code> enthält die externe Schüler-ID. Vorhandene Kinder
+                werden innerhalb des aktuellen Verfahrens über diese ID und die bestehenden Identitätsregeln erkannt. Ein Treffer ergänzt die vorhandenen Pooldaten um die
                 Anmeldung. Ohne Treffer wird ein Datensatz mit dem Abgleichstatus „Nur Anmeldung“ angelegt.
                 Jede Schüler-ID darf in der Importdatei nur einmal vorkommen.
               </p>

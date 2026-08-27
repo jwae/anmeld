@@ -222,7 +222,6 @@ async function loadFallstatusOptions(pool) {
 
 async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
   const offeneFallColumns = await loadTableColumns(pool, "anm_offener_fall");
-  const schuelerColumns = await loadTableColumns(pool, "anm_schueler");
   if (!offeneFallColumns.size) return [];
   const erwarteteSnrExpr = `(
     SELECT prev_sr.schul_nr
@@ -242,15 +241,13 @@ async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
       COALESCE(f.id, 0) AS fall_id,
       COALESCE(f.verfahren_id, 0) AS verfahren_id,
       COALESCE(f.fallstatus_id, 0) AS fallstatus_id,
-      ${offeneFallColumns.has("schueler_id") ? "COALESCE(f.schueler_id, 0)" : "0"} AS schueler_row_id,
-      COALESCE(f.schueler_pool_id, 0) AS schueler_pool_id,
-      COALESCE(f.schueler_anmeldung_id, 0) AS schueler_anmeldung_id,
-      COALESCE(sa.runde_id, sr.runde_id, 0) AS runde_id,
-      COALESCE(NULLIF(TRIM(s.vorname), ''), NULLIF(TRIM(sp.vorname), ''), NULLIF(TRIM(sa.vorname), ''), '') AS vorname,
-      COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') AS nachname,
-      DATE_FORMAT(COALESCE(s.geburtsdatum, sp.geburtsdatum, sa.geburtsdatum), '%Y-%m-%d') AS geburtsdatum,
-      COALESCE(NULLIF(TRIM(x.externe_id), ''), NULLIF(TRIM(s.schueler_id), ''), NULLIF(TRIM(sa.schueler_schul_id), ''), NULLIF(TRIM(sp.id), ''), '') AS schueler_ident,
-      COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''), NULLIF(TRIM(sa.snr), ''), '') AS aktuelle_snr,
+      COALESCE(f.schueler_id, 0) AS interne_schueler_id,
+      COALESCE(sr.runde_id, 0) AS runde_id,
+      COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
+      COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
+      DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+      COALESCE(NULLIF(TRIM(x.externe_id), ''), '') AS externe_schueler_id,
+      COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''), '') AS aktuelle_snr,
       COALESCE(NULLIF(TRIM(curr.name), ''), '') AS aktuelle_schule,
       COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''), '') AS erwartete_snr,
       COALESCE(NULLIF(TRIM(expected.name), ''), '') AS erwartete_schule,
@@ -262,37 +259,32 @@ async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
       COALESCE(NULLIF(TRIM(f.bemerkung), ''), '') AS bemerkung,
       DATE_FORMAT(f.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
       DATE_FORMAT(f.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at,
-      CASE
-        ${offeneFallColumns.has("schueler_id") ? "WHEN f.schueler_id IS NOT NULL THEN 'anm_schueler'" : ""}
-        ${offeneFallColumns.has("schueler_id") ? " " : ""}WHEN f.schueler_pool_id IS NOT NULL THEN 'anm_schueler_pool'
-        WHEN f.schueler_anmeldung_id IS NOT NULL THEN 'anm_schueler_anmeldung'
-        ELSE 'unbekannt'
-      END AS quelle
+      'anm_schueler' AS quelle
     FROM anm_offener_fall f
-    LEFT JOIN anm_schueler s
-      ON ${offeneFallColumns.has("schueler_id") ? "s.id = f.schueler_id" : "1 = 0"}
-    LEFT JOIN anm_schueler_runde sr
+    JOIN anm_schueler s
+      ON s.id = f.schueler_id
+    JOIN anm_schueler_runde sr
       ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id AND sr.runde_id = ?
-    LEFT JOIN anm_schueler_externe_id x ON x.id = (
-      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
-    )
-    LEFT JOIN anm_schueler_pool sp
-      ON sp.id = f.schueler_pool_id
-    LEFT JOIN anm_schueler_anmeldung sa
-      ON sa.id = f.schueler_anmeldung_id
+    LEFT JOIN (
+      SELECT schueler_id, MIN(NULLIF(TRIM(externe_id), '')) AS externe_id
+      FROM anm_schueler_externe_id
+      WHERE NULLIF(TRIM(externe_id), '') IS NOT NULL
+      GROUP BY schueler_id
+      HAVING COUNT(DISTINCT NULLIF(TRIM(externe_id), '')) = 1
+    ) x ON x.schueler_id = s.id
     LEFT JOIN anm_kat_fallgrund fg
       ON fg.id = f.fallgrund_id
     LEFT JOIN anm_kat_fallstatus fs
       ON fs.id = f.fallstatus_id
     LEFT JOIN anm_schulen curr
-      ON curr.snr = COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''), NULLIF(TRIM(sa.snr), ''))
+      ON curr.snr = COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))
     LEFT JOIN anm_schulen expected
       ON expected.snr = COALESCE(NULLIF(TRIM(${erwarteteSnrExpr}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''))
     LEFT JOIN anm_schulen assign
       ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
-      AND COALESCE(sa.runde_id, sr.runde_id, 0) = ?
-    ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), NULLIF(TRIM(sp.nachname), ''), NULLIF(TRIM(sa.nachname), ''), '') ASC
+      AND sr.runde_id = ?
+    ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), '') ASC
     `,
     [rundeId, verfahrenId, rundeId],
   );
@@ -301,14 +293,12 @@ async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
     fall_id: Number(row?.fall_id || 0),
     verfahren_id: Number(row?.verfahren_id || 0),
     fallstatus_id: Number(row?.fallstatus_id || 0),
-    schueler_row_id: Number(row?.schueler_row_id || 0),
-    schueler_pool_id: Number(row?.schueler_pool_id || 0),
-    schueler_anmeldung_id: Number(row?.schueler_anmeldung_id || 0),
+    interne_schueler_id: Number(row?.interne_schueler_id || 0),
+    externe_schueler_id: normalizeText(row?.externe_schueler_id),
     runde_id: Number(row?.runde_id || 0),
     vorname: normalizeText(row?.vorname),
     nachname: normalizeText(row?.nachname),
     geburtsdatum: normalizeText(row?.geburtsdatum),
-    schueler_ident: normalizeText(row?.schueler_ident),
     aktuelle_snr: normalizeText(row?.aktuelle_snr),
     aktuelle_schule: normalizeText(row?.aktuelle_schule),
     erwartete_snr: normalizeText(row?.erwartete_snr),
@@ -463,7 +453,7 @@ async function fetchOrsDistancesKm(selectedSchool, students) {
     const firstRow = Array.isArray(matrix?.[0]) ? matrix[0] : [];
     const distances = new Map();
     routableStudents.forEach((student, index) => {
-      distances.set(student.row_id, formatDistanceKm(firstRow[index]));
+      distances.set(student.interne_schueler_id, formatDistanceKm(firstRow[index]));
     });
     return { distances, mode };
   }
@@ -634,7 +624,7 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const columns = await loadTableColumns(pool, "anm_schueler");
   if (!columns.size) return { rows: [], distanceMode: "" };
 
-  const studentIdColumn = "COALESCE(x.externe_id, s.schueler_id, '')";
+  const studentIdColumn = "COALESCE(x.externe_id, '')";
   const latitudeColumn = columns.has("latitude") ? "s.latitude" : "NULL";
   const longitudeColumn = columns.has("longitude") ? "s.longitude" : "NULL";
   const recommendationColumn = columns.has("empfehlung") ? "s.empfehlung" : "''";
@@ -648,8 +638,8 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const [rows] = await pool.query(
     `
     SELECT
-      COALESCE(s.id, 0) AS row_id,
-      COALESCE(${studentIdColumn}, '') AS schueler_id,
+      COALESCE(s.id, 0) AS interne_schueler_id,
+      COALESCE(${studentIdColumn}, '') AS externe_schueler_id,
       COALESCE(s.vorname, '') AS vorname,
       COALESCE(s.nachname, '') AS nachname,
       COALESCE(${recommendationColumn}, '') AS empfehlung,
@@ -665,9 +655,13 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
       ${longitudeColumn} AS longitude
     FROM anm_schueler s
     JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
-    LEFT JOIN anm_schueler_externe_id x ON x.id = (
-      SELECT MIN(x2.id) FROM anm_schueler_externe_id x2 WHERE x2.schueler_id = s.id
-    )
+    LEFT JOIN (
+      SELECT schueler_id, MIN(NULLIF(TRIM(externe_id), '')) AS externe_id
+      FROM anm_schueler_externe_id
+      WHERE NULLIF(TRIM(externe_id), '') IS NOT NULL
+      GROUP BY schueler_id
+      HAVING COUNT(DISTINCT NULLIF(TRIM(externe_id), '')) = 1
+    ) x ON x.schueler_id = s.id
     LEFT JOIN anm_schulen koord
       ON koord.snr = ${coordinatedSchoolColumn || "NULL"}
     WHERE ${filters.join(" AND ")}
@@ -677,8 +671,8 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   );
 
   const baseRows = (rows || []).map((row) => ({
-    row_id: Number(row?.row_id || 0),
-    schueler_id: normalizeText(row?.schueler_id),
+    interne_schueler_id: Number(row?.interne_schueler_id || 0),
+    externe_schueler_id: normalizeText(row?.externe_schueler_id),
     vorname: normalizeText(row?.vorname),
     nachname: normalizeText(row?.nachname),
     empfehlung: normalizeText(row?.empfehlung),
@@ -703,7 +697,7 @@ async function loadStudentRows(pool, verfahrenId, rundeId, selectedSchool) {
   const distanceMode = mode || "luftlinie";
 
   const rowsWithDistance = baseRows.map((row) => {
-    const orsDistance = orsDistances.get(row.row_id);
+    const orsDistance = orsDistances.get(row.interne_schueler_id);
     const luftlinie = calculateHaversineKm(
       selectedSchool.latitude,
       selectedSchool.longitude,
@@ -738,20 +732,6 @@ function buildCoordinatorName(req) {
     || normalizeText(req.user?.username)
     || normalizeText(req.user?.email)
     || "System";
-}
-
-function buildAssignedSchoolExpr(alias, columns) {
-  const assignedColumn = columns.has("zugewiesene_schule_snr")
-    ? `NULLIF(TRIM(${alias}.zugewiesene_schule_snr), '')`
-    : "NULL";
-  const manualFallbackColumn = columns.has("koordinierte_snr")
-    ? `NULLIF(TRIM(${alias}.koordinierte_snr), '')`
-    : "NULL";
-  const registrationColumn = columns.has("anmeldeschule_snr")
-    ? `NULLIF(TRIM(${alias}.anmeldeschule_snr), '')`
-    : (columns.has("snr") ? `NULLIF(TRIM(${alias}.snr), '')` : "NULL");
-
-  return `COALESCE(${assignedColumn}, ${manualFallbackColumn}, ${registrationColumn})`;
 }
 
 function createKoordinationController({ getPool }) {
@@ -794,7 +774,7 @@ function createKoordinationController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         const rowIds = Array.from(
           new Set(
-            (Array.isArray(req.body?.row_ids) ? req.body.row_ids : [])
+            (Array.isArray(req.body?.interne_schueler_ids) ? req.body.interne_schueler_ids : [])
               .map((value) => Number(value || 0))
               .filter((value) => Number.isInteger(value) && value > 0),
           ),
@@ -917,7 +897,9 @@ function createKoordinationController({ getPool }) {
         const rundeId = Number(req.body?.runde_id || 0);
         const rowIds = Array.from(
           new Set(
-            (Array.isArray(req.body?.row_ids) ? req.body.row_ids : [req.body?.row_id])
+            (Array.isArray(req.body?.interne_schueler_ids)
+              ? req.body.interne_schueler_ids
+              : [])
               .map((value) => Number(value || 0))
               .filter((value) => Number.isInteger(value) && value > 0),
           ),
@@ -927,7 +909,7 @@ function createKoordinationController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
         await assertWritableContext(getPool(), verfahrenId, rundeId);
-        if (!rowIds.length) return sendError(res, 400, "row_ids ist erforderlich.");
+        if (!rowIds.length) return sendError(res, 400, "interne_schueler_ids ist erforderlich.");
         if (!schulNr) return sendError(res, 400, "zugewiesene_schule_snr ist erforderlich.");
 
         const pool = getPool();
