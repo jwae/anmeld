@@ -3,12 +3,16 @@ const { pathToFileURL } = require("node:url");
 
 const { assertWritableContext, assertStudentWritable } = require("../lib/anmeldeWriteGuard");
 const { normalizeImportRecommendation, importRecommendationDiffers } = require("../lib/importRecommendation");
+const { buildStammdatenabweichungNote } = require("../lib/importCaseNote");
 const {
   findStudentByExternalId,
   findStudentsByPersonData,
+  findStudentsByUmlautPersonData,
   normalizeExternalIdentity,
+  pickNonEmptyAddressFields,
   resolveStudent,
   updateStudentMaster,
+  updateStudentOrigin,
   upsertRoundState,
 } = require("../lib/schuelerIdentityService");
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
@@ -37,9 +41,16 @@ function normalizeTextLower(value) {
 }
 
 function normalizeDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
   const text = normalizeText(value);
   if (!text) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) {
     const [day, month, year] = text.split(".");
     return `${year}-${month}-${day}`;
@@ -761,7 +772,7 @@ async function validatePoolImportRows(pool, payload) {
     duplicateCountById.set(id, Number(duplicateCountById.get(id) || 0) + 1);
   }
 
-  const rows = csvRows.map((row) => {
+  const rows = await Promise.all(csvRows.map(async (row) => {
     const record = row?.record || {};
     const rowNumber = Number(row?.row_number || 0);
     const recommendation = normalizeImportRecommendation(record?.[mapping.empfehlung] || "");
@@ -822,6 +833,42 @@ async function validatePoolImportRows(pool, payload) {
         errors.push(error?.message || "Externe Identitaet ist ungueltig.");
       }
     }
+    const personMatches = !existing && data.vorname && data.nachname && isValidIsoDate(data.geburtsdatum)
+      ? await findStudentsByPersonData(pool, {
+        verfahren_id: verfahrenId,
+        vorname: data.vorname,
+        nachname: data.nachname,
+        geburtsdatum: data.geburtsdatum,
+      })
+      : [];
+    if (personMatches.length > 1) {
+      errors.push(`Personendaten sind nicht eindeutig (${personMatches.length} Treffer).`);
+    } else if (personMatches.length === 1) {
+      existing = {
+        ...personMatches[0],
+        source_school_snr: personMatches[0]?.herkunftsschule_snr,
+      };
+    }
+    const umlautMatches = !existing && data.vorname && data.nachname && isValidIsoDate(data.geburtsdatum)
+      ? await findStudentsByUmlautPersonData(pool, {
+        verfahren_id: verfahrenId,
+        vorname: data.vorname,
+        nachname: data.nachname,
+        geburtsdatum: data.geburtsdatum,
+      })
+      : [];
+    const umlautMatch = umlautMatches.length === 1;
+    if (umlautMatches.length > 1) {
+      errors.push(`Umlaut-Matching ist nicht eindeutig (${umlautMatches.length} Treffer).`);
+    } else if (umlautMatch) {
+      existing = {
+        ...umlautMatches[0],
+        source_school_snr: umlautMatches[0]?.herkunftsschule_snr,
+      };
+      const existingName = [normalizeText(existing?.nachname), normalizeText(existing?.vorname)].filter(Boolean).join(", ") || "-";
+      const importName = [data.nachname, data.vorname].filter(Boolean).join(", ") || "-";
+      warnings.push(`Möglicher vorhandener Datensatz durch Umlaut-Matching erkannt. Bisheriger Name: ${existingName}; Importname: ${importName}. Import ist zunächst deaktiviert und muss bewusst ausgewählt werden.`);
+    }
     const hasUnknownSchoolError = errors.includes("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
     if (existing && hasUnknownSchoolError) {
       const index = errors.indexOf("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
@@ -855,9 +902,9 @@ async function validatePoolImportRows(pool, payload) {
       ];
 
       const filteredComparisons = comparisons.filter((entry) => comparisonFieldKeys.has(entry.field));
-      if (comparisonFieldKeys.has("strasse")) filteredComparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
-      if (comparisonFieldKeys.has("plz")) filteredComparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
-      if (comparisonFieldKeys.has("ort")) filteredComparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
+      if (comparisonFieldKeys.has("strasse") && data.strasse) filteredComparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
+      if (comparisonFieldKeys.has("plz") && data.plz) filteredComparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
+      if (comparisonFieldKeys.has("ort") && data.ort) filteredComparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
       if (comparisonFieldKeys.has("foerderbedarf")) filteredComparisons.push({ field: "foerderbedarf", matches: normalizeText(existing?.foerderbedarf) === data.foerderbedarf });
       if (comparisonFieldKeys.has("zieldifferent")) filteredComparisons.push({ field: "zieldifferent", matches: Number(existing?.zieldifferent || 0) === normalizeBoolean(data.zieldifferent) });
       if (comparisonFieldKeys.has("ef")) filteredComparisons.push({ field: "ef", matches: Number(existing?.ef || 0) === normalizeBoolean(data.ef) });
@@ -874,7 +921,7 @@ async function validatePoolImportRows(pool, payload) {
 
     return {
       row_number: rowNumber,
-      selected: errors.length === 0 && importAction !== "VORHANDEN",
+      selected: errors.length === 0 && importAction !== "VORHANDEN" && !umlautMatch,
       import_action: importAction,
       status,
       errors,
@@ -882,7 +929,7 @@ async function validatePoolImportRows(pool, payload) {
       changed_fields: changedFields,
       data,
     };
-  });
+  }));
 
   return {
     rows,
@@ -967,9 +1014,24 @@ async function validateAnmeldungenImportRows(pool, payload) {
     if (!isValidImportBoolean(data.foerderbedarf)) errors.push("Foerderbedarf ist ungueltig.");
     if (!isValidImportBoolean(data.zieldifferent)) errors.push("Zieldifferent ist ungueltig.");
 
-    const existing = data.externe_schueler_id
+    let existing = data.externe_schueler_id
       ? await findExistingSchuelerRecord(pool, verfahrenId, rundeId, data.externe_schueler_id, data.anmeldeschule_snr)
       : null;
+    const umlautMatches = !existing && data.vorname && data.nachname && isValidIsoDate(data.geburtsdatum)
+      ? await findStudentsByUmlautPersonData(pool, {
+        verfahren_id: verfahrenId,
+        vorname: data.vorname,
+        nachname: data.nachname,
+        geburtsdatum: data.geburtsdatum,
+      })
+      : [];
+    const umlautMatch = umlautMatches.length === 1;
+    if (umlautMatches.length > 1) {
+      errors.push(`Umlaut-Matching ist nicht eindeutig (${umlautMatches.length} Treffer).`);
+    } else if (umlautMatch) {
+      [existing] = umlautMatches;
+      warnings.push("Möglicher vorhandener Datensatz durch Umlaut-Matching erkannt. Import ist zunächst deaktiviert und muss bewusst ausgewählt werden.");
+    }
     const hasUnknownSchoolError = errors.includes("anmeldeschule_snr existiert nicht im Verfahren.");
     if (existing && hasUnknownSchoolError) {
       const index = errors.indexOf("anmeldeschule_snr existiert nicht im Verfahren.");
@@ -1002,9 +1064,9 @@ async function validateAnmeldungenImportRows(pool, payload) {
         comparisons.push({ field: "zieldifferent", matches: Number(existing?.zieldifferent || 0) === normalizeBoolean(data.zieldifferent) });
       }
       if (mappedFields.has("bemerkung")) comparisons.push({ field: "bemerkung", matches: normalizeText(existing?.bemerkung) === data.bemerkung });
-      if (mappedFields.has("strasse")) comparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
-      if (mappedFields.has("plz")) comparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
-      if (mappedFields.has("ort")) comparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
+      if (mappedFields.has("strasse") && data.strasse) comparisons.push({ field: "strasse", matches: normalizeText(existing?.strasse) === data.strasse });
+      if (mappedFields.has("plz") && data.plz) comparisons.push({ field: "plz", matches: normalizeText(existing?.plz) === data.plz });
+      if (mappedFields.has("ort") && data.ort) comparisons.push({ field: "ort", matches: normalizeText(existing?.ort) === data.ort });
 
       changedFields = comparisons.filter((entry) => !entry.matches).map((entry) => entry.field);
       if (changedFields.length === 0) importAction = "VORHANDEN";
@@ -1013,7 +1075,7 @@ async function validateAnmeldungenImportRows(pool, payload) {
     const status = errors.length > 0 ? "fehler" : warnings.length > 0 ? "warnung" : "gueltig";
     rows.push({
       row_number: rowNumber,
-      selected: errors.length === 0 && importAction !== "VORHANDEN",
+      selected: errors.length === 0 && importAction !== "VORHANDEN" && !umlautMatch,
       import_action: importAction,
       pool_match: poolMatch,
       abgleich_status: abgleichStatus,
@@ -1071,7 +1133,7 @@ async function upsertAnmeldungenWizardImportV3(connection, payload) {
   });
   await updateStudentMaster(connection, resolved.student.id, {
     vorname: row.vorname, nachname: row.nachname, geburtsdatum: row.geburtsdatum,
-    strasse: row.strasse, plz: row.plz, ort: row.ort,
+    ...pickNonEmptyAddressFields(row),
     foerderbedarf: normalizeBoolean(row.foerderbedarf),
     zieldifferent: normalizeBoolean(row.zieldifferent), empfehlung: row.empfehlung,
     foerder_id: row.foerder_id, notiz: row.bemerkung ?? row.notiz,
@@ -1890,10 +1952,11 @@ async function upsertStudent(pool, payload) {
   const abgleichStatus = hasAnmeldung ? "Pool + Anm" : "Nur Pool";
   const anmeldestatus = hasAnmeldung ? normalizeText(currentRound?.anmeldestatus) || "Ohne" : "Ohne";
   await updateStudentMaster(pool, resolved.student.id, {
-    vorname, nachname, geburtsdatum, strasse, plz, ort, foerderbedarf,
+    vorname, nachname, geburtsdatum, ...pickNonEmptyAddressFields({ strasse, plz, ort }), foerderbedarf,
     zieldifferent, ef, empfehlung, notiz: normalizeText(row?.notiz) || null,
     herkunftsschule_snr: snr || null,
   });
+  await updateStudentOrigin(pool, resolved.student.id, "Pool");
   const existingRound = await upsertRoundState(pool, {
     verfahren_id: verfahrenId,
     schueler_id: resolved.student.id,
@@ -1917,25 +1980,6 @@ function buildSek1ImportErrorNote(row) {
   if (schulNr) parts.push(`anmeldeschule_snr ${schulNr}`);
   if (errors.length) parts.push(`Fehler: ${errors.join(", ")}`);
   return parts.join(" | ");
-}
-
-function buildStammdatenabweichungNote(row) {
-  const rowNumber = Number(row?.row_number || 0);
-  const changedFields = Array.isArray(row?.changed_fields)
-    ? row.changed_fields.filter((field) => ["vorname", "nachname", "geburtsdatum"].includes(String(field)))
-    : [];
-  const labels = {
-    vorname: "Vorname",
-    nachname: "Nachname",
-    geburtsdatum: "Geburtsdatum",
-  };
-  const changes = changedFields.map((field) => {
-    const previousValue = normalizeText(row?.existing_data?.[field]) || "-";
-    const nextValue = normalizeText(row?.data?.[field]) || "-";
-    return `${labels[field] || field}: ${previousValue} -> ${nextValue}`;
-  });
-  const prefix = rowNumber ? `Zeile ${rowNumber}` : "Import";
-  return changes.length ? `${prefix} | Stammdatenabweichung: ${changes.join(", ")}` : `${prefix} | Stammdatenabweichung festgestellt.`;
 }
 
 async function ensureSek1OpenCaseByCode(pool, payload) {
@@ -2849,6 +2893,7 @@ function createImporteController({ getPool }) {
         const session = storePreview(anmSchuelerAnmeldungenImportSessions, {
           verfahren_id: verfahrenId,
           runde_id: rundeId,
+          file_name: normalizeText(req.body?.file_name),
           mapping: req.body?.mapping || {},
           rows: validation.rows,
         });
@@ -2933,7 +2978,7 @@ function createImporteController({ getPool }) {
                 verfahren_id: verfahrenId,
                 schueler_id: Number(result?.id || 0),
                 fallgrund_code: "STAMMDATEN_ABWEICHUNG",
-                note: buildStammdatenabweichungNote(row),
+                note: buildStammdatenabweichungNote(row, validation.file_name),
               });
               if (openCaseResult.created || openCaseResult.updated) openCases += 1;
             }

@@ -2,14 +2,29 @@ function normalizeText(value) {
   return String(value ?? "").trim();
 }
 
+function normalizeGermanMatchText(value) {
+  return normalizeText(value)
+    .toLocaleLowerCase("de-DE")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/\s+/g, " ");
+}
+
 function normalizeDate(value) {
   if (!value) return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
   const text = normalizeText(value);
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const germanMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  return germanMatch ? `${germanMatch[3]}-${germanMatch[2]}-${germanMatch[1]}` : null;
 }
 
 function normalizeBoolean(value) {
@@ -87,6 +102,45 @@ async function findStudentsByPersonData(connection, data) {
   return rows || [];
 }
 
+async function findStudentsByUmlautPersonData(connection, data) {
+  const verfahrenId = Number(data?.verfahren_id || 0);
+  const vorname = normalizeText(data?.vorname);
+  const nachname = normalizeText(data?.nachname);
+  const geburtsdatum = normalizeDate(data?.geburtsdatum);
+  if (!verfahrenId || !vorname || !nachname || !geburtsdatum) return [];
+
+  const [rows] = await connection.query(
+    `SELECT *
+       FROM anm_schueler
+      WHERE verfahren_id = ?
+        AND geburtsdatum = ?
+      ORDER BY id`,
+    [verfahrenId, geburtsdatum],
+  );
+  const exactVorname = vorname.toLocaleLowerCase("de-DE");
+  const exactNachname = nachname.toLocaleLowerCase("de-DE");
+  const matchVorname = normalizeGermanMatchText(vorname);
+  const matchNachname = normalizeGermanMatchText(nachname);
+
+  return (rows || []).filter((row) => {
+    const rowVorname = normalizeText(row?.vorname).toLocaleLowerCase("de-DE");
+    const rowNachname = normalizeText(row?.nachname).toLocaleLowerCase("de-DE");
+    const isExact = rowVorname === exactVorname && rowNachname === exactNachname;
+    return !isExact
+      && normalizeGermanMatchText(row?.vorname) === matchVorname
+      && normalizeGermanMatchText(row?.nachname) === matchNachname;
+  });
+}
+
+function pickNonEmptyAddressFields(data) {
+  const result = {};
+  for (const field of ["strasse", "plz", "ort"]) {
+    const value = normalizeText(data?.[field]);
+    if (value) result[field] = value;
+  }
+  return result;
+}
+
 async function createStudent(connection, data) {
   const columns = ["verfahren_id", "herkunft", "vorname", "nachname", "geburtsdatum"];
   const values = [
@@ -160,6 +214,20 @@ async function updateStudentMaster(connection, studentId, data) {
   );
 }
 
+async function updateStudentOrigin(connection, studentId, origin) {
+  const normalizedOrigin = normalizeText(origin);
+  if (!["Pool", "Anmeldung", "Manuell"].includes(normalizedOrigin)) {
+    const error = new Error("Die Herkunft des Schülers ist ungültig.");
+    error.code = "INVALID_STUDENT_ORIGIN";
+    error.statusCode = 400;
+    throw error;
+  }
+  await connection.query(
+    "UPDATE anm_schueler SET herkunft = ?, updated_at = NOW() WHERE id = ?",
+    [normalizedOrigin, Number(studentId)],
+  );
+}
+
 async function attachExternalId(connection, studentId, identity) {
   const normalized = normalizeExternalIdentity(identity);
   if (!normalized) return null;
@@ -190,9 +258,15 @@ async function resolveStudent(connection, data) {
 
   const candidates = await findStudentsByPersonData(connection, data);
   if (candidates.length > 1) throw createAmbiguousMatchError(candidates.length);
+  const umlautCandidates = candidates.length === 0
+    ? await findStudentsByUmlautPersonData(connection, data)
+    : [];
+  if (umlautCandidates.length > 1) throw createAmbiguousMatchError(umlautCandidates.length);
   let created = false;
   if (candidates.length === 1) {
     [student] = candidates;
+  } else if (umlautCandidates.length === 1) {
+    [student] = umlautCandidates;
   } else {
     student = await createStudent(connection, data);
     created = true;
@@ -201,7 +275,12 @@ async function resolveStudent(connection, data) {
   if (identity?.externe_id) {
     externalIdAdded = (await attachExternalId(connection, student.id, identity)) !== null;
   }
-  return { student, created, matchedBy: created ? "NEW" : "PERSON_DATA", externalIdAdded };
+  return {
+    student,
+    created,
+    matchedBy: created ? "NEW" : umlautCandidates.length === 1 ? "UMLAUT_PERSON_DATA" : "PERSON_DATA",
+    externalIdAdded,
+  };
 }
 
 async function findRoundState(connection, { verfahren_id, schueler_id, runde_id }) {
@@ -256,11 +335,15 @@ module.exports = {
   findRoundState,
   findStudentByExternalId,
   findStudentsByPersonData,
+  findStudentsByUmlautPersonData,
   normalizeDate,
   normalizeBoolean,
   normalizeExternalIdentity,
+  normalizeGermanMatchText,
   normalizeText,
+  pickNonEmptyAddressFields,
   resolveStudent,
   updateStudentMaster,
+  updateStudentOrigin,
   upsertRoundState,
 };

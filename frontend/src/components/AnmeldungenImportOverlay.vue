@@ -231,6 +231,7 @@ async function runValidation() {
       {
         verfahren_id: props.verfahrenId,
         runde_id: props.rundeId,
+        file_name: selectedFileName.value,
         global_anmeldeschule_snr: globalSchulNr.value,
         csv_columns: csvColumns.value,
         csv_rows: csvRows.value.map((row) => ({

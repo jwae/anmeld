@@ -4,8 +4,11 @@ const assert = require("node:assert/strict");
 const {
   resolveStudent,
   updateStudentMaster,
+  updateStudentOrigin,
   upsertRoundState,
   normalizeExternalIdentity,
+  normalizeGermanMatchText,
+  pickNonEmptyAddressFields,
 } = require("../lib/schuelerIdentityService");
 
 class IdentityDatabase {
@@ -30,6 +33,13 @@ class IdentityDatabase {
       return [[this.students.find((row) => row.id === match?.schueler_id)].filter(Boolean), []];
     }
     if (compact.startsWith("SELECT * FROM anm_schueler WHERE verfahren_id")) {
+      if (!compact.includes("LOWER(TRIM")) {
+        const [verfahrenId, geburtsdatum] = params;
+        return [this.students.filter((row) => (
+          row.verfahren_id === verfahrenId
+          && row.geburtsdatum === geburtsdatum
+        )), []];
+      }
       const [verfahrenId, vorname, nachname, geburtsdatum] = params;
       return [this.students.filter((row) => (
         row.verfahren_id === verfahrenId
@@ -159,12 +169,62 @@ test("Fall 8: mehrere Runden verwenden dieselbe interne Schüler-ID", async () =
   assert.deepEqual(db.rounds.map((row) => row.schueler_id), [resolved.student.id, resolved.student.id]);
 });
 
-test("Fall 9: Herkunft ist write-once", async () => {
+test("Ein allgemeines Stammdatenupdate verändert die Herkunft nicht implizit", async () => {
   const db = new IdentityDatabase();
   const resolved = await resolveStudent(db, poolStudent());
   await updateStudentMaster(db, resolved.student.id, { vorname: "Anni", herkunft: "Anmeldung" });
   assert.equal(db.students[0].herkunft, "Pool");
   assert.equal(db.students[0].vorname, "Anni");
+});
+
+test("Ein Pool-Import kann die Herkunft eines vorhandenen Kindes auf Pool aktualisieren", async () => {
+  const db = new IdentityDatabase();
+  db.students.push({
+    id: 1,
+    verfahren_id: 7,
+    vorname: "Anna",
+    nachname: "Beispiel",
+    geburtsdatum: "2020-05-17",
+    herkunft: "Anmeldung",
+  });
+
+  await updateStudentOrigin(db, 1, "Pool");
+
+  assert.equal(db.students[0].herkunft, "Pool");
+});
+
+test("Umlaut-Matching erkennt deutsche Umschreibungen als vorhandene Person", async () => {
+  const db = new IdentityDatabase();
+  db.students.push({
+    id: 1,
+    verfahren_id: 7,
+    vorname: "Jörg",
+    nachname: "Müller-Straße",
+    geburtsdatum: "2020-05-17",
+    herkunft: "Pool",
+  });
+
+  const resolved = await resolveStudent(db, {
+    verfahren_id: 7,
+    herkunft: "Anmeldung",
+    vorname: "Joerg",
+    nachname: "Mueller-Strasse",
+    geburtsdatum: "2020-05-17",
+  });
+
+  assert.equal(resolved.created, false);
+  assert.equal(resolved.student.id, 1);
+  assert.equal(resolved.matchedBy, "UMLAUT_PERSON_DATA");
+  assert.equal(db.students.length, 1);
+  assert.equal(normalizeGermanMatchText("Änne Öztürk Weiß"), "aenne oeztuerk weiss");
+});
+
+test("Leere Adresswerte werden für Treffer nicht als Update übernommen", () => {
+  assert.deepEqual(pickNonEmptyAddressFields({ strasse: "", plz: "  ", ort: null }), {});
+  assert.deepEqual(
+    pickNonEmptyAddressFields({ strasse: " Hauptstraße 1 ", plz: "12345", ort: "Berlin" }),
+    { strasse: "Hauptstraße 1", plz: "12345", ort: "Berlin" },
+  );
 });
 
 test("Quellenregeln normalisieren zentrale IDs und verlangen Schul-/Kita-Kennungen", () => {
