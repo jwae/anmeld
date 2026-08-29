@@ -116,7 +116,10 @@ const poolCountLabel = computed(() => (
 
 const isSek1Procedure = computed(() => props.verfahrenstyp === "SEK1");
 
-const herkunftOptions = ["Pool", "Anmeldung", "Manuell"];
+const herkunftOptions = [
+  "POOL", "EWO", "SCHILD", "SCHULE", "SCHUELER_ONLINE", "KITA", "SONST",
+  "Pool", "Anmeldung", "Manuell",
+];
 const abgleichStatusOptions = ["Nur Pool", "Nur Anmeldung", "Pool + Anm"];
 const anmeldestatusEditOptions = ["Neuaufnahme", "Warteliste", "Zugeordnet", "Abgelehnt", "Ohne"];
 const teilnahmestatusOptions = ["Aktiv", "Wegzug", "Abgemeldet", "Verstorben"];

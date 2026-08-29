@@ -11,6 +11,12 @@ db_data/
 logs/
 docs
 import/
+!import/
+import/*
+!import/Testumgebung/
+import/Testumgebung/*
+!import/Testumgebung/test-import-pooldaten.mjs
+!import/Testumgebung/schueler aus pool.csv
 my-new-skill-db/
 Importdateien/
 Transfer/

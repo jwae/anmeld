@@ -342,7 +342,7 @@ CREATE TABLE `anm_schueler` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
   `herkunftsschule_snr` varchar(50) DEFAULT NULL COMMENT 'SNR der Herkunftsschule / abgebende Grundschule',
-  `herkunft` enum('Pool','Anmeldung','Manuell') NOT NULL COMMENT 'Aktuelle fachliche Herkunft des Datensatzes; ein Pool-Import setzt den Wert auf Pool.',
+  `herkunft` varchar(50) NOT NULL COMMENT 'Aktuelle fachliche Herkunft des Datensatzes; Importe speichern den ausgewaehlten Quellen-Code.',
   `empfehlung` varchar(50) DEFAULT NULL,
   `vorname` varchar(100) DEFAULT NULL,
   `nachname` varchar(100) DEFAULT NULL,

@@ -5,6 +5,8 @@ const { normalizeImportRecommendation, importRecommendationDiffers } = require("
 test("Empfehlungswerte aus Importdateien werden auf Katalogcodes gemappt", () => {
   assert.equal(normalizeImportRecommendation(" H ").value, "HS");
   assert.equal(normalizeImportRecommendation("r").value, "RS");
+  assert.equal(normalizeImportRecommendation("g").value, "GY");
+  assert.equal(normalizeImportRecommendation("Gymnasium").value, "GY");
   assert.equal(normalizeImportRecommendation("ohne").value, "KEINE");
   assert.equal(normalizeImportRecommendation(" - ").value, "KEINE");
   assert.equal(normalizeImportRecommendation(" h/r ").value, "HS_RS");

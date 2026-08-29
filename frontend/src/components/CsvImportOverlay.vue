@@ -28,6 +28,11 @@ type ValidationRow = {
   data: Record<string, string | null>;
 };
 
+type SourceOption = {
+  code: string;
+  bezeichnung: string;
+};
+
 const props = defineProps<{
   open: boolean;
   token?: string;
@@ -48,9 +53,10 @@ const currentStep = ref(1);
 const busy = ref(false);
 const error = ref("");
 const schemaFields = ref<SchemaField[]>([]);
+const sourceOptions = ref<SourceOption[]>([]);
 const selectedFile = ref<File | null>(null);
 const selectedFileName = ref("");
-const sourceArt = ref<"POOL" | "EWO">("POOL");
+const sourceArt = ref("");
 const csvColumns = ref<string[]>([]);
 const csvRows = ref<ParsedCsvRow[]>([]);
 const csvPreviewRows = ref<string[][]>([]);
@@ -74,7 +80,7 @@ const options = ref({
 });
 
 const canProceed = computed(() => {
-  if (currentStep.value === 1) return csvRows.value.length > 0;
+  if (currentStep.value === 1) return !!sourceArt.value && csvRows.value.length > 0;
   if (currentStep.value === 2) return csvRows.value.length > 0;
   if (currentStep.value === 3) return hasRequiredMappings.value;
   if (currentStep.value === 4) return selectedImportRows.value.length > 0;
@@ -147,7 +153,8 @@ function resetState() {
   error.value = "";
   selectedFile.value = null;
   selectedFileName.value = "";
-  sourceArt.value = "POOL";
+  sourceOptions.value = [];
+  sourceArt.value = "";
   csvColumns.value = [];
   csvRows.value = [];
   csvPreviewRows.value = [];
@@ -168,9 +175,20 @@ async function loadSchema() {
       verfahren_id: props.verfahrenId,
       runde_id: props.rundeId,
       import_art: props.importArt,
-      source_art: sourceArt.value,
     }, props.token);
     schemaFields.value = Array.isArray(response?.fields) ? response.fields : [];
+    sourceOptions.value = (Array.isArray(response?.sources) ? response.sources : [])
+      .map((source: SourceOption) => ({
+        code: String(source?.code || "").trim(),
+        bezeichnung: String(source?.bezeichnung || "").trim(),
+      }))
+      .filter((source: SourceOption) => !!source.code);
+    if (!sourceOptions.value.some((source) => source.code === sourceArt.value)) {
+      sourceArt.value = sourceOptions.value[0]?.code || "";
+    }
+    if (!sourceOptions.value.length) {
+      error.value = "Es ist keine aktive Quelle für den Import hinterlegt.";
+    }
   } catch (loadError: any) {
     error.value = loadError?.response?.data?.error || loadError?.message || "Das Importschema konnte nicht geladen werden.";
   } finally {
@@ -361,10 +379,12 @@ function handleClose() {
         />
 
         <label v-if="currentStep === 1" class="csv-source-field">
-          <span>Quellsystem der externen ID</span>
+          <span>Quelle</span>
           <select v-model="sourceArt" :disabled="busy">
-            <option value="POOL">Pool-/CSV-Datei</option>
-            <option value="EWO">EWO-Datei</option>
+            <option value="" disabled>Bitte auswählen</option>
+            <option v-for="source in sourceOptions" :key="source.code" :value="source.code">
+              {{ source.bezeichnung || source.code }}
+            </option>
           </select>
         </label>
 

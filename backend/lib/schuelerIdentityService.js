@@ -36,6 +36,7 @@ function normalizeBoolean(value) {
 const EXTERNAL_SOURCE_TYPES = new Set([
   "POOL", "SCHULE", "EWO", "SCHILD", "SCHUELER_ONLINE", "KITA", "SONST",
 ]);
+const LEGACY_STUDENT_ORIGINS = new Set(["Pool", "Anmeldung", "Manuell"]);
 
 function normalizeExternalIdentity(identity) {
   const externeId = normalizeText(identity?.externe_id);
@@ -216,7 +217,7 @@ async function updateStudentMaster(connection, studentId, data) {
 
 async function updateStudentOrigin(connection, studentId, origin) {
   const normalizedOrigin = normalizeText(origin);
-  if (!["Pool", "Anmeldung", "Manuell"].includes(normalizedOrigin)) {
+  if (!EXTERNAL_SOURCE_TYPES.has(normalizedOrigin) && !LEGACY_STUDENT_ORIGINS.has(normalizedOrigin)) {
     const error = new Error("Die Herkunft des Schülers ist ungültig.");
     error.code = "INVALID_STUDENT_ORIGIN";
     error.statusCode = 400;

@@ -25,6 +25,11 @@ const {
   buildSchuelerNachHerkunftsschulePdfLines,
   sanitizeFileName: sanitizeSourceSchoolFileName,
 } = require("./schuelerNachHerkunftsschuleReportService");
+const {
+  buildSchulgruppenReport,
+  buildSchulgruppenCsv,
+  sanitizeFileName: sanitizeSchoolGroupsFileName,
+} = require("./schulgruppenReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -146,6 +151,22 @@ async function createAuswertungDownload({ pool, verfahrenId, rundeId, bereich, a
     if (format === "excel") {
       return {
         buffer: buildProcedureDataCsv(report, rundeId),
+        contentType: "text/csv; charset=utf-8",
+        fileName: `${baseName}.csv`,
+      };
+    }
+  }
+
+  if (bereich === "verfahrensuebersicht" && auswertung === "schulgruppen") {
+    const report = await buildSchulgruppenReport(pool, verfahrenId, rundeId);
+    const csvExport = buildSchulgruppenCsv(report);
+    const baseName = sanitizeSchoolGroupsFileName(
+      `schulgruppen-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`,
+    );
+
+    if (format === "excel") {
+      return {
+        buffer: Buffer.from(buildCsv(csvExport.rows), "utf8"),
         contentType: "text/csv; charset=utf-8",
         fileName: `${baseName}.csv`,
       };

@@ -97,7 +97,7 @@ async function buildPoolSchuelerAktuelleRundeReport(pool, verfahrenId, rundeId) 
       ON coord.snr = NULLIF(TRIM(sr.koordinierte_snr), '')
     WHERE sr.verfahren_id = ?
       AND sr.runde_id = ?
-      AND LOWER(TRIM(COALESCE(s.herkunft, ''))) = 'pool'
+      AND LOWER(TRIM(COALESCE(s.herkunft, ''))) <> 'anmeldung'
     `,
     [verfahrenId, rundeId],
   );
@@ -182,7 +182,7 @@ function buildPoolSchuelerAktuelleRundeCsv(report) {
 
 function buildPoolSchuelerAktuelleRundePdfLines(report) {
   const lines = [
-    "Schueler der aktuellen Runde mit Herkunft Pool",
+    "Schueler der aktuellen Runde ohne Herkunft Anmeldung",
     `Verfahren: ${report.procedure.bezeichnung || "-"}`,
     `Runde: ${report.round.bezeichnung || `Runde ${report.round.runden_nummer}`}`,
     `Erstellt am: ${report.generated_at}`,

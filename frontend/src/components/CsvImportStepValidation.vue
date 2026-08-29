@@ -51,10 +51,10 @@ function formatGermanDate(value: string | null | undefined) {
 
 function statusChipClass(row: ValidationRow) {
   if (row.status === "fehler") return "status-chip-fehler";
+  if (row.status === "warnung") return "status-chip-warnung";
   if (row.import_action === "NEU") return "status-chip-neu";
   if (row.import_action === "UPDATE") return "status-chip-update";
   if (row.import_action === "VORHANDEN") return "status-chip-vorhanden";
-  if (row.status === "warnung") return "status-chip-warnung";
   return "status-chip-gueltig";
 }
 
@@ -108,7 +108,7 @@ function formatCellValue(field: { key: string; label: string }, value: string | 
             </td>
             <td>
               <span class="status-chip" :class="statusChipClass(row)">
-                <template v-if="row.status === 'fehler'">{{ statusLabel(row.status) }}</template>
+                <template v-if="row.status === 'fehler' || row.status === 'warnung'">{{ statusLabel(row.status) }}</template>
                 <template v-else>{{ importActionLabel(row.import_action) || statusLabel(row.status) }}</template>
               </span>
             </td>

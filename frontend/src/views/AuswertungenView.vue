@@ -5,6 +5,7 @@ import auswertungenService, {
   type AuswertungsKachel,
   type OffeneAnmeldungenResponse,
   type PoolSchuelerAktuelleRundeResponse,
+  type SchulgruppenResponse,
   type SchuelerNachHerkunftsschuleResponse,
   type SchuelerRundenuebersichtResponse,
 } from "../services/auswertungenService";
@@ -50,6 +51,7 @@ type PreviewState = {
   emptyMessage: string;
   exportBereich: string;
   exportAuswertung: string;
+  exportFormats?: Array<"excel" | "pdf">;
 };
 
 const previewData = ref<PreviewState | null>(null);
@@ -122,8 +124,13 @@ function isSourceSchoolOption(cardId: string, optionKey: string) {
   return cardId === "schuelerlisten" && optionKey === "nach-herkunftsschule";
 }
 
+function isSchoolGroupsOption(cardId: string, optionKey: string) {
+  return cardId === "verfahrensuebersicht" && optionKey === "schulgruppen";
+}
+
 function isPreviewOption(cardId: string, optionKey: string) {
-  return isRoundOverviewOption(cardId, optionKey)
+  return isSchoolGroupsOption(cardId, optionKey)
+    || isRoundOverviewOption(cardId, optionKey)
     || isOpenStatusOption(cardId, optionKey)
     || isPoolOriginOption(cardId, optionKey)
     || isSourceSchoolOption(cardId, optionKey);
@@ -141,6 +148,14 @@ function shouldShowPreviewButton(cardId: string) {
 
 function isPreviewOnlyCard(cardId: string) {
   return cardId === "statistiken" || cardId === "schuelerlisten";
+}
+
+function supportsPreviewExport(format: "excel" | "pdf") {
+  return previewData.value?.exportFormats?.includes(format) ?? true;
+}
+
+function formatPreviewCell(value: string | number | undefined) {
+  return value === undefined || value === null || value === "" ? "-" : value;
 }
 
 function triggerBrowserDownload(blob: Blob, fileName: string) {
@@ -293,6 +308,36 @@ function createSourceSchoolPreviewState(response: SchuelerNachHerkunftsschuleRes
   };
 }
 
+function createSchoolGroupsPreviewState(response: SchulgruppenResponse): PreviewState {
+  const roundLabel = response.runde?.bezeichnung
+    || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  return {
+    key: "verfahrensuebersicht:schulgruppen",
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: [
+      { key: "snr", label: "SNR" },
+      { key: "schule", label: "Schule" },
+      { key: "jahrgang", label: "Jahrgang" },
+      { key: "gesamtkapazitaet", label: "Gesamt-Kapazität" },
+      { key: "maximale_klassen", label: "Max. Klassen" },
+      { key: "anmeldungen_gesamt", label: "Anmeldungen-Gesamt" },
+      { key: "freie_plaetze", label: "Freie Plätze" },
+      { key: "warteliste", label: "Warteliste" },
+      { key: "le", label: "LE" },
+      { key: "zd", label: "ZD" },
+    ],
+    emptyMessage: "Für die Schulgruppen dieses Verfahrens sind keine beteiligten Schulen vorhanden.",
+    exportBereich: "verfahrensuebersicht",
+    exportAuswertung: "schulgruppen",
+    exportFormats: ["excel"],
+  };
+}
+
 async function openPreview(card: AuswertungsKachel) {
   if (!props.verfahrenId || !props.rundeId) return;
   const selectedOption = String(selectedOptions.value[card.id] || "").trim();
@@ -307,7 +352,10 @@ async function openPreview(card: AuswertungsKachel) {
     previewOverlayOpen.value = true;
     previewLoading.value = true;
     previewErrorMessage.value = "";
-    if (isRoundOverviewOption(card.id, selectedOption)) {
+    if (isSchoolGroupsOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getSchulgruppen(props.verfahrenId, props.rundeId, props.token);
+      previewData.value = createSchoolGroupsPreviewState(response);
+    } else if (isRoundOverviewOption(card.id, selectedOption)) {
       const response = await auswertungenService.getSchuelerRundenuebersicht(props.verfahrenId, props.token);
       previewData.value = createRoundOverviewPreviewState(response);
     } else if (isOpenStatusOption(card.id, selectedOption)) {
@@ -611,14 +659,14 @@ watch(
               <tbody>
                 <tr
                   v-for="row in previewData?.rows || []"
-                  :key="`${previewData?.key || 'preview'}-${String(row.interne_schueler_id || row.externe_schueler_id || row.lfd_nr)}`"
+                  :key="`${previewData?.key || 'preview'}-${String(row.snr || row.interne_schueler_id || row.externe_schueler_id || row.lfd_nr)}`"
                 >
                   <td
                     v-for="column in previewData?.columns || []"
-                    :key="`preview-cell-${String(row.lfd_nr || '')}-${column.key}`"
+                    :key="`preview-cell-${String(row.snr || row.lfd_nr || '')}-${column.key}`"
                     :class="column.className || ''"
                   >
-                    {{ row[column.key] || "-" }}
+                    {{ formatPreviewCell(row[column.key]) }}
                   </td>
                 </tr>
               </tbody>
@@ -631,6 +679,7 @@ watch(
             Schliessen
           </button>
           <button
+            v-if="supportsPreviewExport('excel')"
             class="btn-primary auswertung-action-btn"
             type="button"
             :disabled="actionLoadingKey === actionKey(previewData?.exportBereich || 'preview', 'overlay-excel')"
@@ -639,6 +688,7 @@ watch(
             {{ actionLoadingKey === actionKey(previewData?.exportBereich || "preview", "overlay-excel") ? "Exportiere..." : "Export CSV" }}
           </button>
           <button
+            v-if="supportsPreviewExport('pdf')"
             class="btn-primary auswertung-action-btn"
             type="button"
             :disabled="actionLoadingKey === actionKey(previewData?.exportBereich || 'preview', 'overlay-pdf')"

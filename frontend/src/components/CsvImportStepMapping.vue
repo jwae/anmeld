@@ -18,12 +18,28 @@ defineProps<{
 defineEmits<{
   (event: "change", payload: { key: string; value: string }): void;
 }>();
+
+function isMissingRequiredMapping(field: ImportField, mapping: Record<string, string>) {
+  return field.required && !field.readOnly && !String(mapping[field.key] || "").trim();
+}
+
+function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
+  return field.required && !field.readOnly && Boolean(String(mapping[field.key] || "").trim());
+}
 </script>
 
 <template>
   <section class="wizard-step">
     <div class="mapping-grid">
-      <article v-for="field in fields" :key="field.key" class="mapping-card">
+      <article
+        v-for="field in fields"
+        :key="field.key"
+        class="mapping-card"
+        :class="{
+          'is-required-unmapped': isMissingRequiredMapping(field, mapping),
+          'is-mapped': hasImportMapping(field, mapping),
+        }"
+      >
         <div class="mapping-copy">
           <p class="mapping-title">
             {{ field.label }}
@@ -68,6 +84,26 @@ defineEmits<{
   border: 1px solid #dbe4f0;
   border-radius: 14px;
   background: #fff;
+}
+
+.mapping-card.is-required-unmapped {
+  border-color: #e7b8bd;
+  background: #fff8f8;
+}
+
+.mapping-card.is-required-unmapped select {
+  border-color: #dca7ad;
+  background: #fffafa;
+}
+
+.mapping-card.is-mapped {
+  border-color: #68b883;
+  background: #dcfce7;
+}
+
+.mapping-card.is-mapped select {
+  border-color: #4fa36d;
+  background: #f0fdf4;
 }
 
 .mapping-title {

@@ -1,6 +1,10 @@
 const RECOMMENDATION_IMPORT_MAPPING = new Map([
   ["H", "HS"],
   ["R", "RS"],
+  ["G", "GY"],
+  ["HAUPTSCHULE", "HS"],
+  ["REALSCHULE", "RS"],
+  ["GYMNASIUM", "GY"],
   ["OHNE", "KEINE"],
   ["-", "KEINE"],
   ["H/R", "HS_RS"],

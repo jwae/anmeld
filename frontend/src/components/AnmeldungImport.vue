@@ -40,6 +40,8 @@ const schildDiagnostics = ref<Array<{
   skipped_rows: number;
   error_rows: number;
   rows_read: number;
+  status_summary?: { UPDATE: number; NEU: number; FEHLER: number };
+  row_results?: Array<{ row_number: number; action: "UPDATE" | "NEU" | "FEHLER"; message: string }>;
   diagnostics?: {
     school_name?: string;
     school_snr?: string;
@@ -144,6 +146,7 @@ async function handleWizardSuccess(result: any) {
       pool_anmeldung: Number(result?.pool_anmeldung || 0),
       nur_anmeldung: Number(result?.nur_anmeldung || 0),
       rows_read: inserted + updated + skipped + errors,
+      status_summary: result?.status_summary || { UPDATE: updated, NEU: inserted, FEHLER: errors },
     },
   };
   successMessage.value = "Anmeldungsimport erfolgreich abgeschlossen.";
@@ -251,13 +254,9 @@ onMounted(() => {
       </div>
 
       <div v-if="importSummary?.total_summary" class="import-summary">
-        <div><strong>Gelesen:</strong> {{ importSummary.total_summary?.rows_read || 0 }}</div>
-        <div><strong>Importiert:</strong> {{ importSummary.total_summary?.imported_rows || 0 }}</div>
-        <div><strong>Aktualisiert:</strong> {{ importSummary.total_summary?.updated_rows || 0 }}</div>
-        <div><strong>Uebersprungen:</strong> {{ importSummary.total_summary?.skipped_rows || 0 }}</div>
-        <div><strong>Fehler:</strong> {{ importSummary.total_summary?.error_rows || 0 }}</div>
-        <div><strong>Pool + Anmeldung:</strong> {{ importSummary.total_summary?.pool_anmeldung || 0 }}</div>
-        <div><strong>Nur Anmeldung:</strong> {{ importSummary.total_summary?.nur_anmeldung || 0 }}</div>
+        <div><strong>UPDATE:</strong> {{ importSummary.total_summary?.status_summary?.UPDATE ?? importSummary.total_summary?.updated_rows ?? 0 }}</div>
+        <div><strong>NEU:</strong> {{ importSummary.total_summary?.status_summary?.NEU ?? importSummary.total_summary?.imported_rows ?? 0 }}</div>
+        <div><strong>FEHLER:</strong> {{ importSummary.total_summary?.status_summary?.FEHLER ?? importSummary.total_summary?.error_rows ?? 0 }}</div>
       </div>
 
       <div v-if="schildDiagnostics.length" class="diagnostic-actions">
@@ -328,6 +327,19 @@ onMounted(() => {
                 <div><strong>Fehler:</strong> {{ entry.error_rows ?? "-" }}</div>
               </div>
               <p v-if="entry.message" class="diagnostic-message">{{ entry.message }}</p>
+              <p v-if="entry.status_summary" class="diagnostic-message">
+                {{ entry.status_summary.UPDATE }} UPDATE · {{ entry.status_summary.NEU }} NEU · {{ entry.status_summary.FEHLER }} FEHLER
+              </p>
+              <div v-if="entry.row_results?.length" class="table-wrap">
+                <table class="import-table">
+                  <thead><tr><th>Zeile</th><th>Status</th><th>Detail</th></tr></thead>
+                  <tbody>
+                    <tr v-for="result in entry.row_results" :key="`${entry.snr}-${result.row_number}-${result.action}`">
+                      <td>{{ result.row_number }}</td><td>{{ result.action }}</td><td>{{ result.message }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </article>
           </div>
         </div>

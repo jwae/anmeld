@@ -193,6 +193,15 @@ test("Ein Pool-Import kann die Herkunft eines vorhandenen Kindes auf Pool aktual
   assert.equal(db.students[0].herkunft, "Pool");
 });
 
+test("Eine Importquelle kann als Herkunft des Schülers gespeichert werden", async () => {
+  const db = new IdentityDatabase();
+  db.students.push({ id: 1, verfahren_id: 7, herkunft: "Pool" });
+
+  await updateStudentOrigin(db, 1, "EWO");
+
+  assert.equal(db.students[0].herkunft, "EWO");
+});
+
 test("Umlaut-Matching erkennt deutsche Umschreibungen als vorhandene Person", async () => {
   const db = new IdentityDatabase();
   db.students.push({

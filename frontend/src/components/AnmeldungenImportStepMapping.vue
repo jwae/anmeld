@@ -4,6 +4,52 @@ defineEmits<{
   (event: "change", payload: { key: string; value: string }): void;
   (event: "update:globalSchulNr", value: string): void;
 }>();
+
+function normalizeColumnName(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isSourceSchoolColumn(column: string) {
+  const normalized = normalizeColumnName(column);
+  return normalized.includes("herkunftsschule")
+    || normalized.includes("quellschule")
+    || normalized === "source_school_snr"
+    || normalized === "snr_abg";
+}
+
+function columnsForField(fieldKey: string, columns: string[]) {
+  return fieldKey === "anmeldeschule_snr"
+    ? columns.filter((column) => !isSourceSchoolColumn(column))
+    : columns;
+}
+
+function isMissingRequiredMapping(
+  field: { key: string; required: boolean; readOnly?: boolean },
+  mapping: Record<string, string>,
+  globalSchulNr: string,
+) {
+  if (!field.required || field.readOnly) return false;
+  if (field.key === "anmeldeschule_snr" && String(globalSchulNr || "").trim()) return false;
+  return !String(mapping[field.key] || "").trim();
+}
+
+function hasImportMapping(
+  field: { key: string; required: boolean; readOnly?: boolean },
+  mapping: Record<string, string>,
+  globalSchulNr: string,
+) {
+  if (!field.required || field.readOnly) return false;
+  if (field.key === "anmeldeschule_snr" && String(globalSchulNr || "").trim()) return true;
+  return Boolean(String(mapping[field.key] || "").trim());
+}
 </script>
 <template>
   <section class="wizard-step">
@@ -21,13 +67,21 @@ defineEmits<{
       />
     </article>
     <div class="mapping-grid">
-      <article v-for="field in fields" :key="field.key" class="mapping-card">
+      <article
+        v-for="field in fields"
+        :key="field.key"
+        class="mapping-card"
+        :class="{
+          'is-required-unmapped': isMissingRequiredMapping(field, mapping, globalSchulNr),
+          'is-mapped': hasImportMapping(field, mapping, globalSchulNr),
+        }"
+      >
         <div class="mapping-copy">
           <p class="mapping-title">{{ field.label }}<span v-if="field.required" class="mapping-badge is-required">Pflicht</span><span v-else-if="field.readOnly" class="mapping-badge">Automatisch</span></p>
           <p>{{ field.key === 'anmeldeschule_snr' && globalSchulNr ? 'Globaler Schulwert vorhanden, CSV-Feld optional.' : field.description }}</p>
         </div>
         <template v-if="field.readOnly"><div class="mapping-readonly">{{ field.systemValue || "Automatisch gesetzt" }}</div></template>
-        <template v-else><select :value="mapping[field.key] || ''" @change="$emit('change', { key: field.key, value: ($event.target as HTMLSelectElement).value })"><option value="">Nicht zuordnen</option><option v-for="column in columns" :key="column" :value="column">{{ column }}</option></select></template>
+        <template v-else><select :value="mapping[field.key] || ''" @change="$emit('change', { key: field.key, value: ($event.target as HTMLSelectElement).value })"><option value="">Nicht zuordnen</option><option v-for="column in columnsForField(field.key, columns)" :key="column" :value="column">{{ column }}</option></select></template>
       </article>
     </div>
   </section>
@@ -36,6 +90,10 @@ defineEmits<{
 .wizard-step { display: grid; gap: 12px; }
 .mapping-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .mapping-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 220px); gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #dbe4f0; border-radius: 14px; background: #fff; }
+.mapping-card.is-required-unmapped { border-color: #e7b8bd; background: #fff8f8; }
+.mapping-card.is-required-unmapped select { border-color: #dca7ad; background: #fffafa; }
+.mapping-card.is-mapped { border-color: #68b883; background: #dcfce7; }
+.mapping-card.is-mapped select { border-color: #4fa36d; background: #f0fdf4; }
 .mapping-card-global { grid-template-columns: minmax(0, 1fr) minmax(220px, 260px); }
 .mapping-title { margin: 0 0 4px; font-weight: 700; color: #19365b; font-size: 14px; }
 .mapping-copy p:last-child { margin: 0; color: #526985; font-size: 12px; line-height: 1.35; }

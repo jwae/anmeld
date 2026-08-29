@@ -13,9 +13,11 @@
     "migrate:user-protocol-events": "node scripts/run-migration.js 024_add_user_protocol_events.sql",
     "migrate:student-identity-phase1": "node scripts/run-migration.js 025_prepare_round_independent_student_identity.sql",
     "migrate:student-identity-phase4": "node scripts/run-migration.js 027_remove_legacy_student_identity.sql",
+    "migrate:student-origin-source": "node scripts/run-migration.js 028_store_selected_source_in_student_origin.sql",
     "verify:student-identity-phase3a": "node scripts/verify-phase3a.js",
     "verify:student-identity-phase3": "node scripts/verify-phase3.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:import:pool": "node --test ../import/Testumgebung/test-import-pooldaten.mjs"
   },
   "keywords": [],
   "author": "",

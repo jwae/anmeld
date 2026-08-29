@@ -133,6 +133,36 @@ export type SchuelerNachHerkunftsschuleResponse = {
   rows: OffeneAnmeldungenRow[];
 };
 
+export type SchulgruppenRow = {
+  snr: string;
+  schule: string;
+  jahrgang: string;
+  gesamtkapazitaet: number;
+  maximale_klassen: number;
+  anmeldungen_gesamt: number;
+  freie_plaetze: number;
+  warteliste: number;
+  le: number;
+  zd: number;
+};
+
+export type SchulgruppenResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  runde: {
+    id: number;
+    bezeichnung: string;
+    runden_nummer: number;
+  };
+  generated_at: string;
+  total: number;
+  rows: SchulgruppenRow[];
+};
+
 function buildAuthConfig(token?: string): AuthConfig {
   const trimmedToken = String(token || "").trim();
   if (!trimmedToken) return {};
@@ -146,6 +176,17 @@ function buildAuthConfig(token?: string): AuthConfig {
 const auswertungenService = {
   async getCatalog(verfahrenId: number, rundeId: number, token?: string) {
     const response = await apiClient.get<AuswertungsCatalogResponse>("/api/auswertungen/catalog", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getSchulgruppen(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.get<SchulgruppenResponse>("/api/auswertungen/schulgruppen", {
       params: {
         verfahren_id: verfahrenId,
         runde_id: rundeId,

@@ -8,6 +8,7 @@ function createAuswertungenRouter({ requirePermission, getPool }) {
   router.use(requirePermission("verfahren.anzeigen"));
 
   router.get("/catalog", controller.catalog);
+  router.get("/schulgruppen", controller.schulgruppen);
   router.get("/offene-anmeldungen", controller.offeneAnmeldungen);
   router.get("/pool-schueler-aktuelle-runde", controller.poolSchuelerAktuelleRunde);
   router.get("/schueler-nach-herkunftsschule", controller.schuelerNachHerkunftsschule);

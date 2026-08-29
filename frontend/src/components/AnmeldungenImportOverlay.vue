@@ -165,7 +165,7 @@ function buildAutoMapping(columns: string[]) {
   const byKey = new Map(columns.map((column) => [normalizeMappingKey(column), column]));
   const aliases: Record<string, string[]> = {
     externe_schueler_id: ["externe_schueler_id"],
-    anmeldeschule_snr: ["anmeldeschule_snr", "snr", "schul_nr", "schulnummer"],
+    anmeldeschule_snr: ["anmeldeschule_snr", "aufnahmeschule_snr", "snr_aufn", "snr", "schul_nr", "schulnummer"],
     anmeldestatus: ["anmeldestatus", "status", "anmeldestatus_code"],
     vorname: ["vorname"],
     nachname: ["nachname", "name"],

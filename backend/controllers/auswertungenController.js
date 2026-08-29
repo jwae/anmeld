@@ -3,6 +3,7 @@ const { buildSchuelerRundenuebersichtReport } = require("../lib/schuelerRundenue
 const { buildOffeneAnmeldungenReport } = require("../lib/offeneAnmeldungenReportService");
 const { buildPoolSchuelerAktuelleRundeReport } = require("../lib/poolSchuelerAktuelleRundeReportService");
 const { buildSchuelerNachHerkunftsschuleReport } = require("../lib/schuelerNachHerkunftsschuleReportService");
+const { buildSchulgruppenReport } = require("../lib/schulgruppenReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -16,7 +17,6 @@ const CARD_DEFINITIONS = [
     formats: ["pdf", "excel"],
     options: [
       { key: "verfahrensdaten", label: "Verfahrensdaten" },
-      { key: "runden", label: "Runden" },
       { key: "schulgruppen", label: "Schulgruppen" },
       { key: "kapazitaeten", label: "Kapazitaeten" },
       { key: "zusammenfassung", label: "Zusammenfassung" },
@@ -113,6 +113,40 @@ function createAuswertungenController({ getPool }) {
       res.json({
         cards: CARD_DEFINITIONS,
       });
+    },
+
+    schulgruppen: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildSchulgruppenReport(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: "Beteiligte Schulen der Schulgruppen",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Schulgruppen-Auswertung konnte nicht geladen werden.",
+        );
+      }
     },
 
     schuelerRundenuebersicht: async (req, res) => {
