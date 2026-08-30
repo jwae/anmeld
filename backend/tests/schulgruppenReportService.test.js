@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 
 const {
   buildSchulgruppenCsv,
+  buildSchulgruppenAssignmentCsv,
+  mapSchoolGroupAssignmentRow,
   mapSchoolGroupRow,
 } = require("../lib/schulgruppenReportService");
 
@@ -52,4 +54,32 @@ test("buildSchulgruppenCsv erzeugt die geforderte Spaltenfolge", () => {
     "ZD",
   ]);
   assert.deepEqual(csv.rows[1], ["123456", "Schule", "5", 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test("Schulgruppen-Zuordnungen enthalten Rolle, Gruppe und Schule", () => {
+  const row = mapSchoolGroupAssignmentRow({
+    rolle: " Zielschulen ",
+    schulgruppe: " Weiterfuehrende Schulen ",
+    beschreibung: " Gruppe A ",
+    aktiv: 1,
+    snr: " 123456 ",
+    schule: " Gesamtschule Mitte ",
+  });
+
+  assert.deepEqual(row, {
+    rolle: "Zielschulen",
+    schulgruppe: "Weiterfuehrende Schulen",
+    beschreibung: "Gruppe A",
+    aktiv: "Ja",
+    snr: "123456",
+    schule: "Gesamtschule Mitte",
+  });
+  assert.deepEqual(buildSchulgruppenAssignmentCsv({ rows: [row] }).rows[0], [
+    "Rolle",
+    "Schulgruppe",
+    "Beschreibung",
+    "Aktiv",
+    "SNR",
+    "Schule",
+  ]);
 });

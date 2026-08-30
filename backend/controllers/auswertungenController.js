@@ -3,7 +3,15 @@ const { buildSchuelerRundenuebersichtReport } = require("../lib/schuelerRundenue
 const { buildOffeneAnmeldungenReport } = require("../lib/offeneAnmeldungenReportService");
 const { buildPoolSchuelerAktuelleRundeReport } = require("../lib/poolSchuelerAktuelleRundeReportService");
 const { buildSchuelerNachHerkunftsschuleReport } = require("../lib/schuelerNachHerkunftsschuleReportService");
-const { buildSchulgruppenReport } = require("../lib/schulgruppenReportService");
+const { buildSchuelerlisteReport } = require("../lib/schuelerlistenReportService");
+const { buildSchulenReport } = require("../lib/schulenReportService");
+const { buildOffeneFaelleReport } = require("../lib/offeneFaelleReportService");
+const { buildSchulgruppenAssignmentReport } = require("../lib/schulgruppenReportService");
+const {
+  buildVerfahrensdatenPreviewReport,
+  buildKapazitaetenPreviewReport,
+  buildZusammenfassungPreviewReport,
+} = require("../lib/verfahrensuebersichtReportService");
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -26,20 +34,17 @@ const CARD_DEFINITIONS = [
     id: "schuelerlisten",
     title: "Schuelerlisten",
     description: "Auswertungen der Schuelerdaten.",
-    formats: ["pdf", "excel"],
-      options: [
-        { key: "alle-schueler", label: "Alle Schueler" },
-        { key: "nur-pool", label: "Pool" },
-        { key: "nur-anmeldung", label: "Nur Anmeldung" },
-        { key: "pool-plus-anmeldung", label: "Pool + Anmeldung" },
-        { key: "neuaufnahme", label: "Neuaufnahme" },
-        { key: "warteliste", label: "Warteliste / Zuordnungen" },
-        { key: "zugeordnete-schueler", label: "Zugeordnete Schueler" },
-        { key: "ohne-anmeldung", label: "Ohne Anmeldung" },
+    formats: ["excel"],
+    options: [
+      { key: "alle-schueler", label: "Alle Schueler" },
+      { key: "nur-pool", label: "Pool" },
+      { key: "neuaufnahme", label: "Neuaufnahme" },
+      { key: "warteliste", label: "Warteliste / Zuordnungen" },
+      { key: "zugeordnete-schueler", label: "Zugeordnete Schueler" },
+      { key: "ohne-anmeldung", label: "Ohne Anmeldung" },
       { key: "nach-zielschule", label: "Nach Zielschule mit Herkunftsschule" },
       { key: "nach-herkunftsschule", label: "Nach Herkunftsschule mit Zielschule" },
       { key: "foerderbedarf", label: "Foerderbedarf" },
-      { key: "zieldifferent", label: "Zieldifferent" },
     ],
   },
   {
@@ -58,7 +63,7 @@ const CARD_DEFINITIONS = [
     id: "offene-faelle",
     title: "Offene Faelle",
     description: "Auswertungen aller offenen Faelle.",
-    formats: ["pdf", "excel"],
+    formats: ["excel"],
     options: [
       { key: "alle-offenen-faelle", label: "Alle offenen Faelle, mit Fallgrund und Status" },
     ],
@@ -79,13 +84,6 @@ const CARD_DEFINITIONS = [
     description: "Statistische Auswertungen.",
     formats: ["pdf", "excel"],
     options: [
-      { key: "anzahl-anmeldungen", label: "Anzahl Anmeldungen" },
-      { key: "anmeldungen-je-schule", label: "Anmeldungen je Schule" },
-      { key: "auslastung-der-schulen", label: "Auslastung der Schulen" },
-      { key: "freie-plaetze", label: "Freie Plaetze" },
-      { key: "herkunftsschulen", label: "Herkunftsschulen" },
-      { key: "foerderbedarf", label: "Foerderbedarf" },
-      { key: "koordinierungen", label: "Koordinierungen" },
       { key: "entwicklung-ueber-die-runden", label: "Entwicklung ueber die Runden" },
     ],
   },
@@ -122,9 +120,9 @@ function createAuswertungenController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
         if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
 
-        const report = await buildSchulgruppenReport(getPool(), verfahrenId, rundeId);
+        const report = await buildSchulgruppenAssignmentReport(getPool(), verfahrenId, rundeId);
         return res.json({
-          title: "Beteiligte Schulen der Schulgruppen",
+          title: "Schulgruppen und zugeordnete Schulen",
           verfahren: {
             id: report.procedure.id,
             bezeichnung: report.procedure.bezeichnung || "",
@@ -145,6 +143,58 @@ function createAuswertungenController({ getPool }) {
           res,
           error?.statusCode || 500,
           error?.message || "Die Schulgruppen-Auswertung konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    verfahrensuebersicht: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        const auswertung = normalizeText(req.query?.auswertung);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const builders = {
+          verfahrensdaten: {
+            title: "Verfahrensdaten",
+            build: buildVerfahrensdatenPreviewReport,
+          },
+          kapazitaeten: {
+            title: "Kapazitaeten",
+            build: buildKapazitaetenPreviewReport,
+          },
+          zusammenfassung: {
+            title: "Zusammenfassung des Verfahrens",
+            build: buildZusammenfassungPreviewReport,
+          },
+        };
+        const definition = builders[auswertung];
+        if (!definition) return sendError(res, 404, "Auswertung der Verfahrensuebersicht nicht gefunden.");
+
+        const report = await definition.build(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: definition.title,
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Vorschau der Verfahrensuebersicht konnte nicht geladen werden.",
         );
       }
     },
@@ -278,6 +328,111 @@ function createAuswertungenController({ getPool }) {
       }
     },
 
+    schuelerliste: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        const auswertung = normalizeText(req.query?.auswertung);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildSchuelerlisteReport(getPool(), verfahrenId, rundeId, auswertung);
+        return res.json({
+          title: report.definition.title,
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Schuelerliste konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    schulen: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        const auswertung = normalizeText(req.query?.auswertung);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildSchulenReport(getPool(), verfahrenId, rundeId, auswertung);
+        return res.json({
+          title: report.definition.title,
+          kind: report.definition.kind,
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Schulauswertung konnte nicht geladen werden.",
+        );
+      }
+    },
+
+    offeneFaelle: async (req, res) => {
+      try {
+        const verfahrenId = parsePositiveNumber(req.query?.verfahren_id);
+        const rundeId = parsePositiveNumber(req.query?.runde_id);
+        if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
+        if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
+
+        const report = await buildOffeneFaelleReport(getPool(), verfahrenId, rundeId);
+        return res.json({
+          title: "Alle offenen Faelle mit Fallgrund und Status",
+          verfahren: {
+            id: report.procedure.id,
+            bezeichnung: report.procedure.bezeichnung || "",
+            schuljahr: report.procedure.schuljahr || "",
+          },
+          runde: {
+            id: report.round.id,
+            bezeichnung: report.round.bezeichnung || "",
+            runden_nummer: report.round.runden_nummer || 0,
+          },
+          generated_at: report.generated_at,
+          total: report.rows.length,
+          rows: report.rows,
+        });
+      } catch (error) {
+        console.error(error);
+        return sendError(
+          res,
+          error?.statusCode || 500,
+          error?.message || "Die Auswertung der offenen Faelle konnte nicht geladen werden.",
+        );
+      }
+    },
+
     generate: async (req, res) => {
       const verfahrenId = parsePositiveNumber(req.body?.verfahren_id);
       const rundeId = parsePositiveNumber(req.body?.runde_id);
@@ -329,6 +484,12 @@ function createAuswertungenController({ getPool }) {
         if (!auswertung) return sendError(res, 400, "Auswertung ist erforderlich.");
         if (!["pdf", "excel", "word"].includes(format)) {
           return sendError(res, 400, "Ausgabeformat ist ungueltig.");
+        }
+        if (bereich === "schuelerlisten" && format !== "excel") {
+          return sendError(res, 400, "Schuelerlisten sind nur als CSV-Export verfuegbar.");
+        }
+        if (bereich === "offene-faelle" && format !== "excel") {
+          return sendError(res, 400, "Offene Faelle sind nur als CSV-Export verfuegbar.");
         }
 
         const download = await createAuswertungDownload({

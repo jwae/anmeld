@@ -79,6 +79,8 @@ export type OffeneAnmeldungenRow = {
   abgebende_schule_name: string;
   anmeldestatus: string;
   schule: string;
+  foerderbedarf?: string;
+  zieldifferent?: string;
   bemerkung: string;
 };
 
@@ -134,16 +136,12 @@ export type SchuelerNachHerkunftsschuleResponse = {
 };
 
 export type SchulgruppenRow = {
+  rolle: string;
+  schulgruppe: string;
+  beschreibung: string;
+  aktiv: string;
   snr: string;
   schule: string;
-  jahrgang: string;
-  gesamtkapazitaet: number;
-  maximale_klassen: number;
-  anmeldungen_gesamt: number;
-  freie_plaetze: number;
-  warteliste: number;
-  le: number;
-  zd: number;
 };
 
 export type SchulgruppenResponse = {
@@ -161,6 +159,27 @@ export type SchulgruppenResponse = {
   generated_at: string;
   total: number;
   rows: SchulgruppenRow[];
+};
+
+export type VerfahrensuebersichtResponse = {
+  title: string;
+  verfahren: {
+    id: number;
+    bezeichnung: string;
+    schuljahr: string;
+  };
+  runde: {
+    id: number;
+    bezeichnung: string;
+    runden_nummer: number;
+  };
+  generated_at: string;
+  total: number;
+  rows: Array<Record<string, string | number>>;
+};
+
+export type SchulenResponse = VerfahrensuebersichtResponse & {
+  kind: "metrics" | "students" | "capacities";
 };
 
 function buildAuthConfig(token?: string): AuthConfig {
@@ -190,6 +209,18 @@ const auswertungenService = {
       params: {
         verfahren_id: verfahrenId,
         runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getVerfahrensuebersicht(verfahrenId: number, rundeId: number, auswertung: string, token?: string) {
+    const response = await apiClient.get<VerfahrensuebersichtResponse>("/api/auswertungen/verfahrensuebersicht", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+        auswertung,
       },
       ...buildAuthConfig(token),
     });
@@ -277,6 +308,41 @@ const auswertungenService = {
 
   async getSchuelerNachHerkunftsschule(verfahrenId: number, rundeId: number, token?: string) {
     const response = await apiClient.get<SchuelerNachHerkunftsschuleResponse>("/api/auswertungen/schueler-nach-herkunftsschule", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getSchuelerliste(verfahrenId: number, rundeId: number, auswertung: string, token?: string) {
+    const response = await apiClient.get<OffeneAnmeldungenResponse>("/api/auswertungen/schuelerliste", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+        auswertung,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getSchulenAuswertung(verfahrenId: number, rundeId: number, auswertung: string, token?: string) {
+    const response = await apiClient.get<SchulenResponse>("/api/auswertungen/schulen", {
+      params: {
+        verfahren_id: verfahrenId,
+        runde_id: rundeId,
+        auswertung,
+      },
+      ...buildAuthConfig(token),
+    });
+    return response.data;
+  },
+
+  async getOffeneFaelleAuswertung(verfahrenId: number, rundeId: number, token?: string) {
+    const response = await apiClient.get<VerfahrensuebersichtResponse>("/api/auswertungen/offene-faelle", {
       params: {
         verfahren_id: verfahrenId,
         runde_id: rundeId,

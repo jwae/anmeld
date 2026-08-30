@@ -8,6 +8,8 @@ import auswertungenService, {
   type SchulgruppenResponse,
   type SchuelerNachHerkunftsschuleResponse,
   type SchuelerRundenuebersichtResponse,
+  type SchulenResponse,
+  type VerfahrensuebersichtResponse,
 } from "../services/auswertungenService";
 
 const props = defineProps<{
@@ -30,6 +32,11 @@ const actionLoadingKey = ref("");
 const previewOverlayOpen = ref(false);
 const previewLoading = ref(false);
 const previewErrorMessage = ref("");
+const hiddenSchuelerlistenOptions = new Set([
+  "nur-anmeldung",
+  "pool-plus-anmeldung",
+  "zieldifferent",
+]);
 let errorMessageTimer: ReturnType<typeof setTimeout> | null = null;
 let successMessageTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -124,34 +131,72 @@ function isSourceSchoolOption(cardId: string, optionKey: string) {
   return cardId === "schuelerlisten" && optionKey === "nach-herkunftsschule";
 }
 
+function isStudentListOption(cardId: string) {
+  return cardId === "schuelerlisten";
+}
+
+function isGenericStudentListOption(cardId: string, optionKey: string) {
+  return cardId === "schuelerlisten"
+    && [
+      "alle-schueler",
+      "neuaufnahme",
+      "zugeordnete-schueler",
+      "ohne-anmeldung",
+      "nach-zielschule",
+      "foerderbedarf",
+    ].includes(optionKey);
+}
+
+function isSchoolsOption(cardId: string, optionKey: string) {
+  return cardId === "schulen"
+    && ["anmeldungen-je-schule", "zugeordnete-schueler", "freie-plaetze", "kapazitaetsuebersicht"].includes(optionKey);
+}
+
+function isOpenCasesOption(cardId: string, optionKey: string) {
+  return cardId === "offene-faelle" && optionKey === "alle-offenen-faelle";
+}
+
 function isSchoolGroupsOption(cardId: string, optionKey: string) {
   return cardId === "verfahrensuebersicht" && optionKey === "schulgruppen";
 }
 
+function isVerfahrensuebersichtOption(cardId: string, optionKey: string) {
+  return cardId === "verfahrensuebersicht"
+    && ["verfahrensdaten", "schulgruppen", "kapazitaeten", "zusammenfassung"].includes(optionKey);
+}
+
 function isPreviewOption(cardId: string, optionKey: string) {
-  return isSchoolGroupsOption(cardId, optionKey)
+  return isVerfahrensuebersichtOption(cardId, optionKey)
     || isRoundOverviewOption(cardId, optionKey)
-    || isOpenStatusOption(cardId, optionKey)
-    || isPoolOriginOption(cardId, optionKey)
-    || isSourceSchoolOption(cardId, optionKey);
+    || isStudentListOption(cardId)
+    || isSchoolsOption(cardId, optionKey)
+    || isOpenCasesOption(cardId, optionKey);
+}
+
+function isImplementedOption(cardId: string, optionKey: string) {
+  return (cardId === "verfahrensuebersicht" && ["verfahrensdaten", "schulgruppen", "kapazitaeten", "zusammenfassung"].includes(optionKey))
+    || isRoundOverviewOption(cardId, optionKey)
+    || isStudentListOption(cardId)
+    || isSchoolsOption(cardId, optionKey)
+    || isOpenCasesOption(cardId, optionKey);
 }
 
 function isImplementedDownload(cardId: string, optionKey: string) {
-  return (cardId === "verfahrensuebersicht" && optionKey === "verfahrensdaten")
-    || isPreviewOption(cardId, optionKey);
+  return isPreviewOption(cardId, optionKey);
 }
 
 function shouldShowPreviewButton(cardId: string) {
-  if (cardId === "statistiken" || cardId === "schuelerlisten") return true;
+  if (["verfahrensuebersicht", "statistiken", "schuelerlisten", "anschreiben"].includes(cardId)) return true;
   return isPreviewOption(cardId, String(selectedOptions.value[cardId] || "").trim());
 }
 
 function isPreviewOnlyCard(cardId: string) {
-  return cardId === "statistiken" || cardId === "schuelerlisten";
+  return ["verfahrensuebersicht", "statistiken", "schuelerlisten", "anschreiben"].includes(cardId);
 }
 
 function supportsPreviewExport(format: "excel" | "pdf") {
-  return previewData.value?.exportFormats?.includes(format) ?? true;
+  if (!previewData.value) return false;
+  return previewData.value.exportFormats?.includes(format) ?? true;
 }
 
 function formatPreviewCell(value: string | number | undefined) {
@@ -183,7 +228,21 @@ async function loadCatalog() {
     errorMessage.value = "";
     successMessage.value = "";
     const response = await auswertungenService.getCatalog(props.verfahrenId, props.rundeId, props.token);
-    cards.value = Array.isArray(response?.cards) ? response.cards : [];
+    cards.value = (Array.isArray(response?.cards) ? response.cards : []).map((card) => {
+      if (card.id === "schuelerlisten") {
+        return {
+          ...card,
+          options: card.options.filter((option) => !hiddenSchuelerlistenOptions.has(option.key)),
+        };
+      }
+      if (card.id === "statistiken") {
+        return {
+          ...card,
+          options: card.options.filter((option) => option.key === "entwicklung-ueber-die-runden"),
+        };
+      }
+      return card;
+    });
     ensureSelectedOptions(cards.value);
   } catch (error: any) {
     cards.value = [];
@@ -209,12 +268,12 @@ function createRoundOverviewPreviewState(response: SchuelerRundenuebersichtRespo
     total: Number(response.total || 0),
     rows: Array.isArray(response.rows) ? response.rows : [],
     columns: [
-      { key: "lfd_nr", label: "Lfd. Nr." },
-      { key: "externe_schueler_id", label: "Externe Schueler-ID" },
-      { key: "name_vorname", label: "Name, Vorname" },
-      { key: "geburtsdatum", label: "Geb.-Dat." },
-      { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
-      { key: "abgebende_schule_name", label: "Name abgebende Schule" },
+      { key: "lfd_nr", label: "Nr." },
+      { key: "externe_schueler_id", label: "ID" },
+      { key: "name_vorname", label: "Name" },
+      { key: "geburtsdatum", label: "Geb.-Dat.", className: "no-wrap" },
+      { key: "abgebende_schule_nr", label: "Abg.SNr." },
+      { key: "abgebende_schule_name", label: "Schule" },
       { key: "r1_status", label: "R1-Status", className: "round-col round-col-r1" },
       { key: "r1_schule", label: "R1-Schule", className: "round-col round-col-r1" },
       { key: "r2_status", label: "R2-Status", className: "round-col round-col-r2" },
@@ -225,6 +284,7 @@ function createRoundOverviewPreviewState(response: SchuelerRundenuebersichtRespo
     emptyMessage: "Keine Daten fuer dieses Verfahren vorhanden.",
     exportBereich: "statistiken",
     exportAuswertung: "entwicklung-ueber-die-runden",
+    exportFormats: ["excel"],
   };
 }
 
@@ -247,11 +307,14 @@ function createOpenStatusPreviewState(response: OffeneAnmeldungenResponse): Prev
       { key: "abgebende_schule_name", label: "Name abgebende Schule" },
       { key: "anmeldestatus", label: "Anmeldestatus" },
       { key: "schule", label: "Schule" },
+      { key: "foerderbedarf", label: "Förderbedarf" },
+      { key: "zieldifferent", label: "ZD" },
       { key: "bemerkung", label: "Bemerkung" },
     ],
     emptyMessage: 'Fuer die ausgewaehlte Runde gibt es keine Schuelerinnen und Schueler mit den Anmeldestatus "Zuordnung", "Warteliste" oder "Ohne".',
     exportBereich: "schuelerlisten",
     exportAuswertung: "warteliste",
+    exportFormats: ["excel"],
   };
 }
 
@@ -274,11 +337,14 @@ function createPoolOriginPreviewState(response: PoolSchuelerAktuelleRundeRespons
       { key: "abgebende_schule_name", label: "Name abgebende Schule" },
       { key: "anmeldestatus", label: "Anmeldestatus" },
       { key: "schule", label: "Schule" },
+      { key: "foerderbedarf", label: "Förderbedarf" },
+      { key: "zieldifferent", label: "ZD" },
       { key: "bemerkung", label: "Bemerkung" },
     ],
     emptyMessage: 'Fuer die ausgewaehlte Runde gibt es keine Schuelerinnen und Schueler mit Herkunft "Pool".',
     exportBereich: "schuelerlisten",
     exportAuswertung: "nur-pool",
+    exportFormats: ["excel"],
   };
 }
 
@@ -300,11 +366,48 @@ function createSourceSchoolPreviewState(response: SchuelerNachHerkunftsschuleRes
       { key: "geburtsdatum", label: "GebDat" },
       { key: "schule", label: "Zielschule" },
       { key: "anmeldestatus", label: "Anmeldestatus" },
+      { key: "foerderbedarf", label: "Förderbedarf" },
+      { key: "zieldifferent", label: "ZD" },
       { key: "bemerkung", label: "Bemerkung" },
     ],
     emptyMessage: "Fuer die ausgewaehlte Runde gibt es keine Schuelerdaten.",
     exportBereich: "schuelerlisten",
     exportAuswertung: "nach-herkunftsschule",
+    exportFormats: ["excel"],
+  };
+}
+
+function createStudentListPreviewState(
+  optionKey: string,
+  response: OffeneAnmeldungenResponse,
+): PreviewState {
+  const roundLabel = response.runde?.bezeichnung
+    || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  return {
+    key: `schuelerlisten:${optionKey}`,
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: [
+      { key: "lfd_nr", label: "Lfd. Nr." },
+      { key: "externe_schueler_id", label: "Externe Schüler-ID" },
+      { key: "name_vorname", label: "Name, Vorname" },
+      { key: "geburtsdatum", label: "Geb.-Dat." },
+      { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
+      { key: "abgebende_schule_name", label: "Name abgebende Schule" },
+      { key: "anmeldestatus", label: "Anmeldestatus" },
+      { key: "schule", label: "Schule" },
+      { key: "foerderbedarf", label: "Förderbedarf" },
+      { key: "zieldifferent", label: "ZD" },
+      { key: "bemerkung", label: "Bemerkung" },
+    ],
+    emptyMessage: "Für die ausgewählte Schülerliste sind keine Datensätze vorhanden.",
+    exportBereich: "schuelerlisten",
+    exportAuswertung: optionKey,
+    exportFormats: ["excel"],
   };
 }
 
@@ -320,20 +423,160 @@ function createSchoolGroupsPreviewState(response: SchulgruppenResponse): Preview
     total: Number(response.total || 0),
     rows: Array.isArray(response.rows) ? response.rows : [],
     columns: [
+      { key: "rolle", label: "Rolle" },
+      { key: "schulgruppe", label: "Schulgruppe" },
+      { key: "beschreibung", label: "Beschreibung" },
+      { key: "aktiv", label: "Aktiv" },
       { key: "snr", label: "SNR" },
       { key: "schule", label: "Schule" },
-      { key: "jahrgang", label: "Jahrgang" },
-      { key: "gesamtkapazitaet", label: "Gesamt-Kapazität" },
-      { key: "maximale_klassen", label: "Max. Klassen" },
-      { key: "anmeldungen_gesamt", label: "Anmeldungen-Gesamt" },
-      { key: "freie_plaetze", label: "Freie Plätze" },
-      { key: "warteliste", label: "Warteliste" },
-      { key: "le", label: "LE" },
-      { key: "zd", label: "ZD" },
     ],
-    emptyMessage: "Für die Schulgruppen dieses Verfahrens sind keine beteiligten Schulen vorhanden.",
+    emptyMessage: "Für dieses Verfahren sind keine Schulgruppen zugeordnet.",
     exportBereich: "verfahrensuebersicht",
     exportAuswertung: "schulgruppen",
+    exportFormats: ["excel"],
+  };
+}
+
+function createVerfahrensuebersichtPreviewState(
+  optionKey: string,
+  response: VerfahrensuebersichtResponse,
+): PreviewState {
+  const roundLabel = response.runde?.bezeichnung
+    || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  const definitions: Record<string, { columns: PreviewColumn[]; emptyMessage: string }> = {
+    verfahrensdaten: {
+      columns: [
+        { key: "bereich", label: "Bereich" },
+        { key: "feld", label: "Feld" },
+        { key: "wert", label: "Wert" },
+      ],
+      emptyMessage: "Für dieses Verfahren sind keine Verfahrensdaten vorhanden.",
+    },
+    kapazitaeten: {
+      columns: [
+        { key: "snr", label: "SNR" },
+        { key: "schule", label: "Schule" },
+        { key: "jahrgang", label: "Jahrgang" },
+        { key: "gesamtkapazitaet", label: "Gesamt-Kapazität" },
+        { key: "maximale_klassen", label: "Max. Klassen" },
+        { key: "anmeldungen_gesamt", label: "Anmeldungen-Gesamt" },
+        { key: "freie_plaetze", label: "Freie Plätze" },
+        { key: "warteliste", label: "Warteliste" },
+        { key: "le", label: "LE" },
+        { key: "zd", label: "ZD" },
+      ],
+      emptyMessage: "Für dieses Verfahren sind keine Kapazitäten hinterlegt.",
+    },
+    zusammenfassung: {
+      columns: [
+        { key: "kennzahl", label: "Kennzahl" },
+        { key: "wert", label: "Wert" },
+      ],
+      emptyMessage: "Für dieses Verfahren kann keine Zusammenfassung gebildet werden.",
+    },
+  };
+  const definition = definitions[optionKey] || definitions.zusammenfassung;
+
+  return {
+    key: `verfahrensuebersicht:${optionKey}`,
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: definition.columns,
+    emptyMessage: definition.emptyMessage,
+    exportBereich: "verfahrensuebersicht",
+    exportAuswertung: optionKey,
+  };
+}
+
+function createSchoolsPreviewState(optionKey: string, response: SchulenResponse): PreviewState {
+  const roundLabel = response.runde?.bezeichnung
+    || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  const columnsByKind: Record<SchulenResponse["kind"], PreviewColumn[]> = {
+    metrics: [
+      { key: "snr", label: "SNR" },
+      { key: "schule", label: "Schule" },
+      { key: "schulform", label: "Schulform" },
+      { key: "anmeldungen", label: "Anmeldungen" },
+      { key: "neuaufnahmen", label: "Neuaufnahmen" },
+      { key: "warteliste", label: "Warteliste" },
+      { key: "zugeordnet", label: "Zugeordnet" },
+      { key: "kapazitaet", label: "Kapazität" },
+      { key: "reservierte_plaetze", label: "Reserviert" },
+      { key: "freie_plaetze", label: "Freie Plätze" },
+    ],
+    students: [
+      { key: "lfd_nr", label: "Lfd. Nr." },
+      { key: "externe_schueler_id", label: "Externe Schüler-ID" },
+      { key: "name_vorname", label: "Name, Vorname" },
+      { key: "geburtsdatum", label: "Geb.-Dat." },
+      { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
+      { key: "abgebende_schule_name", label: "Name abgebende Schule" },
+      { key: "schule", label: "Zielschule" },
+      { key: "foerderbedarf", label: "Förderbedarf" },
+      { key: "zieldifferent", label: "ZD" },
+      { key: "bemerkung", label: "Bemerkung" },
+    ],
+    capacities: [
+      { key: "snr", label: "SNR" },
+      { key: "schule", label: "Schule" },
+      { key: "schulform", label: "Schulform" },
+      { key: "jahrgang", label: "Jahrgang" },
+      { key: "maximale_klassen", label: "Max. Klassen" },
+      { key: "schueler_pro_klasse", label: "Schüler je Klasse" },
+      { key: "gesamtkapazitaet", label: "Gesamtkapazität" },
+      { key: "reservierte_plaetze", label: "Reserviert" },
+      { key: "verfuegbare_plaetze", label: "Verfügbar" },
+      { key: "bemerkung", label: "Bemerkung" },
+    ],
+  };
+
+  return {
+    key: `schulen:${optionKey}`,
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: columnsByKind[response.kind] || columnsByKind.metrics,
+    emptyMessage: "Für diese Schulauswertung sind keine Datensätze vorhanden.",
+    exportBereich: "schulen",
+    exportAuswertung: optionKey,
+  };
+}
+
+function createOpenCasesPreviewState(response: VerfahrensuebersichtResponse): PreviewState {
+  const roundLabel = response.runde?.bezeichnung
+    || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  return {
+    key: "offene-faelle:alle-offenen-faelle",
+    title: response.title,
+    verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
+    rundeLabel: roundLabel,
+    generatedAt: response.generated_at || "-",
+    total: Number(response.total || 0),
+    rows: Array.isArray(response.rows) ? response.rows : [],
+    columns: [
+      { key: "lfd_nr", label: "Lfd. Nr." },
+      { key: "fall_id", label: "Fall-ID" },
+      { key: "externe_schueler_id", label: "Externe Schüler-ID" },
+      { key: "name_vorname", label: "Name, Vorname" },
+      { key: "geburtsdatum", label: "Geb.-Dat." },
+      { key: "aktuelle_snr", label: "Aktuelle SNR" },
+      { key: "aktuelle_schule", label: "Aktuelle Schule" },
+      { key: "fallgrund_code", label: "Fallgrund-Code" },
+      { key: "fallgrund", label: "Fallgrund" },
+      { key: "fallstatus", label: "Fallstatus" },
+      { key: "bemerkung", label: "Bemerkung" },
+      { key: "aktualisiert", label: "Aktualisiert" },
+    ],
+    emptyMessage: "Für die ausgewählte Runde sind keine offenen Fälle vorhanden.",
+    exportBereich: "offene-faelle",
+    exportAuswertung: "alle-offenen-faelle",
     exportFormats: ["excel"],
   };
 }
@@ -342,8 +585,10 @@ async function openPreview(card: AuswertungsKachel) {
   if (!props.verfahrenId || !props.rundeId) return;
   const selectedOption = String(selectedOptions.value[card.id] || "").trim();
   if (!isPreviewOption(card.id, selectedOption)) {
-    errorMessage.value = "Die Vorschau ist fuer die aktuell ausgewaehlte Auswertung noch nicht verfuegbar.";
-    successMessage.value = "";
+    previewData.value = null;
+    previewLoading.value = false;
+    previewErrorMessage.value = "Die aktuell ausgewaehlte Auswertung ist in dieser Version nicht umgesetzt.";
+    previewOverlayOpen.value = true;
     return;
   }
 
@@ -352,9 +597,18 @@ async function openPreview(card: AuswertungsKachel) {
     previewOverlayOpen.value = true;
     previewLoading.value = true;
     previewErrorMessage.value = "";
+    previewData.value = null;
     if (isSchoolGroupsOption(card.id, selectedOption)) {
       const response = await auswertungenService.getSchulgruppen(props.verfahrenId, props.rundeId, props.token);
       previewData.value = createSchoolGroupsPreviewState(response);
+    } else if (isVerfahrensuebersichtOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getVerfahrensuebersicht(
+        props.verfahrenId,
+        props.rundeId,
+        selectedOption,
+        props.token,
+      );
+      previewData.value = createVerfahrensuebersichtPreviewState(selectedOption, response);
     } else if (isRoundOverviewOption(card.id, selectedOption)) {
       const response = await auswertungenService.getSchuelerRundenuebersicht(props.verfahrenId, props.token);
       previewData.value = createRoundOverviewPreviewState(response);
@@ -364,9 +618,34 @@ async function openPreview(card: AuswertungsKachel) {
     } else if (isPoolOriginOption(card.id, selectedOption)) {
       const response = await auswertungenService.getPoolSchuelerAktuelleRunde(props.verfahrenId, props.rundeId, props.token);
       previewData.value = createPoolOriginPreviewState(response);
-    } else {
+    } else if (isSourceSchoolOption(card.id, selectedOption)) {
       const response = await auswertungenService.getSchuelerNachHerkunftsschule(props.verfahrenId, props.rundeId, props.token);
       previewData.value = createSourceSchoolPreviewState(response);
+    } else if (isGenericStudentListOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getSchuelerliste(
+        props.verfahrenId,
+        props.rundeId,
+        selectedOption,
+        props.token,
+      );
+      previewData.value = createStudentListPreviewState(selectedOption, response);
+    } else if (isSchoolsOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getSchulenAuswertung(
+        props.verfahrenId,
+        props.rundeId,
+        selectedOption,
+        props.token,
+      );
+      previewData.value = createSchoolsPreviewState(selectedOption, response);
+    } else if (isOpenCasesOption(card.id, selectedOption)) {
+      const response = await auswertungenService.getOffeneFaelleAuswertung(
+        props.verfahrenId,
+        props.rundeId,
+        props.token,
+      );
+      previewData.value = createOpenCasesPreviewState(response);
+    } else {
+      throw new Error("Die Vorschau ist fuer diese Auswertung nicht verfuegbar.");
     }
   } catch (error: any) {
     previewData.value = null;
@@ -400,6 +679,131 @@ async function exportPreview(format: "excel" | "pdf") {
       : `${previewData.value.title}: PDF wurde heruntergeladen.`;
   } catch (error: any) {
     previewErrorMessage.value = error?.response?.data?.error || error?.message || "Der Export konnte nicht erzeugt werden.";
+  } finally {
+    actionLoadingKey.value = "";
+  }
+}
+
+function appendPrintTextElement(
+  doc: Document,
+  parent: HTMLElement,
+  tagName: string,
+  textValue: string,
+  className = "",
+) {
+  const element = doc.createElement(tagName);
+  element.textContent = textValue;
+  if (className) element.className = className;
+  parent.appendChild(element);
+  return element;
+}
+
+async function printRoundOverview() {
+  const data = previewData.value;
+  if (!data || data.key !== "statistiken:entwicklung-ueber-die-runden") return;
+
+  let printFrame: HTMLIFrameElement | null = null;
+  let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+  const cleanup = () => {
+    if (cleanupTimer) {
+      clearTimeout(cleanupTimer);
+      cleanupTimer = null;
+    }
+    printFrame?.remove();
+    printFrame = null;
+  };
+
+  try {
+    actionLoadingKey.value = actionKey(data.key, "print");
+    previewErrorMessage.value = "";
+    printFrame = document.createElement("iframe");
+    printFrame.setAttribute("aria-hidden", "true");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "1px";
+    printFrame.style.height = "1px";
+    printFrame.style.border = "0";
+    printFrame.style.opacity = "0";
+    document.body.appendChild(printFrame);
+
+    const printWindow = printFrame.contentWindow;
+    const printDocument = printFrame.contentDocument;
+    if (!printWindow || !printDocument) throw new Error("Die Druckansicht konnte nicht erstellt werden.");
+
+    printDocument.open();
+    printDocument.write("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><title></title></head><body></body></html>");
+    printDocument.close();
+    printDocument.title = data.title;
+
+    const style = printDocument.createElement("style");
+    style.textContent = `
+      @page { size: A4 landscape; margin: 10mm; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: #111827; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; }
+      h1 { margin: 0 0 3mm; color: #17385f; font-size: 16pt; }
+      .print-meta { display: flex; flex-wrap: wrap; gap: 2mm 7mm; margin: 0 0 5mm; color: #374151; font-size: 9pt; }
+      table { width: 100%; border-collapse: collapse; table-layout: auto; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; page-break-inside: avoid; }
+      th, td { padding: 1.6mm 1.8mm; border: 0.2mm solid #cbd5e1; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+      th { background: #e8eef6; color: #17385f; font-weight: 700; white-space: nowrap; }
+      .no-wrap { white-space: nowrap; }
+      .round-col-r1 { background: #f1f8ff; }
+      .round-col-r2 { background: #f3fbf0; }
+      .round-col-r3 { background: #fff6ee; }
+      .print-empty { padding: 6mm; border: 0.2mm solid #cbd5e1; text-align: center; }
+    `;
+    printDocument.head.appendChild(style);
+
+    const body = printDocument.body;
+    appendPrintTextElement(printDocument, body, "h1", data.title);
+    const meta = printDocument.createElement("div");
+    meta.className = "print-meta";
+    body.appendChild(meta);
+    appendPrintTextElement(printDocument, meta, "span", `Verfahren: ${data.verfahrenLabel}`);
+    if (data.rundeLabel) appendPrintTextElement(printDocument, meta, "span", `Runde: ${data.rundeLabel}`);
+    appendPrintTextElement(printDocument, meta, "span", `Erstellt: ${data.generatedAt}`);
+    appendPrintTextElement(printDocument, meta, "span", `Datensätze: ${data.total}`);
+
+    if (!data.rows.length) {
+      appendPrintTextElement(printDocument, body, "p", data.emptyMessage, "print-empty");
+    } else {
+      const table = printDocument.createElement("table");
+      const tableHead = printDocument.createElement("thead");
+      const headRow = printDocument.createElement("tr");
+      for (const column of data.columns) {
+        const cell = appendPrintTextElement(printDocument, headRow, "th", column.label);
+        if (column.className) cell.className = column.className;
+      }
+      tableHead.appendChild(headRow);
+      table.appendChild(tableHead);
+
+      const tableBody = printDocument.createElement("tbody");
+      for (const row of data.rows) {
+        const tableRow = printDocument.createElement("tr");
+        for (const column of data.columns) {
+          const rawValue = row[column.key];
+          const displayValue = rawValue === undefined || rawValue === null || rawValue === "" ? "-" : String(rawValue);
+          const cell = appendPrintTextElement(printDocument, tableRow, "td", displayValue);
+          if (column.className) cell.className = column.className;
+        }
+        tableBody.appendChild(tableRow);
+      }
+      table.appendChild(tableBody);
+      body.appendChild(table);
+    }
+
+    await new Promise<void>((resolve) => {
+      printWindow.requestAnimationFrame(() => printWindow.requestAnimationFrame(() => resolve()));
+    });
+    printWindow.addEventListener("afterprint", cleanup, { once: true });
+    cleanupTimer = setTimeout(cleanup, 60000);
+    printWindow.focus();
+    printWindow.print();
+  } catch (error: any) {
+    cleanup();
+    previewErrorMessage.value = error?.message || "Die Druckansicht konnte nicht erstellt werden.";
   } finally {
     actionLoadingKey.value = "";
   }
@@ -558,7 +962,7 @@ watch(
               :key="`${card.id}-${option.key}`"
               class="auswertung-option"
               :class="{
-                'is-highlighted': isPreviewOption(card.id, option.key),
+                'is-implemented': isImplementedOption(card.id, option.key),
                 'is-selected': selectedOptions[card.id] === option.key,
               }"
             >
@@ -632,7 +1036,7 @@ watch(
           <p>Daten fuer die Vorschau werden geladen...</p>
         </section>
 
-        <section v-else class="auswertungen-preview-body">
+        <section v-else-if="previewData" class="auswertungen-preview-body">
           <div class="auswertungen-preview-meta">
             <span>Verfahren: {{ previewData?.verfahrenLabel || context.verfahren }}</span>
             <span v-if="previewData?.rundeLabel">Runde: {{ previewData?.rundeLabel }}</span>
@@ -658,8 +1062,8 @@ watch(
               </thead>
               <tbody>
                 <tr
-                  v-for="row in previewData?.rows || []"
-                  :key="`${previewData?.key || 'preview'}-${String(row.snr || row.interne_schueler_id || row.externe_schueler_id || row.lfd_nr)}`"
+                  v-for="(row, rowIndex) in previewData?.rows || []"
+                  :key="`${previewData?.key || 'preview'}-${String(row.snr || row.interne_schueler_id || row.externe_schueler_id || row.lfd_nr)}-${rowIndex}`"
                 >
                   <td
                     v-for="column in previewData?.columns || []"
@@ -677,6 +1081,15 @@ watch(
         <div class="auswertungen-preview-actions">
           <button class="btn-secondary" type="button" @click="closePreviewOverlay">
             Schliessen
+          </button>
+          <button
+            v-if="previewData?.key === 'statistiken:entwicklung-ueber-die-runden'"
+            class="btn-primary auswertung-action-btn"
+            type="button"
+            :disabled="actionLoadingKey === actionKey(previewData.key, 'print')"
+            @click="printRoundOverview"
+          >
+            {{ actionLoadingKey === actionKey(previewData.key, "print") ? "Druck wird vorbereitet..." : "Drucken" }}
           </button>
           <button
             v-if="supportsPreviewExport('excel')"
@@ -851,11 +1264,6 @@ watch(
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.auswertung-option.is-highlighted {
-  color: #0d66c2;
-  font-weight: 700;
-}
-
 .auswertung-option.is-selected {
   border-color: #7fb1eb;
   background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
@@ -896,7 +1304,14 @@ watch(
 
 .auswertung-option-label {
   min-width: 0;
+  color: #000;
+  font-weight: 400;
   line-height: 1.3;
+}
+
+.auswertung-option.is-implemented .auswertung-option-label {
+  color: #000;
+  font-weight: 400;
 }
 
 .auswertung-option.is-selected .auswertung-option-label {
@@ -979,7 +1394,7 @@ watch(
 }
 
 .auswertungen-preview-dialog {
-  width: min(1440px, calc(100vw - 32px));
+  width: 70vw;
   max-height: min(92vh, 980px);
   display: grid;
   gap: 18px;

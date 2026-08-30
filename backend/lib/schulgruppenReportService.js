@@ -38,6 +38,70 @@ function mapSchoolGroupRow(row) {
   };
 }
 
+function mapSchoolGroupAssignmentRow(row) {
+  return {
+    rolle: normalizeText(row?.rolle) || "-",
+    schulgruppe: normalizeText(row?.schulgruppe) || "-",
+    beschreibung: normalizeText(row?.beschreibung) || "-",
+    aktiv: Number(row?.aktiv || 0) === 1 ? "Ja" : "Nein",
+    snr: normalizeText(row?.snr) || "-",
+    schule: normalizeText(row?.schule) || "-",
+  };
+}
+
+async function buildSchulgruppenAssignmentReport(pool, verfahrenId, rundeId) {
+  const procedure = await anmeldeverfahrenModel.findById(pool, verfahrenId);
+  if (!procedure) {
+    const error = new Error("Anmeldeverfahren nicht gefunden.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const round = await anmelderundenModel.findById(pool, rundeId);
+  if (!round || Number(round.verfahren_id) !== Number(verfahrenId)) {
+    const error = new Error("Anmelderunde nicht gefunden.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const [rows] = await pool.query(
+    `
+    SELECT
+      vsg.rolle,
+      sg.name AS schulgruppe,
+      sg.beschreibung,
+      sg.aktiv,
+      sgs.snr,
+      s.name AS schule
+    FROM anm_verfahren_schulgruppe vsg
+    JOIN anm_schulgruppe sg
+      ON sg.id = vsg.schulgruppe_id
+    LEFT JOIN anm_schulgruppe_schule sgs
+      ON sgs.schulgruppe_id = sg.id
+    LEFT JOIN anm_schulen s
+      ON s.snr = sgs.snr
+    WHERE vsg.verfahren_id = ?
+    ORDER BY
+      CASE vsg.rolle
+        WHEN 'Quellschulen' THEN 1
+        WHEN 'Zielschulen' THEN 2
+        ELSE 9
+      END,
+      sg.name ASC,
+      COALESCE(NULLIF(TRIM(s.name), ''), '-') ASC,
+      sgs.snr ASC
+    `,
+    [verfahrenId],
+  );
+
+  return {
+    procedure,
+    round,
+    generated_at: formatTimestampDate(new Date()),
+    rows: (rows || []).map(mapSchoolGroupAssignmentRow),
+  };
+}
+
 async function buildSchulgruppenReport(pool, verfahrenId, rundeId) {
   const procedure = await anmeldeverfahrenModel.findById(pool, verfahrenId);
   if (!procedure) {
@@ -162,9 +226,28 @@ function buildSchulgruppenCsv(report) {
   };
 }
 
+function buildSchulgruppenAssignmentCsv(report) {
+  return {
+    rows: [
+      ["Rolle", "Schulgruppe", "Beschreibung", "Aktiv", "SNR", "Schule"],
+      ...report.rows.map((row) => ([
+        row.rolle,
+        row.schulgruppe,
+        row.beschreibung,
+        row.aktiv,
+        row.snr,
+        row.schule,
+      ])),
+    ],
+  };
+}
+
 module.exports = {
   buildSchulgruppenReport,
   buildSchulgruppenCsv,
+  buildSchulgruppenAssignmentReport,
+  buildSchulgruppenAssignmentCsv,
   mapSchoolGroupRow,
+  mapSchoolGroupAssignmentRow,
   sanitizeFileName,
 };

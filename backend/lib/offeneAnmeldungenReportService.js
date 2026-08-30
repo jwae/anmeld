@@ -29,6 +29,11 @@ function formatTimestampDate(value) {
   return `${day}.${month}.${year}`;
 }
 
+function formatFlag(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  return normalized && !["0", "false", "nein", "no"].includes(normalized) ? "Ja" : "Nein";
+}
+
 function normalizeOpenStatus(value) {
   const normalized = normalizeText(value).toLowerCase();
   if (normalized === "zuordnung" || normalized === "zugeordnet") return "Zuordnung";
@@ -94,6 +99,8 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
       COALESCE(NULLIF(TRIM(reg.name), ''), '') AS anmeldeschule_name,
       COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), '') AS koordinierte_snr,
       COALESCE(NULLIF(TRIM(coord.name), ''), '') AS koordinierte_schule_name,
+      COALESCE(NULLIF(TRIM(s.foerderbedarf), ''), '') AS foerderbedarf,
+      COALESCE(NULLIF(TRIM(s.zieldifferent), ''), '') AS zieldifferent,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
     JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
@@ -132,6 +139,8 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
         schule: isAssigned
           ? (normalizeText(row?.koordinierte_schule_name) || normalizeText(row?.koordinierte_snr) || "-")
           : (normalizeText(row?.anmeldeschule_name) || normalizeText(row?.anmeldeschule_snr) || "-"),
+        foerderbedarf: formatFlag(row?.foerderbedarf),
+        zieldifferent: formatFlag(row?.zieldifferent),
         bemerkung: normalizeText(row?.bemerkung) || "-",
       };
     })
@@ -155,6 +164,8 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
       abgebende_schule_name: row.abgebende_schule_name,
       anmeldestatus: row.anmeldestatus,
       schule: row.schule,
+      foerderbedarf: row.foerderbedarf,
+      zieldifferent: row.zieldifferent,
       bemerkung: row.bemerkung,
     }));
 
@@ -178,6 +189,8 @@ function buildOffeneAnmeldungenCsv(report) {
         "Name abgebende Schule",
         "Anmeldestatus",
         "Schule",
+        "Foerderbedarf",
+        "ZD",
         "Bemerkung",
       ],
       ...report.rows.map((row) => ([
@@ -189,6 +202,8 @@ function buildOffeneAnmeldungenCsv(report) {
         row.abgebende_schule_name,
         row.anmeldestatus,
         row.schule,
+        row.foerderbedarf,
+        row.zieldifferent,
         row.bemerkung,
       ])),
     ],
@@ -204,7 +219,7 @@ function buildOffeneAnmeldungenPdfLines(report) {
     `Erstellt am: ${report.generated_at}`,
     `Datensaetze: ${report.rows.length}`,
     "",
-    "Lfd | Schueler-ID | Name | Geb.-Dat. | Nr. abg. Schule | Name abg. Schule | Anmeldestatus | Schule | Bemerkung",
+    "Lfd | Schueler-ID | Name | Geb.-Dat. | Nr. abg. Schule | Name abg. Schule | Anmeldestatus | Schule | Foerderbedarf | ZD | Bemerkung",
     ...report.rows.map((row) => ([
       row.lfd_nr,
       row.externe_schueler_id || row.interne_schueler_id,
@@ -214,6 +229,8 @@ function buildOffeneAnmeldungenPdfLines(report) {
       row.abgebende_schule_name,
       row.anmeldestatus,
       row.schule,
+      row.foerderbedarf,
+      row.zieldifferent,
       row.bemerkung,
     ].join(" | "))),
   ];

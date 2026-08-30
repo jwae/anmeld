@@ -29,6 +29,11 @@ function formatTimestampDate(value) {
   return `${day}.${month}.${year}`;
 }
 
+function formatFlag(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  return normalized && !["0", "false", "nein", "no"].includes(normalized) ? "Ja" : "Nein";
+}
+
 async function loadTableColumns(pool, tableName) {
   const [rows] = await pool.query(`SHOW COLUMNS FROM ${tableName}`);
   return new Set((rows || []).map((row) => String(row?.Field || "").trim()).filter(Boolean));
@@ -79,6 +84,8 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
       COALESCE(NULLIF(TRIM(reg.name), ''), '') AS anmeldeschule_name,
       COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), '') AS koordinierte_snr,
       COALESCE(NULLIF(TRIM(coord.name), ''), '') AS koordinierte_schule_name,
+      COALESCE(NULLIF(TRIM(s.foerderbedarf), ''), '') AS foerderbedarf,
+      COALESCE(NULLIF(TRIM(s.zieldifferent), ''), '') AS zieldifferent,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
     JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
@@ -117,6 +124,8 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
         schule: isAssigned
           ? (normalizeText(row?.koordinierte_schule_name) || normalizeText(row?.koordinierte_snr) || "-")
           : (normalizeText(row?.anmeldeschule_name) || normalizeText(row?.anmeldeschule_snr) || "-"),
+        foerderbedarf: formatFlag(row?.foerderbedarf),
+        zieldifferent: formatFlag(row?.zieldifferent),
         bemerkung: normalizeText(row?.bemerkung) || "-",
       };
     })
@@ -142,6 +151,8 @@ async function buildSchuelerNachHerkunftsschuleReport(pool, verfahrenId, rundeId
       geburtsdatum: row.geburtsdatum,
       schule: row.schule,
       anmeldestatus: row.anmeldestatus,
+      foerderbedarf: row.foerderbedarf,
+      zieldifferent: row.zieldifferent,
       bemerkung: row.bemerkung,
     }));
 
@@ -164,6 +175,8 @@ function buildSchuelerNachHerkunftsschuleCsv(report) {
         "GebDat",
         "Zielschule",
         "Anmeldestatus",
+        "Foerderbedarf",
+        "ZD",
         "Bemerkung",
       ],
       ...report.rows.map((row) => ([
@@ -174,6 +187,8 @@ function buildSchuelerNachHerkunftsschuleCsv(report) {
         row.geburtsdatum,
         row.schule,
         row.anmeldestatus,
+        row.foerderbedarf,
+        row.zieldifferent,
         row.bemerkung,
       ])),
     ],
@@ -189,7 +204,7 @@ function buildSchuelerNachHerkunftsschulePdfLines(report) {
     `Erstellt am: ${report.generated_at}`,
     `Datensaetze: ${report.rows.length}`,
     "",
-    "Lfd | Schulnummer | Schulname | Name | GebDat | Zielschule | Anmeldestatus | Bemerkung",
+    "Lfd | Schulnummer | Schulname | Name | GebDat | Zielschule | Anmeldestatus | Foerderbedarf | ZD | Bemerkung",
     ...report.rows.map((row) => ([
       row.lfd_nr,
       row.abgebende_schule_nr,
@@ -198,6 +213,8 @@ function buildSchuelerNachHerkunftsschulePdfLines(report) {
       row.geburtsdatum,
       row.schule,
       row.anmeldestatus,
+      row.foerderbedarf,
+      row.zieldifferent,
       row.bemerkung,
     ].join(" | "))),
   ];
