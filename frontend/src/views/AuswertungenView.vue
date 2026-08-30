@@ -310,6 +310,9 @@ function createOpenStatusPreviewState(response: OffeneAnmeldungenResponse): Prev
       { key: "foerderbedarf", label: "Förderbedarf" },
       { key: "zieldifferent", label: "ZD" },
       { key: "bemerkung", label: "Bemerkung" },
+      { key: "strasse", label: "Straße" },
+      { key: "plz", label: "PLZ" },
+      { key: "ort", label: "Ort" },
     ],
     emptyMessage: 'Fuer die ausgewaehlte Runde gibt es keine Schuelerinnen und Schueler mit den Anmeldestatus "Zuordnung", "Warteliste" oder "Ohne".',
     exportBereich: "schuelerlisten",
@@ -383,6 +386,26 @@ function createStudentListPreviewState(
 ): PreviewState {
   const roundLabel = response.runde?.bezeichnung
     || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
+  const columns: PreviewColumn[] = [
+    { key: "lfd_nr", label: "Lfd. Nr." },
+    { key: "externe_schueler_id", label: "Externe Schüler-ID" },
+    { key: "name_vorname", label: "Name, Vorname" },
+    { key: "geburtsdatum", label: "Geb.-Dat." },
+    { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
+    { key: "abgebende_schule_name", label: "Name abgebende Schule" },
+    { key: "anmeldestatus", label: "Anmeldestatus" },
+    { key: "schule", label: "Schule" },
+    { key: "foerderbedarf", label: "Förderbedarf" },
+    { key: "zieldifferent", label: "ZD" },
+    { key: "bemerkung", label: "Bemerkung" },
+  ];
+  if (["zugeordnete-schueler", "ohne-anmeldung"].includes(optionKey)) {
+    columns.push(
+      { key: "strasse", label: "Straße" },
+      { key: "plz", label: "PLZ" },
+      { key: "ort", label: "Ort" },
+    );
+  }
   return {
     key: `schuelerlisten:${optionKey}`,
     title: response.title,
@@ -391,19 +414,7 @@ function createStudentListPreviewState(
     generatedAt: response.generated_at || "-",
     total: Number(response.total || 0),
     rows: Array.isArray(response.rows) ? response.rows : [],
-    columns: [
-      { key: "lfd_nr", label: "Lfd. Nr." },
-      { key: "externe_schueler_id", label: "Externe Schüler-ID" },
-      { key: "name_vorname", label: "Name, Vorname" },
-      { key: "geburtsdatum", label: "Geb.-Dat." },
-      { key: "abgebende_schule_nr", label: "Nr. abg. Schule" },
-      { key: "abgebende_schule_name", label: "Name abgebende Schule" },
-      { key: "anmeldestatus", label: "Anmeldestatus" },
-      { key: "schule", label: "Schule" },
-      { key: "foerderbedarf", label: "Förderbedarf" },
-      { key: "zieldifferent", label: "ZD" },
-      { key: "bemerkung", label: "Bemerkung" },
-    ],
+    columns,
     emptyMessage: "Für die ausgewählte Schülerliste sind keine Datensätze vorhanden.",
     exportBereich: "schuelerlisten",
     exportAuswertung: optionKey,

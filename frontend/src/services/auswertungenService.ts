@@ -82,6 +82,9 @@ export type OffeneAnmeldungenRow = {
   foerderbedarf?: string;
   zieldifferent?: string;
   bemerkung: string;
+  strasse?: string;
+  plz?: string;
+  ort?: string;
 };
 
 export type OffeneAnmeldungenResponse = {

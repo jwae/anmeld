@@ -109,6 +109,9 @@ async function buildSchuelerlisteReport(pool, verfahrenId, rundeId, auswertung) 
     : (studentColumns.has("snr") ? "s.snr" : "''");
   const supportColumn = studentColumns.has("foerderbedarf") ? "s.foerderbedarf" : "''";
   const differentGoalColumn = studentColumns.has("zieldifferent") ? "s.zieldifferent" : "''";
+  const streetColumn = studentColumns.has("strasse") ? "s.strasse" : "''";
+  const postalCodeColumn = studentColumns.has("plz") ? "s.plz" : "''";
+  const cityColumn = studentColumns.has("ort") ? "s.ort" : "''";
   const noteColumn = studentColumns.has("notiz") ? "s.notiz" : "''";
 
   const [rows] = await pool.query(
@@ -128,6 +131,9 @@ async function buildSchuelerlisteReport(pool, verfahrenId, rundeId, auswertung) 
       COALESCE(NULLIF(TRIM(coord.name), ''), '') AS koordinierte_schule_name,
       COALESCE(NULLIF(TRIM(${supportColumn}), ''), '') AS foerderbedarf,
       COALESCE(NULLIF(TRIM(${differentGoalColumn}), ''), '') AS zieldifferent,
+      COALESCE(NULLIF(TRIM(${streetColumn}), ''), '') AS strasse,
+      COALESCE(NULLIF(TRIM(${postalCodeColumn}), ''), '') AS plz,
+      COALESCE(NULLIF(TRIM(${cityColumn}), ''), '') AS ort,
       COALESCE(NULLIF(TRIM(${noteColumn}), ''), '') AS bemerkung
     FROM anm_schueler s
     JOIN anm_schueler_runde sr
@@ -168,6 +174,9 @@ async function buildSchuelerlisteReport(pool, verfahrenId, rundeId, auswertung) 
         : (normalizeText(row?.anmeldeschule_name) || normalizeText(row?.anmeldeschule_snr) || "-"),
       hatFoerderbedarf: isPositiveFlag(row?.foerderbedarf),
       istZieldifferent: isPositiveFlag(row?.zieldifferent),
+      strasse: normalizeText(row?.strasse) || "-",
+      plz: normalizeText(row?.plz) || "-",
+      ort: normalizeText(row?.ort) || "-",
       bemerkung: normalizeText(row?.bemerkung) || "-",
     };
   }).filter((row) => row.interne_schueler_id > 0 && definition.filter(row));
@@ -200,6 +209,9 @@ async function buildSchuelerlisteReport(pool, verfahrenId, rundeId, auswertung) 
       foerderbedarf: row.hatFoerderbedarf ? "Ja" : "Nein",
       zieldifferent: row.istZieldifferent ? "Ja" : "Nein",
       bemerkung: row.bemerkung,
+      strasse: row.strasse,
+      plz: row.plz,
+      ort: row.ort,
     })),
   };
 }

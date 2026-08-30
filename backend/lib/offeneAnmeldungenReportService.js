@@ -83,6 +83,9 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
     ? "s.herkunftsschule_snr"
     : (studentColumns.has("snr") ? "s.snr" : "''");
   const noteColumn = "COALESCE(NULLIF(TRIM(s.notiz), ''), '')";
+  const streetColumn = studentColumns.has("strasse") ? "s.strasse" : "''";
+  const postalCodeColumn = studentColumns.has("plz") ? "s.plz" : "''";
+  const cityColumn = studentColumns.has("ort") ? "s.ort" : "''";
 
   const [rows] = await pool.query(
     `
@@ -101,6 +104,9 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
       COALESCE(NULLIF(TRIM(coord.name), ''), '') AS koordinierte_schule_name,
       COALESCE(NULLIF(TRIM(s.foerderbedarf), ''), '') AS foerderbedarf,
       COALESCE(NULLIF(TRIM(s.zieldifferent), ''), '') AS zieldifferent,
+      COALESCE(NULLIF(TRIM(${streetColumn}), ''), '') AS strasse,
+      COALESCE(NULLIF(TRIM(${postalCodeColumn}), ''), '') AS plz,
+      COALESCE(NULLIF(TRIM(${cityColumn}), ''), '') AS ort,
       ${noteColumn} AS bemerkung
     FROM anm_schueler s
     JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
@@ -141,6 +147,9 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
           : (normalizeText(row?.anmeldeschule_name) || normalizeText(row?.anmeldeschule_snr) || "-"),
         foerderbedarf: formatFlag(row?.foerderbedarf),
         zieldifferent: formatFlag(row?.zieldifferent),
+        strasse: normalizeText(row?.strasse) || "-",
+        plz: normalizeText(row?.plz) || "-",
+        ort: normalizeText(row?.ort) || "-",
         bemerkung: normalizeText(row?.bemerkung) || "-",
       };
     })
@@ -167,6 +176,9 @@ async function buildOffeneAnmeldungenReport(pool, verfahrenId, rundeId) {
       foerderbedarf: row.foerderbedarf,
       zieldifferent: row.zieldifferent,
       bemerkung: row.bemerkung,
+      strasse: row.strasse,
+      plz: row.plz,
+      ort: row.ort,
     }));
 
   return {
