@@ -33,3 +33,4 @@ gemini.md
 backend/.env
 *.log
 ~$*
+.codex/
