@@ -55,7 +55,7 @@ function mapOpenCaseRow(row, index) {
   };
 }
 
-async function buildOffeneFaelleReport(pool, verfahrenId, rundeId) {
+async function buildOffeneFaelleReport(pool, verfahrenId, rundeId, options = {}) {
   const procedure = await anmeldeverfahrenModel.findById(pool, verfahrenId);
   if (!procedure) {
     const error = new Error("Anmeldeverfahren nicht gefunden.");
@@ -84,6 +84,11 @@ async function buildOffeneFaelleReport(pool, verfahrenId, rundeId) {
     ORDER BY prev_r.runden_nummer DESC, prev_sr.id DESC
     LIMIT 1
   )`;
+  const fallstatusCode = normalizeText(options?.fallstatusCode).toUpperCase();
+  const validFallstatusCodes = new Set(["OFFEN", "IN_BEARBEITUNG", "ZUGEORDNET", "ERLEDIGT"]);
+  const fallstatusFilter = validFallstatusCodes.has(fallstatusCode)
+    ? "AND UPPER(TRIM(COALESCE(fs.code, ''))) = ?"
+    : "";
 
   const [rows] = await pool.query(
     `
@@ -127,9 +132,10 @@ async function buildOffeneFaelleReport(pool, verfahrenId, rundeId) {
     LEFT JOIN anm_schulen assign ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
       AND sr.runde_id = ?
+      ${fallstatusFilter}
     ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), '') ASC
     `,
-    [rundeId, verfahrenId, rundeId],
+    [rundeId, verfahrenId, rundeId, ...(fallstatusFilter ? [fallstatusCode] : [])],
   );
 
   return {

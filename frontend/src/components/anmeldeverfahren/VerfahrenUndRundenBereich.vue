@@ -44,8 +44,6 @@ type RundenFormState = {
   status: AnmeldeStatus;
 };
 
-const CANONICAL_ROUND_NUMBERS = [1, 2, 3] as const;
-
 const verfahren = ref<Anmeldeverfahren[]>([]);
 const runden = ref<Anmelderunde[]>([]);
 const selectedVerfahrenId = ref<number | null>(props.initialVerfahrenId ?? null);
@@ -142,31 +140,18 @@ const currentInProgressRound = computed<Anmelderunde | null>(
   () => workingRunde.value,
 );
 
-const nextSuggestedRoundNumber = computed<number | null>(() => (
-  CANONICAL_ROUND_NUMBERS.find((roundNumber) => (
-    !runden.value.some((item) => Number(item.runden_nummer) === roundNumber)
-  )) ?? null
+const nextSuggestedRoundNumber = computed<number>(() => (
+  runden.value.reduce(
+    (highestRoundNumber, item) => Math.max(highestRoundNumber, Number(item.runden_nummer) || 0),
+    0,
+  ) + 1
 ));
 
 const canCreateRound = computed<boolean>(() => (
   !props.isReadonly
   && !!selectedVerfahrenId.value
   && !selectedProcedureLocked.value
-  && nextSuggestedRoundNumber.value !== null
 ));
-
-const assignableRoundNumbers = computed<number[]>(() => {
-  const available = CANONICAL_ROUND_NUMBERS.filter((roundNumber) => (
-    !runden.value.some((item) => (
-      item.id !== rundenForm.value.id && Number(item.runden_nummer) === roundNumber
-    ))
-  ));
-  const currentNumber = Number(rundenForm.value.runden_nummer || 0);
-  if (Number.isInteger(currentNumber) && currentNumber > 0 && !available.includes(currentNumber as 1 | 2 | 3)) {
-    return [...available, currentNumber].sort((a, b) => a - b);
-  }
-  return available;
-});
 
 const nextStartableRound = computed<Anmelderunde | null>(() => {
   if (selectedVerfahren.value?.status !== "In Bearbeitung") return null;
@@ -369,10 +354,6 @@ function openCreateRoundOverlay() {
     showError(null, "Bitte zuerst ein Anmeldeverfahren auswaehlen.");
     return;
   }
-  if (nextSuggestedRoundNumber.value === null) {
-    showError(null, "Fachlich sind pro Verfahren derzeit nur Runde 1 bis 3 vorgesehen.");
-    return;
-  }
   resetRundenForm();
   showRoundOverlay.value = true;
 }
@@ -503,13 +484,8 @@ async function submitRunde() {
   }
 
   const bezeichnung = rundenForm.value.bezeichnung.trim();
-  if (!rundenForm.value.runden_nummer) {
-    errorMessage.value = "Bitte eine Rundennummer auswaehlen.";
-    successMessage.value = "";
-    return;
-  }
-  if (!CANONICAL_ROUND_NUMBERS.includes(rundenForm.value.runden_nummer as 1 | 2 | 3)) {
-    errorMessage.value = "Fachlich sind nur Runde 1 bis 3 vorgesehen.";
+  if (!Number.isInteger(rundenForm.value.runden_nummer) || Number(rundenForm.value.runden_nummer) <= 0) {
+    errorMessage.value = "Rundennummer muss eine positive ganze Zahl sein.";
     successMessage.value = "";
     return;
   }
@@ -784,7 +760,6 @@ onBeforeUnmount(() => {
         <AnmelderundenForm
           v-model="rundenForm"
           :verfahren="selectedVerfahren"
-          :available-round-numbers="assignableRoundNumbers"
           :mode="roundFormMode"
           :saving="savingRunden"
           @submit="submitRunde"

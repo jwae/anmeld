@@ -65,13 +65,18 @@ const CARD_DEFINITIONS = [
     description: "Auswertungen aller offenen Faelle.",
     formats: ["excel"],
     options: [
-      { key: "alle-offenen-faelle", label: "Alle offenen Faelle, mit Fallgrund und Status" },
+      { key: "alle", label: "Alle" },
+      { key: "offene-faelle", label: "Offene Faelle" },
+      { key: "in-bearbeitung", label: "In Bearbeitung" },
+      { key: "zugeordnet", label: "Zugeordnet" },
+      { key: "erledigt", label: "Erledigt" },
     ],
   },
   {
     id: "anschreiben",
     title: "Anschreiben",
     description: "Erzeugung von Serienanschreiben.",
+    disabled: true,
     formats: ["pdf", "word"],
     options: [
       { key: "schreiben-erzieher", label: "Schreiben an die Erzieher" },
@@ -406,9 +411,19 @@ function createAuswertungenController({ getPool }) {
         if (!verfahrenId) return sendError(res, 400, "Ungueltige Verfahrens-ID.");
         if (!rundeId) return sendError(res, 400, "Ungueltige Runden-ID.");
 
-        const report = await buildOffeneFaelleReport(getPool(), verfahrenId, rundeId);
+        const statusByAuswertung = {
+          "offene-faelle": "OFFEN",
+          "in-bearbeitung": "IN_BEARBEITUNG",
+          zugeordnet: "ZUGEORDNET",
+          erledigt: "ERLEDIGT",
+        };
+        const auswertung = normalizeText(req.query?.auswertung);
+        const fallstatusCode = statusByAuswertung[auswertung] || "";
+        const report = await buildOffeneFaelleReport(getPool(), verfahrenId, rundeId, { fallstatusCode });
         return res.json({
-          title: "Alle offenen Faelle mit Fallgrund und Status",
+          title: fallstatusCode
+            ? `${CARD_DEFINITIONS.find((card) => card.id === "offene-faelle")?.options.find((option) => option.key === auswertung)?.label || "Offene Faelle"} mit Fallgrund und Status`
+            : "Alle offenen Faelle mit Fallgrund und Status",
           verfahren: {
             id: report.procedure.id,
             bezeichnung: report.procedure.bezeichnung || "",

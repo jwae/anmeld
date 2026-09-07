@@ -210,7 +210,7 @@ function columnsForReport(report) {
       ["snr", "SNR"], ["schule", "Schule"], ["schulform", "Schulform"], ["jahrgang", "Jahrgang"],
       ["maximale_klassen", "Max. Klassen"], ["schueler_pro_klasse", "Schueler je Klasse"],
       ["gesamtkapazitaet", "Gesamtkapazitaet"], ["reservierte_plaetze", "Reserviert"],
-      ["verfuegbare_plaetze", "Verfuegbar"], ["bemerkung", "Bemerkung"],
+      ["bemerkung", "Bemerkung"],
     ];
   }
   return [

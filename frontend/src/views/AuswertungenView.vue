@@ -153,7 +153,8 @@ function isSchoolsOption(cardId: string, optionKey: string) {
 }
 
 function isOpenCasesOption(cardId: string, optionKey: string) {
-  return cardId === "offene-faelle" && optionKey === "alle-offenen-faelle";
+  return cardId === "offene-faelle"
+    && ["alle", "offene-faelle", "in-bearbeitung", "zugeordnet", "erledigt"].includes(optionKey);
 }
 
 function isSchoolGroupsOption(cardId: string, optionKey: string) {
@@ -186,12 +187,12 @@ function isImplementedDownload(cardId: string, optionKey: string) {
 }
 
 function shouldShowPreviewButton(cardId: string) {
-  if (["verfahrensuebersicht", "statistiken", "schuelerlisten", "anschreiben"].includes(cardId)) return true;
+  if (["verfahrensuebersicht", "statistiken", "schuelerlisten"].includes(cardId)) return true;
   return isPreviewOption(cardId, String(selectedOptions.value[cardId] || "").trim());
 }
 
 function isPreviewOnlyCard(cardId: string) {
-  return ["verfahrensuebersicht", "statistiken", "schuelerlisten", "anschreiben"].includes(cardId);
+  return ["verfahrensuebersicht", "statistiken", "schuelerlisten"].includes(cardId);
 }
 
 function supportsPreviewExport(format: "excel" | "pdf") {
@@ -540,7 +541,6 @@ function createSchoolsPreviewState(optionKey: string, response: SchulenResponse)
       { key: "schueler_pro_klasse", label: "Schüler je Klasse" },
       { key: "gesamtkapazitaet", label: "Gesamtkapazität" },
       { key: "reservierte_plaetze", label: "Reserviert" },
-      { key: "verfuegbare_plaetze", label: "Verfügbar" },
       { key: "bemerkung", label: "Bemerkung" },
     ],
   };
@@ -560,11 +560,11 @@ function createSchoolsPreviewState(optionKey: string, response: SchulenResponse)
   };
 }
 
-function createOpenCasesPreviewState(response: VerfahrensuebersichtResponse): PreviewState {
+function createOpenCasesPreviewState(optionKey: string, response: VerfahrensuebersichtResponse): PreviewState {
   const roundLabel = response.runde?.bezeichnung
     || (response.runde?.runden_nummer ? `Runde ${response.runde.runden_nummer}` : props.context.runde);
   return {
-    key: "offene-faelle:alle-offenen-faelle",
+    key: `offene-faelle:${optionKey}`,
     title: response.title,
     verfahrenLabel: response.verfahren?.bezeichnung || props.context.verfahren,
     rundeLabel: roundLabel,
@@ -587,7 +587,7 @@ function createOpenCasesPreviewState(response: VerfahrensuebersichtResponse): Pr
     ],
     emptyMessage: "Für die ausgewählte Runde sind keine offenen Fälle vorhanden.",
     exportBereich: "offene-faelle",
-    exportAuswertung: "alle-offenen-faelle",
+    exportAuswertung: optionKey,
     exportFormats: ["excel"],
   };
 }
@@ -652,9 +652,10 @@ async function openPreview(card: AuswertungsKachel) {
       const response = await auswertungenService.getOffeneFaelleAuswertung(
         props.verfahrenId,
         props.rundeId,
+        selectedOption,
         props.token,
       );
-      previewData.value = createOpenCasesPreviewState(response);
+      previewData.value = createOpenCasesPreviewState(selectedOption, response);
     } else {
       throw new Error("Die Vorschau ist fuer diese Auswertung nicht verfuegbar.");
     }
@@ -943,12 +944,13 @@ watch(
         v-for="(card, cardIndex) in cards"
         :key="card.id"
         class="auswertung-card"
-        :class="{ 'is-expanded': isExpanded(card.id) }"
+        :class="{ 'is-expanded': isExpanded(card.id), 'is-disabled': card.disabled }"
       >
         <button
           type="button"
           class="auswertung-card-head"
           :aria-expanded="isExpanded(card.id) ? 'true' : 'false'"
+          :disabled="card.disabled"
           @click="toggleCard(card.id)"
         >
           <div class="auswertung-card-copy">
@@ -957,6 +959,7 @@ watch(
               <span>{{ card.title }}</span>
             </h3>
             <p>{{ card.description }}</p>
+            <span v-if="card.disabled" class="auswertung-disabled-note">Derzeit nicht verfügbar</span>
           </div>
           <span
             class="auswertung-chevron"
@@ -1189,6 +1192,22 @@ watch(
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.auswertung-card.is-disabled {
+  opacity: 0.62;
+}
+
+.auswertung-card-head:disabled {
+  cursor: not-allowed;
+}
+
+.auswertung-disabled-note {
+  display: inline-block;
+  margin-top: 10px;
+  color: #6c7f98;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .auswertung-card-copy h3 {

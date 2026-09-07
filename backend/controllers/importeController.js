@@ -1220,15 +1220,19 @@ async function upsertAnmeldungenWizardImportV3(connection, payload) {
     [verfahrenId, resolved.student.id, rundeId],
   );
   const poolMatch = hasPoolAbgleich(roundRows?.[0]) || normalizeTextLower(resolved.student.herkunft) === "pool";
+  const schoolBySnr = await loadProcedureSchoolLookup(connection, verfahrenId);
+  const unknownProcedureSchool = Boolean(schoolSnr) && !schoolBySnr.has(schoolSnr);
+  const [registeredSchoolRows] = schoolSnr
+    ? await connection.query("SELECT 1 FROM anm_schulen WHERE snr = ? LIMIT 1", [schoolSnr])
+    : [[]];
+  const schoolExists = Boolean(registeredSchoolRows?.length);
   await upsertRoundState(connection, {
     verfahren_id: verfahrenId, schueler_id: resolved.student.id, runde_id: rundeId,
-    schul_nr: schoolSnr || null,
+    schul_nr: schoolExists ? schoolSnr : null,
     anmeldestatus: normalizeText(row.anmeldestatus) || "Ohne",
     teilnahmestatus: normalizeText(row.teilnahmestatus) || "Aktiv",
     abgleich_status: poolMatch ? "Pool + Anm" : "Nur Anmeldung",
   });
-  const schoolBySnr = await loadProcedureSchoolLookup(connection, verfahrenId);
-  const unknownProcedureSchool = Boolean(schoolSnr) && !schoolBySnr.has(schoolSnr);
   const unknownSchoolCase = unknownProcedureSchool
     ? await ensureOpenCaseForUnknownProcedureSchool(connection, {
       verfahren_id: verfahrenId, schueler_id: Number(resolved.student.id),

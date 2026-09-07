@@ -53,11 +53,17 @@ const selectedRound = computed<Anmelderunde | null>(
         <p v-if="verfahren">Runden fuer {{ verfahren.bezeichnung }}.</p>
         <p v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
       </div>
-      <div v-if="verfahren" class="anm-card-head-actions">
-        <button v-if="!isReadonly" class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreateRound === false" @click="emit('create-round')">
-          {{ nextAvailableRoundNumber ? `Runde ${nextAvailableRoundNumber} anlegen` : "Runden vollstaendig" }}
+      <div class="anm-card-head-actions">
+        <button
+          class="btn-secondary anm-head-btn anm-head-btn-primary"
+          type="button"
+          :disabled="isReadonly || canCreateRound === false"
+          title="Legt eine weitere Anmelderunde für das ausgewählte Verfahren an"
+          @click="emit('create-round')"
+        >
+          Neue Runde
         </button>
-        <span class="anm-badge">{{ items.length }}</span>
+        <span v-if="verfahren" class="anm-badge">{{ items.length }}</span>
       </div>
     </div>
 
@@ -79,9 +85,6 @@ const selectedRound = computed<Anmelderunde | null>(
       </p>
       <p v-else-if="nextAvailableRoundNumber">
         Fuer dieses Verfahren ist als naechste Runde <strong>Runde {{ nextAvailableRoundNumber }}</strong> vorgesehen.
-      </p>
-      <p v-else>
-        Die fachlich vorgesehenen Runden 1 bis 3 sind bereits angelegt.
       </p>
     </div>
 

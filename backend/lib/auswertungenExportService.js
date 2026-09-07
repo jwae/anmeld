@@ -454,10 +454,18 @@ async function createAuswertungDownload({ pool, verfahrenId, rundeId, bereich, a
     }
   }
 
-  if (bereich === "offene-faelle" && auswertung === "alle-offenen-faelle") {
-    const report = await buildOffeneFaelleReport(pool, verfahrenId, rundeId);
+  const offeneFaelleStatusByAuswertung = {
+    "offene-faelle": "OFFEN",
+    "in-bearbeitung": "IN_BEARBEITUNG",
+    zugeordnet: "ZUGEORDNET",
+    erledigt: "ERLEDIGT",
+  };
+  if (bereich === "offene-faelle" && ["alle", ...Object.keys(offeneFaelleStatusByAuswertung)].includes(auswertung)) {
+    const report = await buildOffeneFaelleReport(pool, verfahrenId, rundeId, {
+      fallstatusCode: offeneFaelleStatusByAuswertung[auswertung] || "",
+    });
     const baseName = sanitizeOpenCasesFileName(
-      `offene-faelle-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`,
+      `${auswertung}-offene-faelle-runde-${report.round.runden_nummer}-${report.procedure.bezeichnung}`,
     );
     if (format === "excel") {
       return {

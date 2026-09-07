@@ -427,7 +427,9 @@ const schoolOverview = computed(() => {
   return rows.map((row) => ({
     ...row,
     freie_plaetze: Number(row.freie_plaetze ?? (Number(row.kapazitaet || 0) - Number(row.neuaufnahme || 0))),
+    zuordnungen: Number(row.zuordnungen ?? (Number(row.zuordnungen || 0) ))
   }));
+
 });
 
 const sortedRows = computed(() => {
@@ -747,7 +749,21 @@ function toggleSchuleFilter(schuleName: string) {
                     {{ row.freie_plaetze }}
                   </span>
                 </td>
-                <td>{{ row.zuordnungen }}</td>
+                <td>     
+                  <span
+                    :class="[
+                      'status-badge',
+                      Number(row.zuordnungen || 0) > 0
+                        ? 'status-badge-positive'
+                        : Number(row.zuordnungen || 0) < 0
+                          ? 'status-badge-negative'
+                          : 'status-badge-muted',
+                    ]"
+                  >
+
+                  {{ row.zuordnungen }}
+                  </span>                
+                </td>
                 <td>{{ row.warteliste }}</td>
                 <td>{{ row.ohne }}</td>
                 <td>{{ row.foerderbedarf }}</td>

@@ -3,7 +3,6 @@ import type { Anmeldeverfahren } from "../types";
 
 defineProps<{
   verfahren: Anmeldeverfahren | null;
-  availableRoundNumbers?: number[];
   mode?: "full" | "limited" | "readonly";
   modelValue: {
     id: number | null;
@@ -37,16 +36,14 @@ const emit = defineEmits<{
       <div class="anm-form-grid">
         <label class="field-block anm-form-field">
           <span class="field-label">Rundennummer</span>
-          <select
+          <input
+            type="number"
+            min="1"
+            step="1"
             :value="modelValue.runden_nummer ?? ''"
             :disabled="saving || !verfahren || mode !== 'full'"
-            @change="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLSelectElement).value || 0) || null })"
-          >
-            <option value="" disabled>Bitte waehlen</option>
-            <option v-for="roundNumber in (availableRoundNumbers || [])" :key="roundNumber" :value="roundNumber">
-              Runde {{ roundNumber }}
-            </option>
-          </select>
+            @input="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLInputElement).value || 0) || null })"
+          />
         </label>
 
         <label class="field-block anm-form-field">

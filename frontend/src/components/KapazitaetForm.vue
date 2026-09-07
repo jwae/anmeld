@@ -20,7 +20,6 @@ const formData = ref({
   jahrgang: '',
   maximale_klassen: 0,
   maximale_schueler_pro_klasse: 0,
-  gesamtkapazitaet: 0,
   reservierte_plaetze: 0,
   bemerkung: '',
 });
@@ -28,6 +27,11 @@ const formData = ref({
 const errors = ref<string[]>([]);
 
 const isEditMode = computed(() => Boolean(formData.value.id));
+const gesamtkapazitaet = computed(() =>
+  Number(formData.value.maximale_klassen || 0)
+  * Number(formData.value.maximale_schueler_pro_klasse || 0)
+  + Number(formData.value.reservierte_plaetze || 0),
+);
 
 watch(() => props.kapazitaet, (newVal) => {
   if (newVal) {
@@ -38,7 +42,6 @@ watch(() => props.kapazitaet, (newVal) => {
       jahrgang: String(newVal.jahrgang || ''),
       maximale_klassen: Number(newVal.maximale_klassen || 0),
       maximale_schueler_pro_klasse: Number(newVal.maximale_schueler_pro_klasse || 0),
-      gesamtkapazitaet: Number(newVal.gesamtkapazitaet || 0),
       reservierte_plaetze: Number(newVal.reservierte_plaetze || 0),
       bemerkung: String(newVal.bemerkung || ''),
     };
@@ -52,7 +55,6 @@ watch(() => props.kapazitaet, (newVal) => {
     jahrgang: '',
     maximale_klassen: 0,
     maximale_schueler_pro_klasse: 0,
-    gesamtkapazitaet: 0,
     reservierte_plaetze: 0,
     bemerkung: '',
   };
@@ -76,13 +78,13 @@ function validate() {
   if (formData.value.maximale_schueler_pro_klasse < 0) {
     errors.value.push('Schüler pro Klasse dürfen nicht negativ sein.');
   }
-  if (formData.value.gesamtkapazitaet < 0) {
+  if (gesamtkapazitaet.value < 0) {
     errors.value.push('Gesamtkapazität darf nicht negativ sein.');
   }
   if (formData.value.reservierte_plaetze < 0) {
     errors.value.push('Reservierte Plätze dürfen nicht negativ sein.');
   }
-  if (formData.value.reservierte_plaetze > formData.value.gesamtkapazitaet) {
+  if (formData.value.reservierte_plaetze > gesamtkapazitaet.value) {
     errors.value.push('Reservierte Plätze dürfen die Gesamtkapazität nicht überschreiten.');
   }
 
@@ -101,7 +103,7 @@ function save() {
     jahrgang: String(formData.value.jahrgang || '').trim(),
     maximale_klassen: Number(formData.value.maximale_klassen || 0),
     maximale_schueler_pro_klasse: Number(formData.value.maximale_schueler_pro_klasse || 0),
-    gesamtkapazitaet: Number(formData.value.gesamtkapazitaet || 0),
+    gesamtkapazitaet: gesamtkapazitaet.value,
     reservierte_plaetze: Number(formData.value.reservierte_plaetze || 0),
     bemerkung: String(formData.value.bemerkung || '').trim(),
   });
@@ -167,14 +169,22 @@ function save() {
         </label>
 
         <label class="field-block">
-          <span class="field-label">Gesamtkapazität</span>
-          <input v-model.number="formData.gesamtkapazitaet" type="number" min="0" />
+          <span class="field-label">Reservierte Plätze</span>
+          <input v-model.number="formData.reservierte_plaetze" type="number" min="0" />
         </label>
 
         <label class="field-block">
-          <span class="field-label">Davon Reservierte Plätze</span>
-          <input v-model.number="formData.reservierte_plaetze" type="number" min="0" />
+          <span class="field-label">Gesamtkapazität</span>
+          <input
+            :value="gesamtkapazitaet"
+            type="text"
+            readonly
+            title="Automatisch berechnet: Klassen × Schüler pro Klasse + reservierte Plätze"
+            aria-label="Gesamtkapazität. Automatisch berechnet aus Klassen, Schülern pro Klasse und reservierten Plätzen."
+          />
         </label>
+
+
 
         <label class="field-block kapazitaet-form-full-width">
           <span class="field-label">Bemerkung</span>
@@ -308,6 +318,13 @@ textarea:focus {
   border-color: #5a97e5;
   box-shadow: 0 0 0 4px rgba(90, 151, 229, 0.18);
   background: #ffffff;
+}
+
+input[readonly] {
+  background: #f2f6fb;
+  color: #6c7f98;
+  border-color: #dce5ef;
+  cursor: default;
 }
 
 select:disabled,

@@ -1,7 +1,5 @@
 const model = require("../models/anmelderundenModel");
 const verfahrenModel = require("../models/anmeldeverfahrenModel");
-const MAX_CANONICAL_ROUND_NUMBER = 3;
-
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
   if (details) payload.details = details;
@@ -85,10 +83,6 @@ function createAnmelderundenController({ getPool }) {
         const payload = parseRoundPayload(req.body);
         const validationError = validateRoundPayload(payload);
         if (validationError) return sendError(res, 400, validationError);
-        if (payload.runden_nummer > MAX_CANONICAL_ROUND_NUMBER) {
-          return sendError(res, 400, "Fachlich sind derzeit nur Runde 1 bis 3 vorgesehen.");
-        }
-
         const duplicate = await model.hasDuplicateRoundNumber(
           getPool(),
           verfahrenId,

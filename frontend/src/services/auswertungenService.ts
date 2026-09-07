@@ -15,6 +15,7 @@ export type AuswertungsKachel = {
   id: string;
   title: string;
   description: string;
+  disabled?: boolean;
   formats: AuswertungFormat[];
   options: AuswertungOption[];
 };
@@ -344,10 +345,11 @@ const auswertungenService = {
     return response.data;
   },
 
-  async getOffeneFaelleAuswertung(verfahrenId: number, rundeId: number, token?: string) {
+  async getOffeneFaelleAuswertung(verfahrenId: number, rundeId: number, auswertung: string, token?: string) {
     const response = await apiClient.get<VerfahrensuebersichtResponse>("/api/auswertungen/offene-faelle", {
       params: {
         verfahren_id: verfahrenId,
+        auswertung,
         runde_id: rundeId,
       },
       ...buildAuthConfig(token),

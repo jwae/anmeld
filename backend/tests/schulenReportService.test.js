@@ -45,5 +45,5 @@ test("Kapazitaetsuebersicht ist nach Jahrgang exportierbar", () => {
   const keys = columnsForReport(report).map((column) => column[0]);
 
   assert.equal(keys.includes("jahrgang"), true);
-  assert.equal(keys.includes("verfuegbare_plaetze"), true);
+  assert.equal(keys.includes("verfuegbare_plaetze"), false);
 });
