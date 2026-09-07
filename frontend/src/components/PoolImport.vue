@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { formatGermanDate as formatDate } from "../utils/date";
 import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import CsvImportOverlay from "./CsvImportOverlay.vue";
@@ -294,15 +295,7 @@ function normalizeDateKey(value: string | null | undefined) {
   return text.toLowerCase();
 }
 
-function formatDate(value: string | null | undefined) {
-  const text = normalizeText(value);
-  if (!text) return "-";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const [year, month, day] = text.split("-");
-    return `${day}.${month}.${year}`;
-  }
-  return text;
-}
+
 
 function truncateText(value: unknown, maxLength = 12) {
   const text = normalizeText(value);

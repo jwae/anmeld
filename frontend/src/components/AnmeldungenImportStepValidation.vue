@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { formatGermanDate } from "../utils/date";
 type Row = {
   row_number: number;
   selected: boolean;
@@ -17,9 +18,11 @@ function actionLabel(action: string) { if (action === "NEU") return "NEU"; if (a
 function statusChipClass(row: Row) { if (row.status === "fehler") return "status-chip-fehler"; if (row.status === "warnung") return "status-chip-warnung"; if (row.import_action === "NEU") return "status-chip-neu"; if (row.import_action === "UPDATE") return "status-chip-update"; return "status-chip-vorhanden"; }
 function hasFieldChanged(row: Row, field: string) { return Array.isArray(row.changed_fields) && row.changed_fields.includes(field); }
 function fieldValue(row: Row, field: string) {
+  if (field === "geburtsdatum") return formatGermanDate(row.data[field]);
   return row.data[field] || "-";
 }
 function previousFieldValue(row: Row, field: string) {
+  if (field === "geburtsdatum") return formatGermanDate(row.existing_data?.[field]);
   return row.existing_data?.[field] || "-";
 }
 function isEmptyPreviousFieldValue(row: Row, field: string) {

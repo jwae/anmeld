@@ -17,6 +17,11 @@ test("MG-Matching unterscheidet exakten Treffer, Schreibfehler und neuen Schuele
   const pool = {
     async query(sql, params = []) {
       const normalized = String(sql).replace(/\s+/g, " ").trim();
+      if (normalized.startsWith("SELECT s.id FROM anm_schueler s JOIN anm_runde")) {
+        assert.equal(params[1], 23);
+        assert.equal(params[2], 51);
+        return [[{ id: params[0] }]];
+      }
       if (normalized.startsWith("SELECT id, status FROM anm_verfahren")) return [[{ id: 23, status: "In Bearbeitung" }]];
       if (normalized.startsWith("SELECT id, verfahren_id, status FROM anm_runde")) return [[{ id: 51, verfahren_id: 23, status: "In Bearbeitung" }]];
       if (normalized.startsWith("SELECT verfahrenstyp FROM anm_verfahren")) return [[{ verfahrenstyp: "SEK1" }]];

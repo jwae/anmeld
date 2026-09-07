@@ -1,3 +1,4 @@
+const { normalizeCalendarDate } = require("../lib/calendarDate");
 ﻿const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -41,21 +42,7 @@ function normalizeTextLower(value) {
 }
 
 function normalizeDate(value) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-  const text = normalizeText(value);
-  if (!text) return null;
-  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-  if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) {
-    const [day, month, year] = text.split(".");
-    return `${year}-${month}-${day}`;
-  }
-  return text;
+  return normalizeCalendarDate(value) ?? (normalizeText(value) || null);
 }
 
 function normalizeBoolean(value) {
@@ -374,11 +361,7 @@ function isValidImportBoolean(value) {
 }
 
 function isValidIsoDate(value) {
-  const text = normalizeText(value);
-  if (!text) return true;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return true;
-  if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) return true;
-  return false;
+  return normalizeCalendarDate(value) !== null;
 }
 
 const MG_REQUIRED_HEADERS = ["SNr-Aufn.", "Name", "Vorname", "Geboren", "GL-Status", "Status"];
@@ -710,6 +693,12 @@ function getPoolImportComparisonFieldKeys(fieldDefinitions, mapping) {
     .map((field) => field.key);
 }
 
+function csvIdentityKey(sourceArt, schoolSnr, externalId) {
+  if (!normalizeText(externalId)) return null;
+  const snr = ["SCHULE", "KITA", "SONST"].includes(sourceArt) ? normalizeText(schoolSnr) : "";
+  return JSON.stringify([sourceArt, snr, normalizeText(externalId)]).toLocaleLowerCase("de-DE");
+}
+
 async function validatePoolImportRows(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
@@ -768,8 +757,9 @@ async function validatePoolImportRows(pool, payload) {
   ]));
 
   const duplicateCountById = new Map();
-  for (const id of ids) {
-    duplicateCountById.set(id, Number(duplicateCountById.get(id) || 0) + 1);
+  for (const row of csvRows) {
+    const key = csvIdentityKey(sourceArt, row?.record?.[mapping.source_school_snr], row?.record?.[mapping.externe_schueler_id]);
+    if (key) duplicateCountById.set(key, Number(duplicateCountById.get(key) || 0) + 1);
   }
 
   const rows = await Promise.all(csvRows.map(async (row) => {
@@ -802,7 +792,7 @@ async function validatePoolImportRows(pool, payload) {
     if (data.source_school_snr && !schoolBySnr.has(data.source_school_snr)) {
       errors.push("Quell-SNR gehoert nicht zu einer Schule im Verfahren.");
     }
-    if (data.externe_schueler_id && Number(duplicateCountById.get(data.externe_schueler_id) || 0) > 1) {
+    if (data.externe_schueler_id && Number(duplicateCountById.get(csvIdentityKey(sourceArt, data.source_school_snr, data.externe_schueler_id)) || 0) > 1) {
       errors.push("Import-ID ist in der CSV doppelt.");
     }
     if (!data.vorname) errors.push("Vorname fehlt.");
@@ -1003,12 +993,12 @@ async function validateAnmeldungenImportRows(pool, payload) {
   const schoolBySnr = await loadProcedureSchoolLookup(pool, verfahrenId);
   const targetStatuses = new Set(getAnmeldestatusTargetValues().map((value) => normalizeTextLower(value)));
 
-  const ids = csvRows
-    .map((row) => normalizeText(row?.record?.[mapping.externe_schueler_id] || ""))
-    .filter(Boolean);
   const duplicateCountById = new Map();
-  for (const id of ids) {
-    duplicateCountById.set(id, Number(duplicateCountById.get(id) || 0) + 1);
+  for (const row of csvRows) {
+    const school = isSourceSchoolMappingColumn(mapping.anmeldeschule_snr)
+      ? globalSchulNr : normalizeText(row?.record?.[mapping.anmeldeschule_snr]) || globalSchulNr;
+    const key = csvIdentityKey("SCHULE", school, row?.record?.[mapping.externe_schueler_id]);
+    if (key) duplicateCountById.set(key, Number(duplicateCountById.get(key) || 0) + 1);
   }
 
   const rows = [];
@@ -1047,7 +1037,7 @@ async function validateAnmeldungenImportRows(pool, payload) {
     const errors = [];
     const warnings = [];
     if (mapsSourceSchoolAsTarget) errors.push("herkunftsschule_snr darf nicht als anmeldeschule_snr zugeordnet werden.");
-    if (data.externe_schueler_id && Number(duplicateCountById.get(data.externe_schueler_id) || 0) > 1) errors.push("Externe Schueler-ID ist in der CSV doppelt.");
+    if (data.externe_schueler_id && Number(duplicateCountById.get(csvIdentityKey("SCHULE", data.anmeldeschule_snr, data.externe_schueler_id)) || 0) > 1) errors.push("Externe Schueler-ID ist in der CSV doppelt.");
     if (!data.anmeldeschule_snr) errors.push("anmeldeschule_snr fehlt.");
     if (data.anmeldeschule_snr && !schoolBySnr.has(data.anmeldeschule_snr)) errors.push("anmeldeschule_snr existiert nicht im Verfahren.");
     if (!data.anmeldestatus_raw) errors.push("Status aus CSV fehlt.");
@@ -1197,7 +1187,7 @@ async function upsertAnmeldungenWizardImportV3(connection, payload) {
   const existingByIdentity = externalId
     ? await findStudentByExternalId(connection, {
       herkunft_art: "SCHULE", herkunft_snr: schoolSnr || null, externe_id: externalId,
-    })
+    }, verfahrenId)
     : null;
   const resolved = await resolveStudent(connection, {
     verfahren_id: verfahrenId,

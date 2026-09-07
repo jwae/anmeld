@@ -731,7 +731,8 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       LEFT JOIN (
         SELECT
           k.snr,
-          SUM(COALESCE(k.gesamtkapazitaet, 0)) AS kapazitaet
+          SUM(COALESCE(k.gesamtkapazitaet, 0)) AS kapazitaet,
+          ${kapazitaetColumns.has("reservierte_plaetze") ? "SUM(COALESCE(k.reservierte_plaetze, 0))" : "0"} AS reservierte_plaetze
         FROM anm_kapazitaet k
         WHERE k.verfahren_id = ?
         GROUP BY k.snr
@@ -740,7 +741,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     `
     : `
       LEFT JOIN (
-        SELECT NULL AS snr, 0 AS kapazitaet
+        SELECT NULL AS snr, 0 AS kapazitaet, 0 AS reservierte_plaetze
       ) cap
         ON 1 = 0
     `;
@@ -752,8 +753,10 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       NULLIF(TRIM(${schoolColumn}), '') AS schulnummer,
       COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule') AS schule,
       COALESCE(cap.kapazitaet, 0) AS kapazitaet,
+      COALESCE(cap.reservierte_plaetze, 0) AS reservierte_plaetze,
       COUNT(*) AS gesamt,
       COALESCE(SUM(CASE WHEN ${statusExpr} = 'neuaufnahme' THEN 1 ELSE 0 END), 0) AS neuaufnahme,
+      COALESCE(SUM(CASE WHEN ${statusExpr} = 'zugeordnet' THEN 1 ELSE 0 END), 0) AS zuordnungen,
       COALESCE(SUM(CASE WHEN ${statusExpr} = 'warteliste' THEN 1 ELSE 0 END), 0) AS warteliste,
       0 AS ohne,
       COALESCE(SUM(${foerderbedarfExpr}), 0) AS foerderbedarf,
@@ -764,7 +767,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       ON sch.snr = ${schoolColumn}
     ${capacityJoin}
     ${assignedWhereClause}
-    GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0)
+    GROUP BY NULLIF(TRIM(${schoolColumn}), ''), COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule'), COALESCE(cap.kapazitaet, 0), COALESCE(cap.reservierte_plaetze, 0)
     ORDER BY COALESCE(NULLIF(TRIM(sch.name), ''), 'Ohne Schule') ASC
     `,
     assignedParams,
@@ -787,6 +790,9 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
     schulnummer: normalizeText(row?.schulnummer),
     schule: normalizeText(row?.schule) || "Ohne Schule",
     kapazitaet: Number(row?.kapazitaet || 0),
+    reservierte_plaetze: Number(row?.reservierte_plaetze || 0),
+    freie_plaetze: Number(row?.kapazitaet || 0) - Number(row?.neuaufnahme || 0),
+    zuordnungen: Number(row?.zuordnungen || 0),
     gesamt: Number(row?.gesamt || 0),
     neuaufnahme: Number(row?.neuaufnahme || 0),
     warteliste: Number(row?.warteliste || 0),
@@ -801,6 +807,9 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
       schulnummer: "",
       schule: "Ohne Zuordnung",
       kapazitaet: 0,
+      reservierte_plaetze: 0,
+      freie_plaetze: 0,
+      zuordnungen: 0,
       gesamt: ohneGesamt,
       neuaufnahme: 0,
       warteliste: 0,

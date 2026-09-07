@@ -49,9 +49,11 @@ type SchoolOverviewRow = {
   schulnummer: string;
   schule: string;
   kapazitaet: number;
+  reservierte_plaetze: number;
   gesamt: number;
   neuaufnahme: number;
   freie_plaetze?: number;
+  zuordnungen: number;
   warteliste: number;
   ohne: number;
   foerderbedarf: number;
@@ -424,7 +426,7 @@ const schoolOverview = computed(() => {
 
   return rows.map((row) => ({
     ...row,
-    freie_plaetze: Number(row.kapazitaet || 0) - Number(row.neuaufnahme || 0),
+    freie_plaetze: Number(row.freie_plaetze ?? (Number(row.kapazitaet || 0) - Number(row.neuaufnahme || 0))),
   }));
 });
 
@@ -700,7 +702,8 @@ function toggleSchuleFilter(schuleName: string) {
                 <th>Kapazitaet</th>
                 <th>Anm.-Gesamt</th>
                 <th>Neuaufnahme</th>
-                <th>Freie Plaetze</th>
+                <th title="Gesamtkapazität − Neuaufnahme">Freie Plaetze</th>
+                <th title="Anmeldestatus Zugeordnet">Zuordnungen</th>
                 <th>Warteliste</th>
                 <th>Ohne</th>
                 <th>LE</th>
@@ -709,10 +712,10 @@ function toggleSchuleFilter(schuleName: string) {
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="10" class="table-empty">Daten werden geladen...</td>
+                <td colspan="11" class="table-empty">Daten werden geladen...</td>
               </tr>
               <tr v-else-if="!schoolOverview.length">
-                <td colspan="10" class="table-empty">Keine Schulen fuer die aktuellen Filter gefunden.</td>
+                <td colspan="11" class="table-empty">Keine Schulen fuer die aktuellen Filter gefunden.</td>
               </tr>
               <tr
                 v-for="row in schoolOverview"
@@ -744,6 +747,7 @@ function toggleSchuleFilter(schuleName: string) {
                     {{ row.freie_plaetze }}
                   </span>
                 </td>
+                <td>{{ row.zuordnungen }}</td>
                 <td>{{ row.warteliste }}</td>
                 <td>{{ row.ohne }}</td>
                 <td>{{ row.foerderbedarf }}</td>
@@ -1534,6 +1538,16 @@ function toggleSchuleFilter(schuleName: string) {
 .status-badge-positive {
   background: #e9f6ec;
   color: #21653a;
+}
+
+.status-badge-negative {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge-muted {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .status-chip {

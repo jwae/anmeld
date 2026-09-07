@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatGermanDate } from "../utils/date";
 type ValidationRow = {
   row_number: number;
   selected: boolean;
@@ -39,15 +40,7 @@ function importActionLabel(action: string) {
   return action;
 }
 
-function formatGermanDate(value: string | null | undefined) {
-  const text = String(value || "").trim();
-  if (!text) return "-";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const [year, month, day] = text.split("-");
-    return `${day}.${month}.${year}`;
-  }
-  return text;
-}
+
 
 function statusChipClass(row: ValidationRow) {
   if (row.status === "fehler") return "status-chip-fehler";

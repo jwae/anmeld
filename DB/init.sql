@@ -169,6 +169,7 @@ CREATE TABLE `anm_runde` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_anm_runde_verfahren_nummer` (`verfahren_id`,`runden_nummer`),
+  UNIQUE KEY `uq_anm_runde_id_verfahren` (`id`,`verfahren_id`),
   KEY `idx_anm_runde_status` (`status`),
   CONSTRAINT `fk_anm_runde_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=54 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -365,6 +366,7 @@ CREATE TABLE `anm_schueler` (
   `quell_jahrgang` varchar(10) DEFAULT NULL COMMENT 'Jahrgang an der Herkunftsschule',
   PRIMARY KEY (`id`),
   KEY `idx_anm_schueler_verfahren` (`verfahren_id`),
+  UNIQUE KEY `uq_anm_schueler_id_verfahren` (`id`,`verfahren_id`),
   KEY `idx_empfehlung` (`empfehlung`),
   KEY `idx_anm_schueler_geo` (`latitude`,`longitude`),
   KEY `idx_anm_schueler_foerder_id` (`foerder_id`),
@@ -379,6 +381,7 @@ CREATE TABLE `anm_schueler` (
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `anm_schueler_externe_id` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) NOT NULL,
   `schueler_id` bigint(20) NOT NULL,
   `herkunft_art` varchar(50) NOT NULL,
   `herkunft_snr` varchar(50) DEFAULT NULL,
@@ -387,10 +390,11 @@ CREATE TABLE `anm_schueler_externe_id` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_anm_schueler_externe_identitaet` (`herkunft_art`,`herkunft_snr_norm`,`externe_id`),
+  UNIQUE KEY `uq_anm_schueler_externe_identitaet` (`verfahren_id`,`herkunft_art`,`herkunft_snr_norm`,`externe_id`),
+  KEY `idx_anm_externe_id_quelle` (`herkunft_art`),
   KEY `idx_anm_schueler_externe_id_schueler` (`schueler_id`),
   CONSTRAINT `fk_anm_schueler_externe_id_quelle` FOREIGN KEY (`herkunft_art`) REFERENCES `anm_kat_quelle` (`code`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_anm_schueler_externe_id_schueler` FOREIGN KEY (`schueler_id`) REFERENCES `anm_schueler` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_anm_externe_id_schueler_verfahren` FOREIGN KEY (`schueler_id`,`verfahren_id`) REFERENCES `anm_schueler` (`id`,`verfahren_id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Externe Identitäten eines Schülers';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -417,8 +421,8 @@ CREATE TABLE `anm_schueler_runde` (
   KEY `idx_anm_schueler_runde_schul_nr` (`schul_nr`),
   KEY `idx_anm_schueler_runde_koordinierte_snr` (`koordinierte_snr`),
   CONSTRAINT `fk_anm_schueler_runde_koordinierte_snr` FOREIGN KEY (`koordinierte_snr`) REFERENCES `anm_schulen` (`snr`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_anm_schueler_runde_runde` FOREIGN KEY (`runde_id`) REFERENCES `anm_runde` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_anm_schueler_runde_schueler` FOREIGN KEY (`schueler_id`) REFERENCES `anm_schueler` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_sr_runde_verfahren` FOREIGN KEY (`runde_id`,`verfahren_id`) REFERENCES `anm_runde` (`id`,`verfahren_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_anm_sr_schueler_verfahren` FOREIGN KEY (`schueler_id`,`verfahren_id`) REFERENCES `anm_schueler` (`id`,`verfahren_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_anm_schueler_runde_schul_nr` FOREIGN KEY (`schul_nr`) REFERENCES `anm_schulen` (`snr`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_anm_schueler_runde_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Rundenabhängige Eigenschaften eines Schülers';

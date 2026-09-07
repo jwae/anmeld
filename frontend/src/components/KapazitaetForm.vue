@@ -172,7 +172,7 @@ function save() {
         </label>
 
         <label class="field-block">
-          <span class="field-label">Reservierte Plätze</span>
+          <span class="field-label">Davon Reservierte Plätze</span>
           <input v-model.number="formData.reservierte_plaetze" type="number" min="0" />
         </label>
 

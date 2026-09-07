@@ -1,3 +1,4 @@
+const { normalizeCalendarDate } = require("./calendarDate");
 function normalizeText(value) {
   return String(value ?? "").trim();
 }
@@ -13,18 +14,7 @@ function normalizeGermanMatchText(value) {
 }
 
 function normalizeDate(value) {
-  if (!value) return null;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-  const text = normalizeText(value);
-  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-  const germanMatch = text.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  return germanMatch ? `${germanMatch[3]}-${germanMatch[2]}-${germanMatch[1]}` : null;
+  return normalizeCalendarDate(value);
 }
 
 function normalizeBoolean(value) {
@@ -67,19 +57,31 @@ function createAmbiguousMatchError(count) {
   return error;
 }
 
-async function findStudentByExternalId(connection, identity) {
+function requireProcedureId(value) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    const error = new Error("Ein gueltiges Verfahren ist fuer die Schueleridentitaet erforderlich.");
+    error.code = "INVALID_PROCEDURE_ID";
+    error.statusCode = 400;
+    throw error;
+  }
+  return id;
+}
+
+async function findStudentByExternalId(connection, identity, procedureId) {
+  const verfahrenId = requireProcedureId(procedureId);
   const normalized = normalizeExternalIdentity(identity);
   if (!normalized) return null;
   const { herkunft_art: art, herkunft_snr: snr, externe_id: externeId } = normalized;
   const [rows] = await connection.query(
     `SELECT s.*
        FROM anm_schueler_externe_id x
-       JOIN anm_schueler s ON s.id = x.schueler_id
-      WHERE x.herkunft_art = ?
+       JOIN anm_schueler s ON s.id = x.schueler_id AND s.verfahren_id = x.verfahren_id
+      WHERE x.verfahren_id = ? AND x.herkunft_art = ?
         AND x.herkunft_snr_norm = ?
         AND x.externe_id = ?
       LIMIT 1`,
-    [art, snr || "", externeId],
+    [verfahrenId, art, snr || "", externeId],
   );
   return rows?.[0] || null;
 }
@@ -229,21 +231,22 @@ async function updateStudentOrigin(connection, studentId, origin) {
   );
 }
 
-async function attachExternalId(connection, studentId, identity) {
+async function attachExternalId(connection, studentId, identity, procedureId) {
+  const verfahrenId = requireProcedureId(procedureId);
   const normalized = normalizeExternalIdentity(identity);
   if (!normalized) return null;
   const { herkunft_art: art, herkunft_snr: snr, externe_id: externeId } = normalized;
   try {
     const [result] = await connection.query(
       `INSERT INTO anm_schueler_externe_id
-         (schueler_id, herkunft_art, herkunft_snr, externe_id)
-       VALUES (?, ?, ?, ?)`,
-      [Number(studentId), art, snr, externeId],
+         (verfahren_id, schueler_id, herkunft_art, herkunft_snr, externe_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [verfahrenId, Number(studentId), art, snr, externeId],
     );
     return Number(result.insertId);
   } catch (error) {
     if (error?.code !== "ER_DUP_ENTRY") throw error;
-    const existing = await findStudentByExternalId(connection, identity);
+    const existing = await findStudentByExternalId(connection, identity, verfahrenId);
     if (Number(existing?.id) === Number(studentId)) return null;
     const conflict = new Error("Die externe Identität ist bereits einem anderen Schüler zugeordnet.");
     conflict.code = "EXTERNAL_ID_CONFLICT";
@@ -253,8 +256,9 @@ async function attachExternalId(connection, studentId, identity) {
 }
 
 async function resolveStudent(connection, data) {
+  const verfahrenId = requireProcedureId(data?.verfahren_id);
   const identity = normalizeExternalIdentity(data?.external_identity);
-  let student = identity ? await findStudentByExternalId(connection, identity) : null;
+  let student = identity ? await findStudentByExternalId(connection, identity, verfahrenId) : null;
   if (student) return { student, created: false, matchedBy: "EXTERNAL_ID", externalIdAdded: false };
 
   const candidates = await findStudentsByPersonData(connection, data);
@@ -274,7 +278,7 @@ async function resolveStudent(connection, data) {
   }
   let externalIdAdded = false;
   if (identity?.externe_id) {
-    externalIdAdded = (await attachExternalId(connection, student.id, identity)) !== null;
+    externalIdAdded = (await attachExternalId(connection, student.id, identity, verfahrenId)) !== null;
   }
   return {
     student,
@@ -299,6 +303,17 @@ async function upsertRoundState(connection, data) {
     schueler_id: Number(data.schueler_id),
     runde_id: Number(data.runde_id),
   };
+  const [context] = await connection.query(
+    `SELECT s.id FROM anm_schueler s JOIN anm_runde r ON r.verfahren_id = s.verfahren_id
+      WHERE s.id = ? AND s.verfahren_id = ? AND r.id = ? LIMIT 1`,
+    [key.schueler_id, key.verfahren_id, key.runde_id],
+  );
+  if (!context?.length) {
+    const error = new Error("Schueler und Runde muessen zum ausgewaehlten Verfahren gehoeren.");
+    error.code = "STUDENT_ROUND_PROCEDURE_MISMATCH";
+    error.statusCode = 409;
+    throw error;
+  }
   const existing = await findRoundState(connection, key);
   const fields = ["anmeldestatus", "teilnahmestatus", "schul_nr", "koordinierte_snr", "koordiniert_am", "koordiniert_von", "abgleich_status"];
   if (existing) {

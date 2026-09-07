@@ -11,6 +11,35 @@ function createResponse() {
   };
 }
 
+for (const scenario of [
+  { source: "SCHULE", schools: ["100001", "100002"], duplicate: false },
+  { source: "SCHULE", schools: ["100001", "100001"], duplicate: true },
+  { source: "POOL", schools: ["100001", "100002"], duplicate: true },
+]) {
+  test(`Pool-CSV prueft vollstaendige Identitaet: ${scenario.source}, ${scenario.schools.join('/')}`, async () => {
+    const pool = { async query(sql) {
+      const normalized = String(sql).replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('SELECT verfahrenstyp')) return [[{ verfahrenstyp: 'GS' }]];
+      if (normalized.startsWith('SELECT code, bezeichnung FROM anm_kat_quelle')) return [[{ code: scenario.source }]];
+      if (normalized.startsWith('SELECT COLUMN_NAME')) return [[...['strasse', 'plz', 'ort'].map(COLUMN_NAME => ({ COLUMN_NAME }))]];
+      if (normalized.includes('FROM ( SELECT DISTINCT sgs.snr')) return [[{ snr: '100001' }, { snr: '100002' }]];
+      if (normalized.includes('FROM anm_schueler_externe_id') || normalized.startsWith('SELECT * FROM anm_schueler')) return [[]];
+      throw new Error(normalized);
+    } };
+    const response = createResponse();
+    await createImporteController({ getPool: () => pool }).anmSchuelerImportValidate({ body: {
+      verfahren_id: 9, runde_id: 4, source_art: scenario.source,
+      mapping: { externe_schueler_id: 'id', source_school_snr: 'snr', vorname: 'vorname', nachname: 'nachname', geburtsdatum: 'geburtsdatum' },
+      csv_rows: scenario.schools.map((snr, index) => ({ row_number: index + 2, record: {
+        id: '4711', snr, vorname: `Kind${index}`, nachname: 'Beispiel', geburtsdatum: '2020-01-01',
+      } })),
+    } }, response);
+    assert.equal(response.statusCode, 200);
+    assert.ok(response.payload.rows.every(row => row.errors.some(error => error.includes('doppelt')) === scenario.duplicate));
+    if (!scenario.duplicate) assert.ok(response.payload.rows.every(row => row.status === 'gueltig'));
+  });
+}
+
 test("CSV-Umlaut-Treffer erzeugt einen Hinweis und ist zunächst deaktiviert", async () => {
   const pool = {
     async query(sql, params = []) {
@@ -67,7 +96,7 @@ test("CSV-Umlaut-Treffer erzeugt einen Hinweis und ist zunächst deaktiviert", a
         record: {
           Vorname: "Joerg",
           Nachname: "Mueller",
-          Geburtsdatum: "03.04.2015",
+          Geburtsdatum: "3.4.2015",
           Strasse: "",
           PLZ: "",
           Ort: "",
@@ -140,7 +169,7 @@ test("Ein exakter vorhandener Datensatz wird in Schritt 4 nicht als neu angezeig
         record: {
           Vorname: "Anna",
           Nachname: "Beispiel",
-          Geburtsdatum: "03.04.2015",
+          Geburtsdatum: "3.4.2015",
           Ort: "Neuer Ort",
         },
       }],
@@ -214,7 +243,7 @@ test("Anmeldungsimport erkennt exakte Personendaten in Schritt 4 als UPDATE", as
           Status: "Neu",
           Vorname: "Anna",
           Nachname: "Beispiel",
-          Geburtsdatum: "03.04.2015",
+          Geburtsdatum: "3.4.2015",
           Empfehlung: "G",
         },
       }],

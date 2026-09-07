@@ -23,10 +23,14 @@ class IdentityDatabase {
 
   async query(sql, params = []) {
     const compact = sql.replace(/\s+/g, " ").trim();
+    if (compact.startsWith("SELECT s.id FROM anm_schueler s JOIN anm_runde")) {
+      const [studentId, procedureId] = params;
+      return [this.students.filter((row) => row.id === studentId && row.verfahren_id === procedureId), []];
+    }
     if (compact.startsWith("SELECT s.* FROM anm_schueler_externe_id")) {
-      const [art, snr, externalId] = params;
+      const [verfahrenId, art, snr, externalId] = params;
       const match = this.externalIds.find((row) => (
-        row.herkunft_art === art
+        row.verfahren_id === verfahrenId && row.herkunft_art === art
         && (row.herkunft_snr || "") === (snr || "")
         && row.externe_id === externalId
       ));
@@ -56,13 +60,13 @@ class IdentityDatabase {
       return [{ insertId: row.id }, []];
     }
     if (compact.startsWith("INSERT INTO anm_schueler_externe_id")) {
-      const [studentId, art, snr, externalId] = params;
-      if (this.externalIds.some((row) => row.herkunft_art === art && (row.herkunft_snr || "") === (snr || "") && row.externe_id === externalId)) {
+      const [verfahrenId, studentId, art, snr, externalId] = params;
+      if (this.externalIds.some((row) => row.verfahren_id === verfahrenId && row.herkunft_art === art && (row.herkunft_snr || "") === (snr || "") && row.externe_id === externalId)) {
         const error = new Error("duplicate");
         error.code = "ER_DUP_ENTRY";
         throw error;
       }
-      const row = { id: this.nextExternalId++, schueler_id: studentId, herkunft_art: art, herkunft_snr: snr, externe_id: externalId };
+      const row = { id: this.nextExternalId++, verfahren_id: verfahrenId, schueler_id: studentId, herkunft_art: art, herkunft_snr: snr, externe_id: externalId };
       this.externalIds.push(row);
       return [{ insertId: row.id }, []];
     }
@@ -103,6 +107,53 @@ function poolStudent(externalId = "POOL-847291") {
     external_identity: externalId ? { herkunft_art: "POOL", herkunft_snr: null, externe_id: externalId } : null,
   };
 }
+
+test("19 vorhandene IDs verhindern keine 20 eigenen Schueler im neuen Verfahren", async () => {
+  const db = new IdentityDatabase();
+  const input = Array.from({ length: 20 }, (_, index) => ({
+    ...poolStudent(`IMPORT-${index}`), vorname: `Kind${index}`,
+  }));
+  for (const row of input.slice(0, 19)) await resolveStudent(db, row);
+  const original = JSON.stringify(db.students);
+  const newIds = [];
+  for (const row of input) {
+    const result = await resolveStudent(db, { ...row, verfahren_id: 8 });
+    assert.equal(result.created, true);
+    newIds.push(result.student.id);
+  }
+  for (const [index, row] of input.entries()) {
+    const result = await resolveStudent(db, { ...row, verfahren_id: 8 });
+    assert.equal(result.created, false);
+    assert.equal(result.student.id, newIds[index]);
+  }
+  assert.equal(db.students.filter((row) => row.verfahren_id === 8).length, 20);
+  assert.equal(JSON.stringify(db.students.filter((row) => row.verfahren_id === 7)), original);
+});
+
+test("Auch ohne externe ID bleiben gleiche Personendaten je Verfahren getrennt", async () => {
+  const db = new IdentityDatabase();
+  const first = await resolveStudent(db, poolStudent(null));
+  const second = await resolveStudent(db, { ...poolStudent(null), verfahren_id: 8 });
+  assert.notEqual(first.student.id, second.student.id);
+  assert.equal(second.created, true);
+});
+
+test("Identitaetssuche ohne gueltiges Verfahren wird abgelehnt", async () => {
+  const db = new IdentityDatabase();
+  for (const verfahren_id of [undefined, 0, -1, NaN, 1.5]) {
+    await assert.rejects(resolveStudent(db, { ...poolStudent(), verfahren_id }), { code: "INVALID_PROCEDURE_ID" });
+  }
+  assert.equal(db.students.length, 0);
+});
+
+test("Fremder Schueler darf keine Rundenzuordnung erhalten", async () => {
+  const db = new IdentityDatabase();
+  const result = await resolveStudent(db, poolStudent());
+  await assert.rejects(upsertRoundState(db, { verfahren_id: 8, schueler_id: result.student.id, runde_id: 3 }), {
+    code: "STUDENT_ROUND_PROCEDURE_MISMATCH",
+  });
+  assert.equal(db.rounds.length, 0);
+});
 
 test("Fälle 1-5: externe IDs identifizieren genau ein Kind und erlauben schulbezogene lokale IDs", async () => {
   const db = new IdentityDatabase();
