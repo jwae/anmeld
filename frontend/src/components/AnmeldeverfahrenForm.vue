@@ -13,6 +13,7 @@ defineProps<{
   saving?: boolean;
   mode?: "full" | "limited" | "readonly";
   visibilityEditable?: boolean;
+  hasChanges?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -98,7 +99,12 @@ const verfahrenstypOptions: Array<{ value: Anmeldeverfahrenstyp; label: string }
       <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">
         Reset
       </button>
-      <button class="btn-primary anm-form-primary-btn" type="button" :disabled="saving" @click="emit('submit')">
+      <button
+        class="btn-primary anm-form-primary-btn"
+        type="button"
+        :disabled="saving || (modelValue.id !== null && !hasChanges)"
+        @click="emit('submit')"
+      >
         {{ saving ? "Speichere..." : (modelValue.id ? "Aenderungen speichern" : "Verfahren anlegen") }}
       </button>
     </div>

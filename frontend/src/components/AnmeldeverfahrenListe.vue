@@ -10,6 +10,7 @@ defineProps<{
   canStart?: boolean;
   canFinish?: boolean;
   isReadonly?: boolean;
+  showHidden?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (e: "create"): void;
   (e: "start"): void;
   (e: "finish"): void;
+  (e: "update:showHidden", value: boolean): void;
 }>();
 
 function canDeleteProcedure(item: Anmeldeverfahren) {
@@ -44,16 +46,26 @@ function formatTimestamp(value: string) {
         <h3>Anmeldeverfahren</h3>
         <p>Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
       </div>
-      <div v-if="!isReadonly" class="anm-card-head-actions">
-        <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreate === false" @click="emit('create')">
-          Neues Verfahren
-        </button>
-        <button class="btn-secondary anm-head-btn anm-head-btn-success" type="button" :disabled="canStart === false" @click="emit('start')">
-          Verfahren starten
-        </button>
-        <button class="btn-secondary anm-head-btn anm-head-btn-danger" type="button" :disabled="canFinish === false" @click="emit('finish')">
-          Verfahren beenden
-        </button>
+      <div class="anm-card-head-actions">
+        <label class="anm-toggle-row">
+          <input
+            type="checkbox"
+            :checked="showHidden"
+            @change="emit('update:showHidden', ($event.target as HTMLInputElement).checked)"
+          />
+          <span>{{ showHidden ? "Ausgeblendete Verfahren ausblenden" : "Ausgeblendete Verfahren anzeigen" }}</span>
+        </label>
+        <template v-if="!isReadonly">
+          <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreate === false" @click="emit('create')">
+            Neues Verfahren
+          </button>
+          <button class="btn-secondary anm-head-btn anm-head-btn-success" type="button" :disabled="canStart === false" @click="emit('start')">
+            Verfahren starten
+          </button>
+          <button class="btn-secondary anm-head-btn anm-head-btn-danger" type="button" :disabled="canFinish === false" @click="emit('finish')">
+            Verfahren beenden
+          </button>
+        </template>
         <span class="anm-badge">{{ items.length }}</span>
       </div>
     </div>
@@ -164,6 +176,16 @@ function formatTimestamp(value: string) {
   margin: 4px 0 0;
   color: #607794;
   font-size: 12px;
+}
+
+.anm-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #27486f;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .anm-badge {

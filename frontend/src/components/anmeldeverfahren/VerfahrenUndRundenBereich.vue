@@ -57,14 +57,20 @@ const deletingVerfahrenId = ref<number | null>(null);
 const deletingRundenId = ref<number | null>(null);
 const errorMessage = ref<string>("");
 const successMessage = ref<string>("");
+const procedureOverlaySuccessMessage = ref<string>("");
+const roundOverlaySuccessMessage = ref<string>("");
 const showHiddenVerfahren = ref<boolean>(false);
 const showProcedureOverlay = ref<boolean>(false);
 const showRoundOverlay = ref<boolean>(false);
 const showStartRoundOverlay = ref<boolean>(false);
 const showDeleteProcedureOverlay = ref<boolean>(false);
+const showDeleteRoundOverlay = ref<boolean>(false);
 const pendingStartRound = ref<Anmelderunde | null>(null);
 const pendingDeleteProcedure = ref<Anmeldeverfahren | null>(null);
+const pendingDeleteRound = ref<Anmelderunde | null>(null);
 let successMessageTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let procedureOverlaySuccessTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let roundOverlaySuccessTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const verfahrenForm = ref<VerfahrenFormState>(createEmptyVerfahrenForm());
 const rundenForm = ref<RundenFormState>(createEmptyRundenForm());
@@ -116,12 +122,38 @@ const procedureFormMode = computed<"full" | "limited" | "readonly">(() => {
 const procedureVisibilityEditable = computed<boolean>(() => (
   !props.isReadonly && (verfahrenForm.value.status === "Vorbereitet" || verfahrenForm.value.status === "Beendet")
 ));
+const hasProcedureFormChanges = computed<boolean>(() => {
+  if (!verfahrenForm.value.id) return true;
+  const savedProcedure = verfahren.value.find((item) => item.id === verfahrenForm.value.id) || null;
+  if (!savedProcedure) return false;
+
+  return (
+    verfahrenForm.value.schuljahr !== savedProcedure.schuljahr
+    || verfahrenForm.value.bezeichnung !== savedProcedure.bezeichnung
+    || verfahrenForm.value.verfahrenstyp !== savedProcedure.verfahrenstyp
+    || verfahrenForm.value.status !== savedProcedure.status
+    || verfahrenForm.value.sichtbar !== savedProcedure.sichtbar
+  );
+});
 const roundFormMode = computed<"full" | "limited" | "readonly">(() => {
   if (props.isReadonly) return "readonly";
   const round = runden.value.find((item) => item.id === rundenForm.value.id) || null;
   if (!round) return "full";
   if (selectedProcedureLocked.value || round.status === "Beendet") return "readonly";
   return round.status === "In Bearbeitung" ? "limited" : "full";
+});
+const hasRoundFormChanges = computed<boolean>(() => {
+  if (!rundenForm.value.id) return true;
+  const savedRound = runden.value.find((item) => item.id === rundenForm.value.id) || null;
+  if (!savedRound) return false;
+
+  return (
+    rundenForm.value.runden_nummer !== savedRound.runden_nummer
+    || rundenForm.value.bezeichnung !== savedRound.bezeichnung
+    || rundenForm.value.startdatum !== (savedRound.startdatum || "")
+    || rundenForm.value.enddatum !== (savedRound.enddatum || "")
+    || rundenForm.value.status !== savedRound.status
+  );
 });
 
 const currentVerfahrenTitle = computed<string>(() => (
@@ -224,6 +256,24 @@ function showSuccess(message: string) {
   }, 4000);
 }
 
+function showProcedureOverlaySuccess(message: string) {
+  if (procedureOverlaySuccessTimeoutId) clearTimeout(procedureOverlaySuccessTimeoutId);
+  procedureOverlaySuccessMessage.value = message;
+  procedureOverlaySuccessTimeoutId = setTimeout(() => {
+    procedureOverlaySuccessMessage.value = "";
+    procedureOverlaySuccessTimeoutId = null;
+  }, 5000);
+}
+
+function showRoundOverlaySuccess(message: string) {
+  if (roundOverlaySuccessTimeoutId) clearTimeout(roundOverlaySuccessTimeoutId);
+  roundOverlaySuccessMessage.value = message;
+  roundOverlaySuccessTimeoutId = setTimeout(() => {
+    roundOverlaySuccessMessage.value = "";
+    roundOverlaySuccessTimeoutId = null;
+  }, 5000);
+}
+
 function selectRoundContext(rundenId: number | null) {
   activeRundenId.value = rundenId;
   focusedRundenId.value = rundenId;
@@ -304,8 +354,9 @@ function resetVerfahrenForm() {
 }
 
 function resetVerfahrenFormToSelection() {
-  if (verfahrenForm.value.id && selectedVerfahren.value) {
-    openEditProcedureOverlay(selectedVerfahren.value);
+  const procedure = verfahren.value.find((item) => item.id === verfahrenForm.value.id) || null;
+  if (procedure) {
+    openEditProcedureOverlay(procedure);
     return;
   }
   resetVerfahrenForm();
@@ -332,6 +383,7 @@ function resetRundenFormToSelection() {
 function openCreateProcedureOverlay() {
   if (props.isReadonly) return;
   resetVerfahrenForm();
+  procedureOverlaySuccessMessage.value = "";
   showProcedureOverlay.value = true;
 }
 
@@ -345,6 +397,7 @@ function openEditProcedureOverlay(item: Anmeldeverfahren) {
     status: item.status,
     sichtbar: item.sichtbar,
   };
+  procedureOverlaySuccessMessage.value = "";
   showProcedureOverlay.value = true;
 }
 
@@ -355,6 +408,7 @@ function openCreateRoundOverlay() {
     return;
   }
   resetRundenForm();
+  roundOverlaySuccessMessage.value = "";
   showRoundOverlay.value = true;
 }
 
@@ -369,6 +423,7 @@ function openEditRoundOverlay(item: Anmelderunde) {
     enddatum: item.enddatum || "",
     status: item.status,
   };
+  roundOverlaySuccessMessage.value = "";
   showRoundOverlay.value = true;
 }
 
@@ -383,8 +438,14 @@ function selectRunde(id: number) {
   emitContext();
 }
 
+function updateShowHiddenVerfahren(value: boolean) {
+  showHiddenVerfahren.value = value;
+  loadVerfahren(selectedVerfahrenId.value);
+}
+
 async function submitVerfahren() {
   if (props.isReadonly) return;
+  if (verfahrenForm.value.id && !hasProcedureFormChanges.value) return;
   const schuljahr = verfahrenForm.value.schuljahr.trim();
   const bezeichnung = verfahrenForm.value.bezeichnung.trim();
   if (!schuljahr) {
@@ -406,6 +467,7 @@ async function submitVerfahren() {
 
   savingVerfahren.value = true;
   try {
+    const isExistingProcedure = Boolean(verfahrenForm.value.id);
     const payload = {
       schuljahr,
       bezeichnung,
@@ -421,8 +483,26 @@ async function submitVerfahren() {
       : await anmeldeverfahrenService.create(payload, props.token);
 
     await loadVerfahren(response.row?.id || null);
-    showProcedureOverlay.value = false;
-    showSuccess(response.message || "Anmeldeverfahren erfolgreich gespeichert.");
+    if (isExistingProcedure && verfahrenForm.value.id) {
+      const updatedProcedure = verfahren.value.find((item) => item.id === verfahrenForm.value.id) || response.row;
+      if (updatedProcedure) {
+        verfahrenForm.value = {
+          id: updatedProcedure.id,
+          schuljahr: updatedProcedure.schuljahr,
+          bezeichnung: updatedProcedure.bezeichnung,
+          verfahrenstyp: updatedProcedure.verfahrenstyp,
+          status: updatedProcedure.status,
+          sichtbar: updatedProcedure.sichtbar,
+        };
+      }
+    } else {
+      showProcedureOverlay.value = false;
+    }
+    if (isExistingProcedure) {
+      showProcedureOverlaySuccess(response.message || "Anmeldeverfahren erfolgreich gespeichert.");
+    } else {
+      showSuccess(response.message || "Anmeldeverfahren erfolgreich gespeichert.");
+    }
   } catch (error) {
     showError(error, "Anmeldeverfahren konnte nicht gespeichert werden.");
   } finally {
@@ -477,6 +557,7 @@ async function confirmDeleteVerfahren() {
 
 async function submitRunde() {
   if (props.isReadonly) return;
+  if (rundenForm.value.id && !hasRoundFormChanges.value) return;
   if (!selectedVerfahrenId.value) {
     errorMessage.value = "Bitte zuerst ein Anmeldeverfahren auswaehlen.";
     successMessage.value = "";
@@ -513,6 +594,7 @@ async function submitRunde() {
 
   savingRunden.value = true;
   try {
+    const isExistingRound = Boolean(rundenForm.value.id);
     const payload = {
       runden_nummer: Number(rundenForm.value.runden_nummer),
       bezeichnung,
@@ -526,8 +608,26 @@ async function submitRunde() {
       : await anmelderundenService.create(selectedVerfahrenId.value, payload, props.token);
 
     await loadRunden(selectedVerfahrenId.value, response.row?.id ?? null);
-    showRoundOverlay.value = false;
-    showSuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
+    if (isExistingRound && rundenForm.value.id) {
+      const updatedRound = runden.value.find((item) => item.id === rundenForm.value.id) || response.row;
+      if (updatedRound) {
+        rundenForm.value = {
+          id: updatedRound.id,
+          runden_nummer: updatedRound.runden_nummer,
+          bezeichnung: updatedRound.bezeichnung,
+          startdatum: updatedRound.startdatum || "",
+          enddatum: updatedRound.enddatum || "",
+          status: updatedRound.status,
+        };
+      }
+    } else {
+      showRoundOverlay.value = false;
+    }
+    if (isExistingRound) {
+      showRoundOverlaySuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
+    } else {
+      showSuccess(response.message || "Anmelderunde erfolgreich gespeichert.");
+    }
   } catch (error) {
     showError(error, "Anmelderunde konnte nicht gespeichert werden.");
   } finally {
@@ -535,14 +635,32 @@ async function submitRunde() {
   }
 }
 
-async function deleteRunde(item: Anmelderunde) {
+function deleteRunde(item: Anmelderunde) {
   if (props.isReadonly) return;
-  const confirmed = window.confirm(`Soll die Anmelderunde "${item.bezeichnung}" wirklich geloescht werden?`);
-  if (!confirmed) return;
+  pendingDeleteRound.value = item;
+  showDeleteRoundOverlay.value = true;
+}
+
+function closeDeleteRoundOverlay() {
+  if (deletingRundenId.value) return;
+  showDeleteRoundOverlay.value = false;
+  pendingDeleteRound.value = null;
+}
+
+function resetDeleteRoundOverlay() {
+  showDeleteRoundOverlay.value = false;
+  pendingDeleteRound.value = null;
+}
+
+async function confirmDeleteRunde() {
+  if (props.isReadonly) return;
+  if (!pendingDeleteRound.value || deletingRundenId.value) return;
+  const item = pendingDeleteRound.value;
 
   deletingRundenId.value = item.id;
   try {
     const response = await anmelderundenService.remove(item.id, props.token);
+    resetDeleteRoundOverlay();
     await loadRunden(selectedVerfahrenId.value);
     showSuccess(response.message || "Anmelderunde erfolgreich geloescht.");
   } catch (error) {
@@ -640,21 +758,13 @@ onBeforeUnmount(() => {
     clearTimeout(successMessageTimeoutId);
     successMessageTimeoutId = null;
   }
+  if (procedureOverlaySuccessTimeoutId) clearTimeout(procedureOverlaySuccessTimeoutId);
+  if (roundOverlaySuccessTimeoutId) clearTimeout(roundOverlaySuccessTimeoutId);
 });
 </script>
 
 <template>
   <section class="verfahren-und-runden-bereich">
-    <section class="anm-toolbar-card">
-      <div class="anm-toolbar-head">
-        <label class="anm-toggle-row">
-          <input v-model="showHiddenVerfahren" type="checkbox" @change="loadVerfahren(selectedVerfahrenId)" />
-          <span>{{ showHiddenVerfahren ? "Ausgeblendete Verfahren ausblenden" : "Ausgeblendete Verfahren anzeigen" }}</span>
-        </label>
-      </div>
-
-    </section>
-
     <transition name="feedback-fade" mode="out-in">
       <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
         <p class="feedback-title">Fehler</p>
@@ -672,6 +782,7 @@ onBeforeUnmount(() => {
         :selected-id="selectedVerfahrenId"
         :loading="loadingVerfahren"
         :deleting-id="deletingVerfahrenId"
+        :show-hidden="showHiddenVerfahren"
         :is-readonly="isReadonly"
         :can-create="!isReadonly"
         :can-start="!isReadonly && selectedVerfahren?.status === 'Vorbereitet'"
@@ -682,6 +793,7 @@ onBeforeUnmount(() => {
         @create="openCreateProcedureOverlay"
         @start="startProcedure"
         @finish="finishProcedure"
+        @update:show-hidden="updateShowHiddenVerfahren"
       />
 
       <AnmelderundenListe
@@ -722,14 +834,15 @@ onBeforeUnmount(() => {
         <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
           {{ errorMessage }}
         </div>
-        <div v-else-if="successMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
-          {{ successMessage }}
+        <div v-else-if="procedureOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+          {{ procedureOverlaySuccessMessage }}
         </div>
         <AnmeldeverfahrenForm
           v-model="verfahrenForm"
           :saving="savingVerfahren"
           :mode="procedureFormMode"
           :visibility-editable="procedureVisibilityEditable"
+          :has-changes="hasProcedureFormChanges"
           @submit="submitVerfahren"
           @reset="resetVerfahrenFormToSelection"
         />
@@ -754,14 +867,15 @@ onBeforeUnmount(() => {
         <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
           {{ errorMessage }}
         </div>
-        <div v-else-if="successMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
-          {{ successMessage }}
+        <div v-else-if="roundOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+          {{ roundOverlaySuccessMessage }}
         </div>
         <AnmelderundenForm
           v-model="rundenForm"
           :verfahren="selectedVerfahren"
           :mode="roundFormMode"
           :saving="savingRunden"
+          :has-changes="hasRoundFormChanges"
           @submit="submitRunde"
           @reset="resetRundenFormToSelection"
         />
@@ -816,6 +930,45 @@ onBeforeUnmount(() => {
     </div>
 
     <div
+      v-if="showDeleteRoundOverlay && pendingDeleteRound"
+      class="anm-overlay-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anm-delete-round-overlay-title"
+      @click.self="closeDeleteRoundOverlay"
+    >
+      <section class="anm-overlay-card anm-delete-procedure-card">
+        <div class="anm-overlay-head">
+          <h3 id="anm-delete-round-overlay-title">Runde endgueltig loeschen?</h3>
+          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
+            Schliessen
+          </button>
+        </div>
+
+        <div class="anm-delete-procedure-summary">
+          <p><strong>Rundennummer:</strong> {{ pendingDeleteRound.runden_nummer }}</p>
+          <p><strong>Bezeichnung:</strong> {{ pendingDeleteRound.bezeichnung }}</p>
+          <p><strong>Status:</strong> {{ pendingDeleteRound.status }}</p>
+          <p><strong>Zeitraum:</strong> {{ pendingDeleteRound.startdatum || "-" }} bis {{ pendingDeleteRound.enddatum || "-" }}</p>
+        </div>
+
+        <div class="anm-delete-procedure-warning">
+          <p>Die Runde und ihre zugehoerigen Daten werden endgueltig geloescht.</p>
+          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
+        </div>
+
+        <div class="anm-actions">
+          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
+            Abbrechen
+          </button>
+          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="confirmDeleteRunde">
+            {{ deletingRundenId === pendingDeleteRound.id ? "Loesche..." : "Runde endgueltig loeschen" }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
       v-if="showDeleteProcedureOverlay && pendingDeleteProcedure"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -831,9 +984,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="anm-delete-procedure-intro">
-          Das Verfahren <strong>"{{ pendingDeleteProcedure.bezeichnung }}"</strong> wird vollstaendig geloescht.
-        </div>
+
 
         <div class="anm-delete-procedure-summary">
           <p><strong>Bezeichnung:</strong> {{ pendingDeleteProcedure.bezeichnung }}</p>
@@ -853,14 +1004,14 @@ onBeforeUnmount(() => {
             <li>Zuweisungen</li>
             <li>Importdaten</li>
           </ul>
-          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden.</strong></p>
+          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
         </div>
 
         <div class="anm-actions">
-          <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
             Abbrechen
           </button>
-          <button class="btn-secondary anm-form-secondary-btn anm-form-danger-btn" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="confirmDeleteVerfahren">
+          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="confirmDeleteVerfahren">
             {{ deletingVerfahrenId === pendingDeleteProcedure.id ? "Loesche..." : "Verfahren endgueltig loeschen" }}
           </button>
         </div>
@@ -876,56 +1027,45 @@ onBeforeUnmount(() => {
 }
 
 .feedback-panel {
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.feedback-panel-success {
+  border: 1px solid #bfe5c9;
+  background: #eefaf2;
+  color: #1f5f37;
+}
+
+.feedback-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.feedback-panel-success p:last-child {
+  margin: 0;
+}
+
+.feedback-fade-enter-active,
+.feedback-fade-leave-active {
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.feedback-fade-enter-from,
+.feedback-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.feedback-panel {
   margin-bottom: 18px;
 }
 
-.anm-toolbar-card,
 .anm-overlay-card {
   border: 1px solid #dbe4f0;
   border-radius: 22px;
   background: #ffffff;
   box-shadow: 0 16px 32px rgba(23, 58, 108, 0.05);
-}
-
-.anm-toolbar-card {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-}
-
-.anm-toolbar-head {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-}
-
-.anm-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #27486f;
-  font-weight: 600;
-}
-
-.anm-toolbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.anm-toolbar-btn {
-  min-height: 34px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.anm-toolbar-btn-danger {
-  border-color: #fca5a5;
-  background: #fee2e2;
-  color: #991b1b;
 }
 
 .anm-grid {
@@ -1046,17 +1186,6 @@ onBeforeUnmount(() => {
 .anm-delete-procedure-warning {
   border-color: #efc0c0;
   background: linear-gradient(180deg, #fff8f8 0%, #fff1f1 100%);
-}
-
-.anm-form-danger-btn {
-  border-color: #d96b6b;
-  background: #b42318;
-  color: #ffffff;
-}
-
-.anm-form-danger-btn:hover:not(:disabled) {
-  background: #941f15;
-  color: #ffffff;
 }
 
 @media (max-width: 900px) {

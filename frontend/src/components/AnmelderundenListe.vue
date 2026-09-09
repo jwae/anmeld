@@ -83,9 +83,7 @@ const selectedRound = computed<Anmelderunde | null>(
       <p v-if="nextRoundId">
         Als naechster fachlicher Schritt kann nur die direkt folgende vorbereitete Runde gestartet werden.
       </p>
-      <p v-else-if="nextAvailableRoundNumber">
-        Fuer dieses Verfahren ist als naechste Runde <strong>Runde {{ nextAvailableRoundNumber }}</strong> vorgesehen.
-      </p>
+
     </div>
 
     <div v-if="!verfahren" class="anm-empty-state">

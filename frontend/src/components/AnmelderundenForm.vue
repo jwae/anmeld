@@ -13,6 +13,7 @@ defineProps<{
     status: string;
   };
   saving?: boolean;
+  hasChanges?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -41,7 +42,7 @@ const emit = defineEmits<{
             min="1"
             step="1"
             :value="modelValue.runden_nummer ?? ''"
-            :disabled="saving || !verfahren || mode !== 'full'"
+            :disabled="saving || !verfahren || mode !== 'full' || modelValue.id !== null"
             @input="emit('update:modelValue', { ...modelValue, runden_nummer: Number(($event.target as HTMLInputElement).value || 0) || null })"
           />
         </label>
@@ -98,7 +99,12 @@ const emit = defineEmits<{
       <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">
         Reset
       </button>
-      <button class="btn-primary anm-form-primary-btn" type="button" :disabled="saving || !verfahren" @click="emit('submit')">
+      <button
+        class="btn-primary anm-form-primary-btn"
+        type="button"
+        :disabled="saving || !verfahren || (modelValue.id !== null && !hasChanges)"
+        @click="emit('submit')"
+      >
         {{ saving ? "Speichere..." : (modelValue.id ? "Aenderungen speichern" : "Runde anlegen") }}
       </button>
     </div>
