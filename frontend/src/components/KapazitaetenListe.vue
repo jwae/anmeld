@@ -33,8 +33,8 @@ function formatAvailableSeats(row: any) {
     <div class="anm-card-head-row">
       <p class="anm-roadmap-eyebrow">Uebersicht</p>
       <div class="kapazitaeten-list-actions">
-        <button type="button" class="btn-secondary" @click="emit('refresh')">Aktualisieren</button>
-        <button type="button" class="btn-primary" :disabled="!verfahrenId || isReadonly" @click="emit('import')">Kapazitaeten importieren</button>
+        <button type="button" class="btn-secondary kapazitaeten-head-action" :disabled="loading" @click="emit('refresh')">Aktualisieren</button>
+        <button type="button" class="btn-secondary kapazitaeten-head-action" :disabled="!verfahrenId || isReadonly" @click="emit('import')">Kapazitaeten importieren</button>
       </div>
     </div>
     <div class="anm-card-head">
@@ -302,14 +302,32 @@ function formatAvailableSeats(row: any) {
   gap: 10px;
 }
 
-.kapazitaeten-list-actions .btn-primary,
-.kapazitaeten-list-actions .btn-secondary {
-  padding: 10px 16px;
+.kapazitaeten-list-actions .kapazitaeten-head-action {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #c8dbef;
+  background: #ffffff;
+  color: #1f466f;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
   cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
 }
 
-.btn-primary:disabled {
-  opacity: 0.6;
+.kapazitaeten-list-actions .kapazitaeten-head-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
+}
+
+.kapazitaeten-list-actions .kapazitaeten-head-action:disabled {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
   cursor: not-allowed;
 }
 </style>

@@ -228,7 +228,7 @@ function buildCapacityImportPreviewRows(parsedRows, beteiligteSchulenBySnr, exis
 
     if (!snr) errors.push('SNR fehlt.');
     if (!jahrgang) errors.push('Jahrgang fehlt.');
-    if (!schulInfo && snr) errors.push('Schule ist in diesem Verfahren nicht beteiligt.');
+    if (!schulInfo && snr) errors.push('Schulnummer nicht im Verfahren.');
     if (Number.isNaN(maximaleKlassen)) errors.push('maximale_klassen ist ungueltig.');
     if (Number.isNaN(maximaleSchuelerProKlasse)) errors.push('maximale_schueler_pro_klasse ist ungueltig.');
     if (Number.isNaN(gesamtkapazitaet)) errors.push('gesamtkapazitaet ist ungueltig.');
