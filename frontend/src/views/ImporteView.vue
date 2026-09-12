@@ -23,17 +23,20 @@ const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 const refreshVersion = ref(0);
+const deleteAllConfirmOpen = ref(false);
 const canDeleteStudentData = computed(() => can("verfahren.bearbeiten"));
 
-async function handleDeleteAll() {
+function openDeleteAllConfirm() {
   if (!canDeleteStudentData.value || props.isReadonly || !props.verfahrenId) return;
-  const verfahrenName = String(props.context?.verfahren || "aktuelles Verfahren");
-  const firstConfirm = confirm(`Moechten Sie wirklich alle Schuelerdaten des Verfahrens '${verfahrenName}' loeschen?`);
-  if (!firstConfirm) return;
+  deleteAllConfirmOpen.value = true;
+}
 
-  const secondConfirm = confirm("Sind Sie sich absolut sicher? Diese Aktion kann nicht rueckgaengig gemacht werden!");
-  if (!secondConfirm) return;
+function closeDeleteAllConfirm() {
+  if (!loading.value) deleteAllConfirmOpen.value = false;
+}
 
+async function handleDeleteAll() {
+  if (!canDeleteStudentData.value || props.isReadonly || !props.verfahrenId || loading.value) return;
   try {
     errorMessage.value = "";
     successMessage.value = "";
@@ -42,8 +45,10 @@ async function handleDeleteAll() {
     const res = await importService.clearSchueler(props.verfahrenId, props.token);
     successMessage.value = res?.message || "Alle Schuelerdaten des aktuellen Verfahrens wurden erfolgreich geloescht.";
     refreshVersion.value += 1;
+    deleteAllConfirmOpen.value = false;
   } catch (error: any) {
     errorMessage.value = error?.response?.data?.error || error?.message || "Das Loeschen der Schuelerdaten ist fehlgeschlagen.";
+    deleteAllConfirmOpen.value = false;
   } finally {
     loading.value = false;
   }
@@ -105,11 +110,31 @@ async function handleDeleteAll() {
         class="btn-danger"
         type="button"
         :disabled="loading || isReadonly || !verfahrenId"
-        @click="handleDeleteAll"
+        @click="openDeleteAllConfirm"
       >
         {{ loading ? "Loesche..." : "Alle Schuelerdaten loeschen" }}
       </button>
     </section>
+
+    <Teleport to="body">
+      <div v-if="deleteAllConfirmOpen" class="delete-all-backdrop" @click.self="closeDeleteAllConfirm">
+        <section class="delete-all-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
+          <button class="delete-all-close" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
+          <div class="delete-all-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+          <div class="delete-all-copy">
+            <h3 id="delete-all-title">Alle Schülerdaten löschen?</h3>
+            <p>Alle Schülerdaten des Verfahrens <strong>{{ context?.verfahren || "Aktuelles Verfahren" }}</strong> werden aus den Import-, Abgleich- und Falltabellen gelöscht.</p>
+            <p class="delete-all-warning">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+          </div>
+          <footer>
+            <button class="delete-all-submit" type="button" :disabled="loading" @click="handleDeleteAll">
+              <i class="bi bi-trash3" aria-hidden="true"></i>
+              {{ loading ? "Lösche..." : "Endgültig löschen" }}
+            </button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -205,6 +230,54 @@ async function handleDeleteAll() {
   font-weight: 700;
   margin: 0 0 4px;
 }
+
+.delete-all-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(31, 20, 24, 0.48);
+}
+
+.delete-all-dialog {
+  position: relative;
+  width: min(500px, 100%);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 15px;
+  padding: 24px;
+  border: 1px solid #fecaca;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(69, 10, 10, 0.32);
+}
+
+.delete-all-close {
+  position: absolute;
+  top: 9px;
+  right: 11px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #7f6570;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.delete-all-close:hover:not(:disabled) { background: #fff1f2; color: #991b1b; }
+.delete-all-close:disabled { cursor: wait; opacity: 0.55; }
+.delete-all-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fee2e2; color: #b91c1c; font-size: 18px; }
+.delete-all-copy h3 { margin: 0; color: #7f1d1d; font-size: 19px; }
+.delete-all-copy p { margin: 8px 0 0; color: #65434a; line-height: 1.5; }
+.delete-all-copy .delete-all-warning { color: #991b1b; font-weight: 700; }
+.delete-all-dialog footer { grid-column: 1 / -1; display: flex; justify-content: center; margin-top: 5px; }
+.delete-all-submit { min-height: 38px; padding: 8px 16px; border: 1px solid #b91c1c; border-radius: 9px; background: #b91c1c; color: #fff; font-weight: 700; }
+.delete-all-submit:hover:not(:disabled) { background: #991b1b; }
+.delete-all-submit:disabled { cursor: wait; opacity: 0.65; }
 
 @media (max-width: 760px) {
   .importe-danger-zone {

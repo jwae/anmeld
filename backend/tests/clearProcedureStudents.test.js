@@ -13,6 +13,7 @@ function createResponse() {
 
 test("Schuelerdaten werden ausschliesslich fuer das angegebene Verfahren geloescht", async () => {
   const deleteQueries = [];
+  let protocolValues = [];
   const connection = {
     async query(sql, params = []) {
       const normalized = String(sql).replace(/\s+/g, " ").trim();
@@ -30,6 +31,10 @@ test("Schuelerdaten werden ausschliesslich fuer das angegebene Verfahren geloesc
       if (normalized.startsWith("DELETE ")) {
         deleteQueries.push({ sql: normalized, params });
         return [{ affectedRows: 1 }];
+      }
+      if (normalized.startsWith("INSERT INTO app_protokoll")) {
+        protocolValues = params;
+        return [{ affectedRows: 1, insertId: 99 }];
       }
       throw new Error(`Unerwartete Abfrage: ${normalized}`);
     },
@@ -55,6 +60,11 @@ test("Schuelerdaten werden ausschliesslich fuer das angegebene Verfahren geloesc
   assert.ok(legacyPoolDelete);
   assert.match(legacyPoolDelete.sql, /NOT EXISTS/);
   assert.deepEqual(legacyPoolDelete.params, [[88]]);
+  assert.equal(protocolValues[11], "Alle_SuS_im_Verfahren_geloescht");
+  assert.equal(protocolValues[3], 17);
+  const details = JSON.parse(protocolValues[8]);
+  assert.equal(details.anzahl_schueler, 1);
+  assert.equal(details.anzahl_datensaetze_gesamt, 7);
 });
 
 test("verfahren_id ist fuer die Loeschung verpflichtend", async () => {

@@ -270,6 +270,13 @@ async function startRound(pool, targetRoundId) {
       [targetRound.id],
     );
 
+    const [sourceRows] = await connection.query(
+      `SELECT COUNT(*) AS total FROM anm_schueler_runde
+       WHERE verfahren_id = ? AND runde_id = ? AND teilnahmestatus = 'Aktiv'`,
+      [targetRound.verfahren_id, currentRound.id],
+    );
+    const sourceStudents = Number(sourceRows?.[0]?.total || 0);
+
     const [insertResult] = await connection.query(
       `INSERT INTO anm_schueler_runde
          (verfahren_id, schueler_id, runde_id, anmeldestatus, teilnahmestatus,
@@ -297,6 +304,7 @@ async function startRound(pool, targetRoundId) {
     return {
       created: false,
       copied_students: copiedStudents,
+      source_students: sourceStudents,
       current_round: {
         ...(await findById(pool, Number(currentRound.id))),
         status: "Beendet",

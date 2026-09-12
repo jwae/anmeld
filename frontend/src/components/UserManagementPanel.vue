@@ -102,6 +102,10 @@ const canViewProtocol = computed<boolean>(() => (
     || effectiveManagementUser.value.permissions.includes("protokoll.bearbeiten")
   )
 ));
+const canEditProtocol = computed<boolean>(() => (
+  Array.isArray(effectiveManagementUser.value?.permissions)
+  && effectiveManagementUser.value.permissions.includes("protokoll.bearbeiten")
+));
 const needsManagementBootstrap = computed<boolean>(() => (
   canManageUsers.value || canManageGroups.value || canManageProcedure.value
 ));

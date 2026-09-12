@@ -229,23 +229,19 @@ function createAnmelderundenController({ getPool }) {
         if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
 
         const result = await model.startRound(getPool(), id);
-        const protokoll = createVerfahrensProtokoll(req, getPool());
-        await protokoll.write({
-          ereignisCode: "RUNDE_BEENDET",
-          objektTyp: "RUNDE",
-          objektId: result.current_round.id,
-          verfahrenId: result.current_round.verfahren_id,
-          rundeId: result.current_round.id,
-          aenderungen: { status: { vorher: "In Bearbeitung", nachher: "Beendet" } },
-        });
-        await protokoll.write({
-          ereignisCode: "RUNDE_GESTARTET",
+        await createVerfahrensProtokoll(req, getPool()).write({
+          ereignisCode: "RUNDENWECHSEL",
           objektTyp: "RUNDE",
           objektId: result.next_round.id,
           verfahrenId: result.next_round.verfahren_id,
           rundeId: result.next_round.id,
-          aenderungen: { status: { vorher: "Vorbereitet", nachher: "In Bearbeitung" } },
-          details: { kopierte_schueler: result.copied_students },
+          details: {
+            von_runde: result.current_round.runden_nummer,
+            nach_runde: result.next_round.runden_nummer,
+            schueler_gesamt: result.source_students,
+            schueler_uebernommen: result.copied_students,
+            schueler_nicht_uebernommen: Math.max(0, result.source_students - result.copied_students),
+          },
         });
         res.status(201).json({
           message: `Runde ${result.current_round.runden_nummer} wurde beendet und Runde ${result.next_round.runden_nummer} gestartet.`,

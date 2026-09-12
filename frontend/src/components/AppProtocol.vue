@@ -26,9 +26,11 @@ interface ProtocolRow {
 const props = withDefaults(defineProps<{
   managementToken?: string;
   isManagementSessionActive?: boolean;
+  canDeleteProtocol?: boolean;
 }>(), {
   managementToken: "",
   isManagementSessionActive: false,
+  canDeleteProtocol: false,
 });
 
 const rows = ref<ProtocolRow[]>([]);
@@ -39,6 +41,11 @@ const errorMessage = ref("");
 const searchText = ref("");
 const eventFilter = ref("");
 const resultFilter = ref("");
+const deleteBeforeDate = ref("");
+const deleting = ref(false);
+const deleteConfirmOpen = ref(false);
+const deleteConfirmResult = ref("");
+let latestProtocolRequest = 0;
 
 const reasonLabels: Record<string, string> = {
   UNVOLLSTAENDIGE_ZUGANGSDATEN: "Unvollständige Zugangsdaten",
@@ -140,16 +147,59 @@ const filteredRows = computed(() => {
 
 async function loadProtocol() {
   if (!props.isManagementSessionActive || !props.managementToken) return;
+  const requestId = ++latestProtocolRequest;
   loading.value = true;
   errorMessage.value = "";
   try {
-    const response = await apiClient.get(`/api/auth/admin/protokoll?limit=${limit.value}`, { headers: headers() });
+    const response = await apiClient.get(`/api/auth/admin/protokoll?limit=${limit.value}&_=${Date.now()}`, {
+      headers: { ...headers(), "Cache-Control": "no-cache" },
+    });
+    // Eine aeltere Antwort darf keinen neueren Tabellenstand (z. B. nach
+    // einer Loeschung) wieder mit ihren zwischengespeicherten Daten ersetzen.
+    if (requestId !== latestProtocolRequest) return;
     rows.value = Array.isArray(response.data?.rows) ? response.data.rows : [];
     total.value = Number(response.data?.total || 0);
   } catch (error: any) {
+    if (requestId !== latestProtocolRequest) return;
     errorMessage.value = error?.response?.data?.error || error?.message || "Das App-Protokoll konnte nicht geladen werden.";
   } finally {
-    loading.value = false;
+    if (requestId === latestProtocolRequest) loading.value = false;
+  }
+}
+
+async function deleteProtocolBeforeDate() {
+  if (!deleteBeforeDate.value || deleting.value) return;
+  deleteConfirmResult.value = "";
+  deleteConfirmOpen.value = true;
+}
+
+function cancelDeleteProtocol() {
+  if (deleting.value) return;
+  deleteConfirmOpen.value = false;
+  deleteConfirmResult.value = "";
+}
+
+async function confirmDeleteProtocol() {
+  if (!deleteBeforeDate.value || deleting.value) return;
+  const formattedDate = new Date(`${deleteBeforeDate.value}T00:00:00`).toLocaleDateString("de-DE");
+  deleting.value = true;
+  errorMessage.value = "";
+  try {
+    const response = await apiClient.delete("/api/auth/admin/protokoll/before", {
+      headers: headers(), data: { before_date: deleteBeforeDate.value },
+    });
+    const deleted = Number(response.data?.deleted || 0);
+    const cutoff = `${deleteBeforeDate.value} 00:00:00`;
+    // Die Tabelle reagiert unmittelbar; der anschliessende Abruf gleicht sie
+    // mit dem Server ab und erfasst auch Eintraege ausserhalb des aktuellen Limits.
+    rows.value = rows.value.filter((row) => String(row.zeitpunkt || "") >= cutoff);
+    total.value = Math.max(0, total.value - deleted);
+    await loadProtocol();
+    deleteConfirmResult.value = `${deleted} Protokolleinträge wurden gelöscht.`;
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.error || error?.message || "Die Protokolleintraege konnten nicht geloescht werden.";
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -171,6 +221,16 @@ onMounted(() => void loadProtocol());
         <i class="bi bi-arrow-clockwise" :class="{ 'is-spinning': loading }" aria-hidden="true"></i>
         <span>{{ loading ? "Lade..." : "Aktualisieren" }}</span>
       </button>
+      <div v-if="canDeleteProtocol" class="app-protocol-delete">
+        <label>
+          <span>Eintraege vor</span>
+          <input v-model="deleteBeforeDate" type="date" :disabled="deleting" />
+        </label>
+        <button type="button" :disabled="!deleteBeforeDate || deleting" @click="deleteProtocolBeforeDate">
+          <i class="bi bi-trash3" aria-hidden="true"></i>
+          {{ deleting ? "Loesche..." : "Protokoll loeschen" }}
+        </button>
+      </div>
     </header>
 
     <div class="app-protocol-filters">
@@ -195,8 +255,34 @@ onMounted(() => void loadProtocol());
       </label>
     </div>
 
+    <Teleport to="body">
+      <div v-if="deleteConfirmOpen" class="app-protocol-confirm-backdrop" @click.self="cancelDeleteProtocol">
+        <section class="app-protocol-confirm" role="dialog" aria-modal="true" aria-labelledby="app-protocol-confirm-title">
+          <button class="app-protocol-confirm-x" type="button" aria-label="Overlay schließen" :disabled="deleting" @click="cancelDeleteProtocol">×</button>
+          <div class="app-protocol-confirm-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
+          <div>
+            <h4 id="app-protocol-confirm-title">Protokolleinträge löschen?</h4>
+            <p>Alle Einträge vor dem <strong>{{ new Date(`${deleteBeforeDate}T00:00:00`).toLocaleDateString("de-DE") }}</strong> werden unwiderruflich gelöscht.</p>
+            <div v-if="deleteConfirmResult" class="app-protocol-confirm-result">
+              <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+              <span>{{ deleteConfirmResult }}</span>
+            </div>
+          </div>
+          <footer>
+            <template v-if="!deleteConfirmResult">
+              <button type="button" class="app-protocol-confirm-delete" :disabled="deleting" @click="confirmDeleteProtocol">
+                <i class="bi bi-trash3" aria-hidden="true"></i>
+                {{ deleting ? "Lösche..." : "Endgültig löschen" }}
+              </button>
+            </template>
+            <button v-else type="button" class="app-protocol-confirm-close" @click="cancelDeleteProtocol">Schließen</button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
+
     <div v-if="errorMessage" class="app-protocol-message is-error">{{ errorMessage }}</div>
-    <div v-else-if="loading" class="app-protocol-message">Protokoll wird geladen...</div>
+    <div v-if="loading" class="app-protocol-message">Protokoll wird geladen...</div>
 
     <div v-else class="app-protocol-table-wrap">
       <table class="app-protocol-table">

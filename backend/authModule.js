@@ -2274,6 +2274,7 @@ function createAuthModule(poolProvider) {
 
   router.get("/admin/protokoll", authenticateToken, requireAnyPermission(PROTOCOL_VIEW_PERMISSION_KEYS), async (req, res) => {
     try {
+      res.set("Cache-Control", "no-store");
       const requestedLimit = Number(req.query?.limit || 200);
       const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 200;
       const pool = getPool();
@@ -2337,6 +2338,23 @@ function createAuthModule(poolProvider) {
       });
     } catch (error) {
       return adminErrorResponse(res, error, "Das App-Protokoll konnte nicht geladen werden.");
+    }
+  });
+
+  router.delete("/admin/protokoll/before", authenticateToken, requirePermission("protokoll.bearbeiten"), async (req, res) => {
+    try {
+      const beforeDate = String(req.body?.before_date || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(beforeDate)) {
+        return res.status(400).json({ error: "Ein gueltiges Stichtagsdatum ist erforderlich." });
+      }
+      const parsedDate = new Date(`${beforeDate}T00:00:00Z`);
+      if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== beforeDate) {
+        return res.status(400).json({ error: "Ein gueltiges Stichtagsdatum ist erforderlich." });
+      }
+      const [result] = await getPool().query("DELETE FROM app_protokoll WHERE zeitpunkt < ?", [`${beforeDate} 00:00:00`]);
+      return res.json({ deleted: Number(result?.affectedRows || 0), before_date: beforeDate });
+    } catch (error) {
+      return adminErrorResponse(res, error, "Die Protokolleintraege konnten nicht geloescht werden.");
     }
   });
 

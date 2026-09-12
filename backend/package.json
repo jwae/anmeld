@@ -12,6 +12,8 @@
     "migrate:protokoll-permissions": "node scripts/run-migration.js 023_add_catalog_protocol_permissions.sql",
     "migrate:user-protocol-events": "node scripts/run-migration.js 024_add_user_protocol_events.sql",
     "migrate:procedure-round-protocol-events": "node scripts/run-migration.js 031_add_procedure_round_protocol_events.sql",
+    "migrate:student-protocol-events": "node scripts/run-migration.js 032_add_student_protocol_events.sql",
+    "migrate:clear-students-protocol-event": "node scripts/run-migration.js 033_add_clear_procedure_students_protocol_event.sql",
     "migrate:student-identity-phase1": "node scripts/run-migration.js 025_prepare_round_independent_student_identity.sql",
     "migrate:student-identity-phase4": "node scripts/run-migration.js 027_remove_legacy_student_identity.sql",
     "migrate:student-origin-source": "node scripts/run-migration.js 028_store_selected_source_in_student_origin.sql",

@@ -1,6 +1,7 @@
 const { normalizeCalendarDate } = require("../lib/calendarDate");
 ﻿const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { randomUUID } = require("node:crypto");
 
 const { assertWritableContext, assertStudentWritable } = require("../lib/anmeldeWriteGuard");
 const { normalizeImportRecommendation, importRecommendationDiffers } = require("../lib/importRecommendation");
@@ -16,6 +17,8 @@ const {
   updateStudentOrigin,
   upsertRoundState,
 } = require("../lib/schuelerIdentityService");
+const { buildStudentProtocol, writeStudentProtocols } = require("../lib/schuelerProtokollService");
+const { PROTOKOLL_ERGEBNIS, getClientIp, writeProtokoll } = require("../lib/protokollService");
 const MAX_CSV_TEXT_LENGTH = 5 * 1024 * 1024;
 
 const poolPreviewSessions = new Map();
@@ -1272,7 +1275,12 @@ async function upsertAnmSchuelerCsvImportV3(connection, payload) {
     error.statusCode = 409;
     throw error;
   }
-  return { action: result.updated ? "UPDATE" : "INSERT", id: result.id, unknown_school_case: false };
+  return {
+    action: result.updated ? "UPDATE" : "INSERT",
+    id: result.id,
+    unknown_school_case: false,
+    protocol: result.protocol || null,
+  };
 }
 
 async function loadPoolSchuelerRows(pool, verfahrenId, rundeId) {
@@ -2055,6 +2063,23 @@ async function upsertSchuelerForAnmeldungImport(pool, payload) {
   };
 }
 
+async function loadStudentProtocolSnapshot(connection, verfahrenId, rundeId, studentId) {
+  const [rows] = await connection.query(
+    `SELECT s.id, s.verfahren_id, s.vorname, s.nachname,
+      DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
+      s.strasse, s.plz, s.ort, s.empfehlung, s.foerderbedarf, s.foerder_id,
+      s.zieldifferent, s.ef, s.notiz, s.herkunft, s.herkunftsschule_snr,
+      sr.runde_id, sr.anmeldestatus, sr.teilnahmestatus, sr.schul_nr,
+      sr.koordinierte_snr, sr.abgleich_status
+     FROM anm_schueler s
+     LEFT JOIN anm_schueler_runde sr
+       ON sr.verfahren_id = s.verfahren_id AND sr.schueler_id = s.id AND sr.runde_id = ?
+     WHERE s.id = ? AND s.verfahren_id = ? LIMIT 1`,
+    [rundeId, studentId, verfahrenId],
+  );
+  return rows?.[0] || null;
+}
+
 async function upsertStudent(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
   const rundeId = Number(payload?.runde_id || 0);
@@ -2106,6 +2131,7 @@ async function upsertStudent(pool, payload) {
       conflict_detail: { externe_schueler_id: externalId, nachname, vorname, anmeldeschule_snr: snr },
     };
   }
+  const before = resolved.created ? null : await loadStudentProtocolSnapshot(pool, verfahrenId, rundeId, resolved.student.id);
   const [roundRows] = await pool.query(
     `SELECT abgleich_status, anmeldestatus
        FROM anm_schueler_runde
@@ -2131,7 +2157,11 @@ async function upsertStudent(pool, payload) {
     anmeldestatus,
     teilnahmestatus: normalizeText(row?.teilnahmestatus) || "Aktiv",
   });
-  return { id: Number(resolved.student.id), updated: !resolved.created, hasAnmeldung, round_created: existingRound.created };
+  const after = await loadStudentProtocolSnapshot(pool, verfahrenId, rundeId, resolved.student.id);
+  return {
+    id: Number(resolved.student.id), updated: !resolved.created, hasAnmeldung, round_created: existingRound.created,
+    protocol: buildStudentProtocol({ before, after, context: payload.protocolContext }),
+  };
 }
 
 function buildSek1ImportErrorNote(row) {
@@ -3001,6 +3031,8 @@ function createImporteController({ getPool }) {
         let skipped = 0;
         let errors = 0;
         const rowResults = [];
+        const protocolEntries = [];
+        const importCorrelationId = randomUUID();
 
         for (const row of rows) {
           await connection.query("SAVEPOINT phase3a_import_row");
@@ -3012,7 +3044,16 @@ function createImporteController({ getPool }) {
               source_art: validation.source_art,
               row: row.data,
               mapping: validation.mapping || {},
+              protocolContext: {
+                quelle: validation.source_art || "POOL",
+                aktion: "IMPORT",
+                korrelationId: importCorrelationId,
+                benutzerId: req.user?.sub,
+                benutzername: req.user?.username,
+                ipAdresse: getClientIp(req),
+              },
             });
+            if (result.protocol) protocolEntries.push(result.protocol);
             if (result.action === "INSERT") inserted += 1;
             else updated += 1;
             rowResults.push({
@@ -3036,6 +3077,7 @@ function createImporteController({ getPool }) {
         }
 
         skipped = (validation.rows || []).filter((row) => !selectedSet.has(Number(row?.row_number || 0)) || row?.status === "fehler").length;
+        await writeStudentProtocols(connection, protocolEntries);
         await connection.commit();
         anmSchuelerImportSessions.delete(normalizeText(req.body?.validation_token));
 
@@ -3378,6 +3420,8 @@ function createImporteController({ getPool }) {
         await connection.beginTransaction();
         let importedStudents = 0;
         let updatedStudents = 0;
+        const protocolEntries = [];
+        const importCorrelationId = randomUUID();
         const createdOpenCases = 0;
 
         for (const row of rows) {
@@ -3386,11 +3430,17 @@ function createImporteController({ getPool }) {
             runde_id: rundeId,
             source_art: "POOL",
             row: row.data,
+            protocolContext: {
+              quelle: "POOL", aktion: "IMPORT", korrelationId: importCorrelationId,
+              benutzerId: req.user?.sub, benutzername: req.user?.username,
+            },
           });
+          if (studentResult.protocol) protocolEntries.push(studentResult.protocol);
           if (studentResult.updated) updatedStudents += 1;
           else importedStudents += 1;
         }
 
+        await writeStudentProtocols(connection, protocolEntries);
         await connection.commit();
         poolPreviewSessions.delete(normalizeText(req.body?.preview_token));
 
@@ -3425,15 +3475,41 @@ function createImporteController({ getPool }) {
     },
 
     deletePoolSchueler: async (req, res) => {
+      const connection = await getPool().getConnection();
       try {
         const rowId = Number(req.params?.id || 0);
         if (!rowId) return sendError(res, 400, "id ist erforderlich.");
-        await assertStudentWritable(getPool(), rowId);
-        await deletePoolSchuelerRow(getPool(), rowId);
+        await connection.beginTransaction();
+        const context = await assertStudentWritable(connection, rowId);
+        const verfahrenId = Number(context.verfahren_id || 0);
+        const rundeId = Number(context.runde_id || 0);
+        const vorher = await loadStudentProtocolSnapshot(connection, verfahrenId, rundeId, rowId);
+
+        await deletePoolSchuelerRow(connection, rowId);
+        await writeProtokoll(connection, {
+          ereignisCode: "SCHUELER_GELOESCHT",
+          ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+          benutzerId: req.user?.sub,
+          benutzername: req.user?.username,
+          verfahrenId,
+          rundeId,
+          objektTyp: "SCHUELER",
+          objektId: rowId,
+          details: {
+            quelle: "MANUELL",
+            aktion: "LOESCHEN",
+            vorher,
+          },
+          ipAdresse: getClientIp(req),
+        });
+        await connection.commit();
         return res.json({ message: "Datensatz wurde geloescht." });
       } catch (error) {
+        await connection.rollback().catch(() => {});
         console.error(error);
         return sendError(res, error?.statusCode || 500, error?.message || "Der Datensatz konnte nicht geloescht werden.");
+      } finally {
+        connection.release();
       }
     },
 
@@ -3460,6 +3536,7 @@ function createImporteController({ getPool }) {
         let totalEfCount = 0;
         const updatedMessages = [];
         const duplicateIdConflicts = [];
+        const importCorrelationId = randomUUID();
 
         for (const school of schoolBySnr.values()) {
           console.log(`[Pool-Schild-Import] Verarbeite Schule ${school.name || "-"} (${school.snr}) | aktiv=${school.active ? "ja" : "nein"}`);
@@ -3562,6 +3639,7 @@ function createImporteController({ getPool }) {
               await connection.beginTransaction();
               let importedStudents = 0;
               let updatedStudents = 0;
+              const protocolEntries = [];
               let duplicateConflictCount = 0;
               const schoolUpdatedMessages = [];
 
@@ -3574,7 +3652,12 @@ function createImporteController({ getPool }) {
                   runde_id: rundeId,
                   source_art: "SCHILD",
                   row: row.data,
+                  protocolContext: {
+                    quelle: "SCHILD", aktion: "IMPORT", korrelationId: importCorrelationId,
+                    benutzerId: req.user?.sub, benutzername: req.user?.username,
+                  },
                 });
+                if (studentResult?.protocol) protocolEntries.push(studentResult.protocol);
                 if (studentResult?.conflict) {
                   duplicateConflictCount += 1;
                   const conflictDetail = {
@@ -3602,6 +3685,7 @@ function createImporteController({ getPool }) {
                 }
               }
 
+              await writeStudentProtocols(connection, protocolEntries);
               await connection.commit();
               console.log(`[Pool-Schild-Import] ${school.snr}: Commit erfolgreich | neu=${importedStudents} | update=${updatedStudents}`);
               totalImportedStudents += importedStudents;
@@ -4410,6 +4494,26 @@ function createImporteController({ getPool }) {
           deletedByTable.anm_schueler_pool = affectedRows;
           deletedRows += affectedRows;
         }
+
+        const correlationId = randomUUID();
+        await writeProtokoll(connection, {
+          ereignisCode: "Alle_SuS_im_Verfahren_geloescht",
+          ergebnis: PROTOKOLL_ERGEBNIS.ERFOLG,
+          benutzerId: req.user?.sub,
+          benutzername: req.user?.username,
+          verfahrenId,
+          objektTyp: "VERFAHREN",
+          objektId: verfahrenId,
+          details: {
+            quelle: "MANUELL",
+            aktion: "ALLE_SCHUELERDATEN_LOESCHEN",
+            anzahl_schueler: Number(deletedByTable.anm_schueler || 0),
+            anzahl_datensaetze_gesamt: deletedRows,
+            geloescht_nach_tabelle: deletedByTable,
+          },
+          ipAdresse: getClientIp(req),
+          korrelationId: correlationId,
+        });
 
         await connection.commit();
         poolPreviewSessions.clear();

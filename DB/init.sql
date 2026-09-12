@@ -615,6 +615,13 @@ INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `
 (17,'VERFAHREN_GELOESCHT','Verfahren geloescht','Ein Anmeldeverfahren wurde geloescht.',1),
 (18,'RUNDE_BEENDET','Runde beendet','Eine Anmelderunde wurde beendet.',1),
 (19,'RUNDE_GELOESCHT','Runde geloescht','Eine Anmelderunde wurde geloescht.',1);
+INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `aktiv`) VALUES
+(20,'SCHUELER_ERSTELLT','Schueler erstellt','Ein Schuelerdatensatz wurde erstellt.',1),
+(21,'SCHUELER_GEAENDERT','Schueler geaendert','Fachliche Daten eines Schuelerdatensatzes wurden geaendert.',1),
+(22,'SCHUELER_GELOESCHT','Schueler geloescht','Ein Schuelerdatensatz wurde geloescht.',1),
+(23,'RUNDENWECHSEL','Rundenwechsel','Eine Anmelderunde wurde in die naechste Runde ueberfuehrt.',1);
+INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `aktiv`) VALUES
+(24,'Alle_SuS_im_Verfahren_geloescht','Alle SuS im Verfahren geloescht','Alle Schuelerdaten eines Anmeldeverfahrens wurden geloescht.',1);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
