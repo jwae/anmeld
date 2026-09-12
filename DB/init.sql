@@ -611,6 +611,10 @@ INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `
 (14,'LOGOUT_VERWALTUNGSBEREICH','Logout Verwaltungsbereich','Abmeldung vom geschuetzten Verwaltungsbereich.',1),
 (15,'BENUTZER_ERSTELLT','Benutzer erstellt','Ein Benutzerkonto wurde in der App-Verwaltung erstellt.',1),
 (16,'BENUTZER_GELOESCHT','Benutzer gelöscht','Ein Benutzerkonto wurde in der App-Verwaltung gelöscht.',1);
+INSERT INTO `anm_kat_ereignisse` (`id`, `code`, `bezeichnung`, `beschreibung`, `aktiv`) VALUES
+(17,'VERFAHREN_GELOESCHT','Verfahren geloescht','Ein Anmeldeverfahren wurde geloescht.',1),
+(18,'RUNDE_BEENDET','Runde beendet','Eine Anmelderunde wurde beendet.',1),
+(19,'RUNDE_GELOESCHT','Runde geloescht','Eine Anmelderunde wurde geloescht.',1);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;

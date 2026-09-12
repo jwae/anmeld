@@ -1,5 +1,8 @@
 const model = require("../models/anmelderundenModel");
 const verfahrenModel = require("../models/anmeldeverfahrenModel");
+const { changedFields, createVerfahrensProtokoll, snapshot } = require("../lib/verfahrensProtokoll");
+
+const ROUND_FIELDS = ["runden_nummer", "bezeichnung", "startdatum", "enddatum", "status"];
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
   if (details) payload.details = details;
@@ -93,12 +96,23 @@ function createAnmelderundenController({ getPool }) {
         }
 
         const row = await model.create(getPool(), verfahrenId, payload);
+        await createVerfahrensProtokoll(req, getPool()).write({
+          ereignisCode: "RUNDE_ERSTELLT",
+          objektTyp: "RUNDE",
+          objektId: row.id,
+          verfahrenId,
+          rundeId: row.id,
+          details: { nachher: snapshot(row, ROUND_FIELDS) },
+        });
         res.status(201).json({
           message: "Anmelderunde erfolgreich angelegt.",
           row,
         });
       } catch (error) {
         console.error(error);
+        await createVerfahrensProtokoll(req, getPool()).writeFailure({
+          ereignisCode: "RUNDE_ERSTELLT", objektTyp: "RUNDE", verfahrenId: req.params.verfahrenId,
+        }, error);
         sendError(res, 500, "Anmelderunde konnte nicht angelegt werden.");
       }
     },
@@ -136,12 +150,23 @@ function createAnmelderundenController({ getPool }) {
         }
 
         const row = await model.update(getPool(), id, payload);
+        await createVerfahrensProtokoll(req, getPool()).write({
+          ereignisCode: "RUNDE_GEAENDERT",
+          objektTyp: "RUNDE",
+          objektId: id,
+          verfahrenId: existing.verfahren_id,
+          rundeId: id,
+          aenderungen: changedFields(existing, row, ROUND_FIELDS),
+        });
         res.json({
           message: "Anmelderunde erfolgreich aktualisiert.",
           row,
         });
       } catch (error) {
         console.error(error);
+        await createVerfahrensProtokoll(req, getPool()).writeFailure({
+          ereignisCode: "RUNDE_GEAENDERT", objektTyp: "RUNDE", objektId: req.params.id, rundeId: req.params.id,
+        }, error);
         sendError(res, 500, "Anmelderunde konnte nicht aktualisiert werden.");
       }
     },
@@ -180,9 +205,20 @@ function createAnmelderundenController({ getPool }) {
         }
 
         await model.remove(getPool(), id);
+        await createVerfahrensProtokoll(req, getPool()).write({
+          ereignisCode: "RUNDE_GELOESCHT",
+          objektTyp: "RUNDE",
+          objektId: id,
+          verfahrenId: existing.verfahren_id,
+          rundeId: id,
+          details: { vorher: snapshot(existing, ROUND_FIELDS) },
+        });
         res.json({ message: "Anmelderunde erfolgreich geloescht." });
       } catch (error) {
         console.error(error);
+        await createVerfahrensProtokoll(req, getPool()).writeFailure({
+          ereignisCode: "RUNDE_GELOESCHT", objektTyp: "RUNDE", objektId: req.params.id, rundeId: req.params.id,
+        }, error);
         sendError(res, 500, "Anmelderunde konnte nicht geloescht werden.");
       }
     },
@@ -193,12 +229,33 @@ function createAnmelderundenController({ getPool }) {
         if (!id) return sendError(res, 400, "Ungueltige Runden-ID.");
 
         const result = await model.startRound(getPool(), id);
+        const protokoll = createVerfahrensProtokoll(req, getPool());
+        await protokoll.write({
+          ereignisCode: "RUNDE_BEENDET",
+          objektTyp: "RUNDE",
+          objektId: result.current_round.id,
+          verfahrenId: result.current_round.verfahren_id,
+          rundeId: result.current_round.id,
+          aenderungen: { status: { vorher: "In Bearbeitung", nachher: "Beendet" } },
+        });
+        await protokoll.write({
+          ereignisCode: "RUNDE_GESTARTET",
+          objektTyp: "RUNDE",
+          objektId: result.next_round.id,
+          verfahrenId: result.next_round.verfahren_id,
+          rundeId: result.next_round.id,
+          aenderungen: { status: { vorher: "Vorbereitet", nachher: "In Bearbeitung" } },
+          details: { kopierte_schueler: result.copied_students },
+        });
         res.status(201).json({
           message: `Runde ${result.current_round.runden_nummer} wurde beendet und Runde ${result.next_round.runden_nummer} gestartet.`,
           ...result,
         });
       } catch (error) {
         console.error(error);
+        await createVerfahrensProtokoll(req, getPool()).writeFailure({
+          ereignisCode: "RUNDE_GESTARTET", objektTyp: "RUNDE", objektId: req.params.id, rundeId: req.params.id,
+        }, error);
         sendError(res, error?.statusCode || 500, error?.message || "Der Rundenwechsel konnte nicht ausgefuehrt werden.");
       }
     },
