@@ -26,6 +26,9 @@
 
 .app-management-eyebrow {
   margin: 0 0 8px;
+}
+
+.app-management-eyebrow:where(:not(.anm-migrated)) {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -35,18 +38,27 @@
 
 .app-management-header h2 {
   margin: 0 0 4px;
+}
+
+.app-management-header h2:where(:not(.anm-migrated)) {
   font-size: 24px;
   color: #173252;
 }
 
 .app-management-intro {
   margin: 0;
+}
+
+.app-management-intro:where(:not(.anm-migrated)) {
   color: #50627b;
   line-height: 1.45;
 }
 
 .app-management-empty {
   padding: 12px 14px;
+}
+
+.app-management-empty:where(:not(.anm-migrated)) {
   border: 1px dashed #c9d7ea;
   border-radius: 14px;
   background: #f8fbff;

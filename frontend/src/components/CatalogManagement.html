@@ -4,7 +4,7 @@
   </div>
 
   <div v-else class="catalog-layout">
-    <aside class="catalog-sidebar" aria-label="Katalogauswahl">
+    <aside class="catalog-sidebar anm-card anm-migrated" aria-label="Katalogauswahl">
       <button
         v-for="catalog in catalogs"
         :key="catalog.name"
@@ -12,7 +12,7 @@
         type="button"
         :title="catalog.name"
         :disabled="loading || saving"
-        @click="selectCatalog(catalog.name)"
+        @click="selectCatalog(catalog.name)" class="anm-button anm-migrated"
       >
         {{ catalog.label }}
       </button>
@@ -27,7 +27,7 @@
         </div>
         <div class="catalog-toolbar-actions">
           <button
-            class="btn-secondary"
+            class="anm-button anm-migrated"
             type="button"
             :disabled="loading || saving || !columns.length || !canInsertRows"
             :title="canInsertRows ? '' : (!canEditCatalogs ? 'Berechtigung zum Bearbeiten von Katalogen fehlt.' : 'Technische Ereignisse werden nur per Migration angelegt.')"
@@ -35,23 +35,23 @@
           >
             Neuer Eintrag
           </button>
-          <button class="btn-secondary" type="button" :disabled="saving || !hasChanges || !canEditCatalogs" @click="discardChanges">
+          <button class="anm-button anm-migrated" type="button" :disabled="saving || !hasChanges || !canEditCatalogs" @click="discardChanges">
             Änderungen verwerfen
           </button>
-          <button class="btn-primary" type="button" :disabled="loading || saving || !hasChanges || !canEditCatalogs" @click="saveChanges()">
+          <button class="anm-button anm-button--primary anm-migrated" type="button" :disabled="loading || saving || !hasChanges || !canEditCatalogs" @click="saveChanges()">
             {{ saving ? "Speichere..." : "Änderungen speichern" }}
           </button>
         </div>
       </div>
 
-      <div v-if="selectedCatalog?.notice" class="feedback-panel catalog-system-notice">
+      <div v-if="selectedCatalog?.notice" class="catalog-system-notice anm-alert anm-migrated" role="status">
         <p>{{ selectedCatalog.notice }}</p>
       </div>
 
-      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
+      <div v-if="errorMessage" class="anm-alert anm-status--danger anm-migrated" role="alert">
         <p>{{ errorMessage }}</p>
       </div>
-      <div v-else-if="noticeMessage" class="feedback-panel feedback-panel-success">
+      <div v-else-if="noticeMessage" class="anm-alert anm-status--success anm-migrated" role="status">
         <p>{{ noticeMessage }}</p>
       </div>
 
@@ -131,13 +131,13 @@
   </div>
 
   <div v-if="leaveDialogOpen" class="catalog-modal-overlay">
-    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Ungespeicherte Änderungen">
+    <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Ungespeicherte Änderungen">
       <h3>Ungespeicherte Änderungen</h3>
       <p>Im Katalog „{{ selectedLabel }}“ liegen ungespeicherte Änderungen vor.</p>
       <div class="catalog-modal-actions">
-        <button class="btn-secondary" type="button" :disabled="saving" @click="finishLeaveDialog(false)">Abbrechen</button>
-        <button class="btn-secondary" type="button" :disabled="saving" @click="discardAndLeave">Verwerfen und wechseln</button>
-        <button class="btn-primary" type="button" :disabled="saving" @click="saveAndLeave">
+        <button class="anm-button anm-migrated" type="button" :disabled="saving" @click="finishLeaveDialog(false)">Abbrechen</button>
+        <button class="anm-button anm-button--danger anm-migrated" type="button" :disabled="saving" @click="discardAndLeave">Verwerfen und wechseln</button>
+        <button class="anm-button anm-button--primary anm-migrated" type="button" :disabled="saving" @click="saveAndLeave">
           {{ saving ? "Speichere..." : "Speichern und wechseln" }}
         </button>
       </div>
@@ -145,7 +145,7 @@
   </div>
 
   <div v-if="deleteDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
-    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Löschungen bestätigen">
+    <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Löschungen bestätigen">
       <h3>Einträge löschen?</h3>
       <p>
         Im Katalog „{{ selectedLabel }}“ werden {{ deletedRows.length }} Einträge endgültig gelöscht:
@@ -154,8 +154,8 @@
         <li v-for="row in deletedRows" :key="`delete-${row.localId}`">{{ rowDisplayName(row) }}</li>
       </ul>
       <div class="catalog-modal-actions">
-        <button class="btn-secondary" type="button" @click="finishDeleteDialog(false)">Abbrechen</button>
-        <button class="btn-primary catalog-danger-button" type="button" @click="finishDeleteDialog(true)">
+        <button class="anm-button anm-migrated" type="button" @click="finishDeleteDialog(false)">Abbrechen</button>
+        <button class="catalog-danger-button anm-button anm-button--danger anm-migrated" type="button" @click="finishDeleteDialog(true)">
           Endgültig löschen
         </button>
       </div>
@@ -163,7 +163,7 @@
   </div>
 
   <div v-if="deactivateDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
-    <section class="catalog-modal" role="dialog" aria-modal="true" aria-label="Ereignisse deaktivieren">
+    <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Ereignisse deaktivieren">
       <h3>Protokollereignisse deaktivieren?</h3>
       <p>
         Für die folgenden Ereignisse werden nach der Deaktivierung keine neuen Protokolleinträge mehr geschrieben:
@@ -172,8 +172,8 @@
         <li v-for="row in deactivatedEventRows" :key="`deactivate-${row.localId}`">{{ rowDisplayName(row) }}</li>
       </ul>
       <div class="catalog-modal-actions">
-        <button class="btn-secondary" type="button" @click="finishDeactivateDialog(false)">Abbrechen</button>
-        <button class="btn-primary catalog-danger-button" type="button" @click="finishDeactivateDialog(true)">
+        <button class="anm-button anm-migrated" type="button" @click="finishDeactivateDialog(false)">Abbrechen</button>
+        <button class="catalog-danger-button anm-button anm-button--danger anm-migrated" type="button" @click="finishDeactivateDialog(true)">
           Trotzdem deaktivieren
         </button>
       </div>

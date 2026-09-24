@@ -1,21 +1,24 @@
-.btn-secondary {
+.btn-secondary:where(:not(.anm-migrated)) {
   background: #fff;
   color: #111;
   border: 1px solid #ccc;
 }
 
 .feedback-panel {
-  border-radius: 14px;
   padding: 12px 14px;
 }
 
-.feedback-panel-success {
+.feedback-panel:where(:not(.anm-migrated)) {
+  border-radius: 14px;
+}
+
+.feedback-panel-success:where(:not(.anm-migrated)) {
   border: 1px solid #bfe5c9;
   background: #eefaf2;
   color: #1f5f37;
 }
 
-.feedback-panel-error {
+.feedback-panel-error:where(:not(.anm-migrated)) {
   border: 1px solid #f0c2c8;
   background: #fff4f6;
 }
@@ -24,37 +27,46 @@
   margin: 0;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-migrated)) {
   background: #1d6ef5;
   border-color: #1d6ef5;
   color: #fff;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:where(:not(.anm-migrated)) {
   background: #1454c8;
   border-color: #1454c8;
 }
 
-.btn-primary:disabled {
+.btn-primary:disabled:where(:not(.anm-migrated)) {
   background: #9fbef5;
   border-color: #9fbef5;
 }
 
 button {
   padding: 10px 12px;
-  border-radius: 10px;
   cursor: pointer;
+}
+
+button:where(:not(.anm-migrated)) {
+  border-radius: 10px;
   font-size: 14px;
   border: 1px solid #111;
 }
 
 button:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
+}
+
+button:disabled:where(:not(.anm-migrated)) {
+  opacity: 0.6;
 }
 
 .eyebrow {
   margin: 0 0 8px;
+}
+
+.eyebrow:where(:not(.anm-migrated)) {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -62,7 +74,7 @@ button:disabled {
   color: #2457a6;
 }
 
-.field-label {
+.field-label:where(:not(.anm-migrated)) {
   font-size: 12px;
   font-weight: 600;
   color: #314561;
@@ -80,6 +92,10 @@ button:disabled {
   min-width: 0;
   box-sizing: border-box;
   padding: 6px 8px;
+}
+
+.field-block input:where(:not(.anm-migrated)),
+.field-block select:where(:not(.anm-migrated)) {
   border: 1px solid #d6d6d6;
   border-radius: 10px;
   font-size: 12px;
@@ -88,6 +104,9 @@ button:disabled {
 .user-management-empty {
   margin-top: 10px;
   padding: 10px 12px;
+}
+
+.user-management-empty:where(:not(.anm-migrated)) {
   border: 1px dashed #c9d7ea;
   border-radius: 14px;
   background: #f8fbff;
@@ -96,14 +115,21 @@ button:disabled {
 
 .user-management-empty p {
   margin: 0;
+}
+
+.user-management-empty p:where(:not(.anm-migrated)) {
   line-height: 1.5;
 }
 
 .user-management-panel,
 .user-management-list-card {
+  padding: 12px;
+}
+
+.user-management-panel:where(:not(.anm-migrated)),
+.user-management-list-card:where(:not(.anm-migrated)) {
   border: 1px solid #dbe4f0;
   border-radius: 16px;
-  padding: 12px;
   background: #ffffff;
 }
 
@@ -136,11 +162,17 @@ button:disabled {
 
 .user-management-panel-head h3 {
   margin: 0 0 2px;
+}
+
+.user-management-panel-head h3:where(:not(.anm-migrated)) {
   font-size: 15px;
 }
 
 .user-management-panel-head p {
   margin: 0;
+}
+
+.user-management-panel-head p:where(:not(.anm-migrated)) {
   color: #5c6f88;
   font-size: 12px;
 }
@@ -155,6 +187,9 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.user-management-checkbox:where(:not(.anm-migrated)) {
   color: #41546d;
   font-size: 13px;
 }
@@ -177,6 +212,9 @@ button:disabled {
 
 .user-management-state {
   padding: 3px 8px;
+}
+
+.user-management-state:where(:not(.anm-migrated)) {
   border-radius: 999px;
   background: #eefaf2;
   color: #1f5f37;
@@ -184,16 +222,16 @@ button:disabled {
   font-weight: 700;
 }
 
-.user-management-state.is-inactive {
+.user-management-state.is-inactive:where(:not(.anm-migrated)) {
   background: #fff3f3;
   color: #a73d3d;
 }
 
-.school-management-row-active {
+.school-management-row-active:where(:not(.anm-migrated)) {
   background: #dff5e4;
 }
 
-.school-management-row-active:hover {
+.school-management-row-active:hover:where(:not(.anm-migrated)) {
   background: #d2efd9;
 }
 
@@ -206,11 +244,17 @@ button:disabled {
 
 .school-management-page > div:first-child h3 {
   margin: 0 0 4px;
+}
+
+.school-management-page > div:first-child h3:where(:not(.anm-migrated)) {
   font-size: 18px;
 }
 
 .school-management-page > div:first-child p:not(.eyebrow) {
   margin: 0;
+}
+
+.school-management-page > div:first-child p:not(.eyebrow):where(:not(.anm-migrated)) {
   color: #50627b;
   line-height: 1.35;
 }
@@ -233,6 +277,9 @@ button:disabled {
 .school-management-table-head-action {
   min-height: 32px;
   padding: 6px 10px;
+}
+
+.school-management-table-head-action:where(:not(.anm-migrated)) {
   font-size: 13px;
   border-radius: 9px;
 }
@@ -244,35 +291,35 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.school-management-help-button {
+.school-management-help-button:where(:not(.anm-migrated)) {
   border-color: #9cbbe8;
   background: #f4f8ff;
   color: #194f9d;
 }
 
-.school-management-help-button:hover {
+.school-management-help-button:hover:where(:not(.anm-migrated)) {
   border-color: #7ea7de;
   background: #eaf2ff;
 }
 
-.school-management-import-info-button {
+.school-management-import-info-button:where(:not(.anm-migrated)) {
   border-color: #b7c8e7;
   background: #f7faff;
   color: #24446f;
 }
 
-.school-management-import-info-button:hover:not(:disabled) {
+.school-management-import-info-button:hover:not(:disabled):where(:not(.anm-migrated)) {
   border-color: #93afd7;
   background: #edf4ff;
 }
 
-.school-management-delete-all {
+.school-management-delete-all:where(:not(.anm-migrated)) {
   border-color: #d96b6b;
   background: #fff1f1;
   color: #a12f2f;
 }
 
-.school-management-delete-all:hover:not(:disabled) {
+.school-management-delete-all:hover:not(:disabled):where(:not(.anm-migrated)) {
   border-color: #c65151;
   background: #ffe3e3;
   color: #8e2323;
@@ -297,10 +344,6 @@ button:disabled {
   width: 100%;
   min-height: 42px;
   padding: 8px 12px;
-  border: 1px solid #d6d6d6;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
-  color: #24344c;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -310,7 +353,14 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
-.school-management-school-select:hover {
+.school-management-school-select:where(:not(.anm-migrated)) {
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f7fbff 0%, #eef5ff 100%);
+  color: #24344c;
+}
+
+.school-management-school-select:hover:where(:not(.anm-migrated)) {
   border-color: #9cbbe8;
   background: linear-gradient(180deg, #fafdff 0%, #f1f7ff 100%);
 }
@@ -334,25 +384,35 @@ button:disabled {
 
 .school-management-table {
   width: 100%;
-  border-collapse: collapse;
   min-width: 1180px;
+}
+
+.school-management-table:where(:not(.anm-migrated)) {
+  border-collapse: collapse;
 }
 
 .school-management-table th,
 .school-management-table td {
   padding: 6px 10px;
-  border-top: 1px solid #e3ebf5;
   text-align: left;
   vertical-align: middle;
+}
+
+.school-management-table th:where(:not(.anm-migrated)),
+.school-management-table td:where(:not(.anm-migrated)) {
+  border-top: 1px solid #e3ebf5;
   font-size: 12px;
   line-height: 1.15;
 }
 
 .school-management-table thead th {
-  border-top: none;
   position: sticky;
   top: 0;
   z-index: 2;
+}
+
+.school-management-table thead th:where(:not(.anm-migrated)) {
+  border-top: none;
   background: #f6f9fd;
   color: #526884;
   font-size: 12px;
@@ -366,6 +426,10 @@ button:disabled {
   align-items: center;
   gap: 6px;
   padding: 0;
+  cursor: pointer;
+}
+
+.school-management-sort:where(:not(.anm-migrated)) {
   border: 0;
   background: transparent;
   color: inherit;
@@ -373,7 +437,6 @@ button:disabled {
   font-weight: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
-  cursor: pointer;
 }
 
 .school-management-sort-indicator {
@@ -382,6 +445,9 @@ button:disabled {
   justify-content: center;
   min-width: 18px;
   height: 18px;
+}
+
+.school-management-sort-indicator:where(:not(.anm-migrated)) {
   border-radius: 999px;
   background: #dce9ff;
   color: #114fb8;
@@ -391,7 +457,7 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(17, 79, 184, 0.12);
 }
 
-.school-management-table tbody tr:hover {
+.school-management-table tbody tr:hover:where(:not(.anm-migrated)) {
   background: #eef5ff;
   box-shadow: inset 0 0 0 1px #d6e4fb;
 }
@@ -415,6 +481,9 @@ button:disabled {
 
 .school-management-actions .btn-secondary {
   padding: 4px 8px;
+}
+
+.school-management-actions .btn-secondary:where(:not(.anm-migrated)) {
   font-size: 12px;
 }
 
@@ -422,26 +491,32 @@ button:disabled {
   display: inline-block;
   width: 12px;
   height: 12px;
+}
+
+.school-status-dot:where(:not(.anm-migrated)) {
   border-radius: 999px;
   background: #b7c2d1;
   box-shadow: inset 0 0 0 1px rgba(31, 47, 69, 0.12);
 }
 
-.school-status-dot.is-online {
+.school-status-dot.is-online:where(:not(.anm-migrated)) {
   background: #2fa35a;
 }
 
-.school-status-dot.is-offline {
+.school-status-dot.is-offline:where(:not(.anm-migrated)) {
   background: #d64b4b;
 }
 
-.school-status-dot.is-unknown {
+.school-status-dot.is-unknown:where(:not(.anm-migrated)) {
   background: #b7c2d1;
 }
 
 .school-management-table-empty {
-  color: #64768d;
   text-align: center;
+}
+
+.school-management-table-empty:where(:not(.anm-migrated)) {
+  color: #64768d;
 }
 
 .school-management-modal-overlay {
@@ -452,8 +527,11 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(22, 34, 52, 0.5);
   backdrop-filter: blur(2px);
+}
+
+.school-management-modal-overlay:where(:not(.anm-migrated)) {
+  background: rgba(22, 34, 52, 0.5);
 }
 
 .school-management-loading-overlay {
@@ -464,8 +542,11 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(22, 34, 52, 0.4);
   backdrop-filter: blur(2px);
+}
+
+.school-management-loading-overlay:where(:not(.anm-migrated)) {
+  background: rgba(22, 34, 52, 0.4);
 }
 
 .school-management-loading-dialog {
@@ -474,20 +555,26 @@ button:disabled {
   justify-items: center;
   gap: 10px;
   padding: 22px 20px;
+  text-align: center;
+}
+
+.school-management-loading-dialog:where(:not(.anm-migrated)) {
   border: 1px solid #dbe4f0;
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff 0%, #f4f8fe 100%);
   box-shadow: 0 28px 70px rgba(18, 45, 88, 0.24);
-  text-align: center;
 }
 
-.school-management-loading-dialog strong {
+.school-management-loading-dialog strong:where(:not(.anm-migrated)) {
   font-size: 18px;
   color: #173252;
 }
 
 .school-management-loading-dialog p {
   margin: 0;
+}
+
+.school-management-loading-dialog p:where(:not(.anm-migrated)) {
   color: #50627b;
   line-height: 1.45;
 }
@@ -497,9 +584,12 @@ button:disabled {
 }
 
 .school-management-loading-link {
+  text-decoration: none;
+}
+
+.school-management-loading-link:where(:not(.anm-migrated)) {
   color: #1459a8;
   font-weight: 700;
-  text-decoration: none;
 }
 
 .school-management-loading-link:hover {
@@ -509,10 +599,13 @@ button:disabled {
 .school-management-loading-spinner {
   width: 30px;
   height: 30px;
+  animation: school-management-spin 0.9s linear infinite;
+}
+
+.school-management-loading-spinner:where(:not(.anm-migrated)) {
   border-radius: 999px;
   border: 3px solid #d7e5fb;
   border-top-color: #1d6ef5;
-  animation: school-management-spin 0.9s linear infinite;
 }
 
 @keyframes school-management-spin {
@@ -532,6 +625,9 @@ button:disabled {
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
   padding: 18px;
+}
+
+.school-management-modal:where(:not(.anm-migrated)) {
   border: 1px solid #dbe4f0;
   border-radius: 18px;
   background: linear-gradient(180deg, #ffffff 0%, #f4f8fe 100%);
@@ -547,12 +643,18 @@ button:disabled {
 
 .school-management-modal-head h3 {
   margin: 0 0 4px;
+}
+
+.school-management-modal-head h3:where(:not(.anm-migrated)) {
   font-size: 18px;
   color: #173252;
 }
 
 .school-management-modal-head p {
   margin: 0;
+}
+
+.school-management-modal-head p:where(:not(.anm-migrated)) {
   color: #5a6d86;
   font-size: 13px;
 }
@@ -586,6 +688,9 @@ button:disabled {
   white-space: pre-wrap;
   position: relative;
   z-index: 3;
+}
+
+.school-management-modal-feedback:where(:not(.anm-migrated)) {
   box-shadow: 0 10px 24px rgba(18, 45, 88, 0.08);
 }
 
@@ -594,6 +699,9 @@ button:disabled {
   justify-content: flex-end;
   gap: 8px;
   padding-top: 14px;
+}
+
+.school-management-modal-actions:where(:not(.anm-migrated)) {
   border-top: 1px solid #dbe4f0;
 }
 
@@ -606,8 +714,12 @@ button:disabled {
   align-items: center;
   justify-content: center;
   text-align: center;
-  line-height: 1.2;
   white-space: nowrap;
+}
+
+.school-management-modal-actions .btn-primary:where(:not(.anm-migrated)),
+.school-management-modal-actions .btn-secondary:where(:not(.anm-migrated)) {
+  line-height: 1.2;
 }
 
 .school-management-import-overwrite-toggle {
@@ -615,27 +727,36 @@ button:disabled {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
+  cursor: pointer;
+}
+
+.school-management-import-overwrite-toggle:where(:not(.anm-migrated)) {
   border: 1px solid #dbe4f0;
   border-radius: 12px;
   background: #f8fbff;
   color: #24344c;
-  cursor: pointer;
 }
 
 .school-management-import-overwrite-toggle-input {
   position: absolute;
-  opacity: 0;
   pointer-events: none;
+}
+
+.school-management-import-overwrite-toggle-input:where(:not(.anm-migrated)) {
+  opacity: 0;
 }
 
 .school-management-import-overwrite-toggle-switch {
   position: relative;
   width: 44px;
   height: 24px;
+  transition: background 0.2s ease;
+}
+
+.school-management-import-overwrite-toggle-switch:where(:not(.anm-migrated)) {
   border-radius: 999px;
   background: #c7d4e6;
   box-shadow: inset 0 0 0 1px rgba(36, 52, 76, 0.08);
-  transition: background 0.2s ease;
 }
 
 .school-management-import-overwrite-toggle-switch::after {
@@ -645,18 +766,21 @@ button:disabled {
   left: 3px;
   width: 18px;
   height: 18px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 2px 6px rgba(18, 45, 88, 0.18);
   transition: transform 0.2s ease;
 }
 
-.school-management-import-overwrite-toggle-label {
+.school-management-import-overwrite-toggle-switch:where(:not(.anm-migrated))::after {
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(18, 45, 88, 0.18);
+}
+
+.school-management-import-overwrite-toggle-label:where(:not(.anm-migrated)) {
   font-size: 13px;
   font-weight: 600;
 }
 
-.school-management-import-overwrite-toggle-input:checked + .school-management-import-overwrite-toggle-switch {
+.school-management-import-overwrite-toggle-input:checked + .school-management-import-overwrite-toggle-switch:where(:not(.anm-migrated)) {
   background: #1d6ef5;
 }
 
@@ -664,43 +788,53 @@ button:disabled {
   transform: translateX(20px);
 }
 
-.school-management-import-overwrite-toggle-input:focus-visible + .school-management-import-overwrite-toggle-switch {
+.school-management-import-overwrite-toggle-input:focus-visible + .school-management-import-overwrite-toggle-switch:where(:not(.anm-migrated)) {
   outline: 2px solid #8bb3f8;
   outline-offset: 2px;
 }
 
-.school-management-import-overwrite-toggle-input:disabled + .school-management-import-overwrite-toggle-switch {
+.school-management-import-overwrite-toggle-input:disabled + .school-management-import-overwrite-toggle-switch:where(:not(.anm-migrated)) {
   opacity: 0.7;
 }
 
-.school-management-import-overwrite-toggle-input:disabled ~ .school-management-import-overwrite-toggle-label {
+.school-management-import-overwrite-toggle-input:disabled ~ .school-management-import-overwrite-toggle-label:where(:not(.anm-migrated)) {
   opacity: 0.75;
 }
 
 .school-management-modal-table {
   width: 100%;
+  overflow: hidden;
+}
+
+.school-management-modal-table:where(:not(.anm-migrated)) {
   border-collapse: collapse;
   background: #ffffff;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
-  overflow: hidden;
 }
 
 .school-management-modal-table th,
 .school-management-modal-table td {
   padding: 7px 10px;
-  border-top: 1px solid #e3ebf5;
   text-align: left;
+}
+
+.school-management-modal-table th:where(:not(.anm-migrated)),
+.school-management-modal-table td:where(:not(.anm-migrated)) {
+  border-top: 1px solid #e3ebf5;
   font-size: 12px;
   color: #24344c;
   line-height: 1.15;
 }
 
 .school-management-modal-table thead th {
-  border-top: none;
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.school-management-modal-table thead th:where(:not(.anm-migrated)) {
+  border-top: none;
   background: #f6f9fd;
   color: #526884;
   font-size: 12px;
@@ -715,6 +849,11 @@ button:disabled {
   justify-content: center;
   min-width: 100%;
   padding: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.school-management-import-select-all:where(:not(.anm-migrated)) {
   border: 0;
   background: transparent;
   color: inherit;
@@ -723,13 +862,14 @@ button:disabled {
   letter-spacing: inherit;
   text-transform: inherit;
   line-height: 1.2;
-  white-space: nowrap;
-  cursor: pointer;
 }
 
 .school-management-import-preview-row td {
   padding-top: 4px;
   padding-bottom: 4px;
+}
+
+.school-management-import-preview-row td:where(:not(.anm-migrated)) {
   line-height: 1.05;
 }
 
@@ -737,7 +877,7 @@ button:disabled {
   cursor: pointer;
 }
 
-.school-management-modal-row:hover {
+.school-management-modal-row:hover:where(:not(.anm-migrated)) {
   background: #eef5ff;
   box-shadow: inset 0 0 0 1px #d6e4fb;
 }
@@ -753,6 +893,9 @@ button:disabled {
   margin: 0;
   padding: 24px 12px;
   text-align: center;
+}
+
+.school-management-modal-empty:where(:not(.anm-migrated)) {
   color: #64768d;
 }
 
@@ -778,22 +921,31 @@ button:disabled {
 
 .school-management-import-info-card {
   padding: 14px 16px;
-  border: 1px solid #dbe4f0;
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   display: grid;
   gap: 12px;
 }
 
+.school-management-import-info-card:where(:not(.anm-migrated)) {
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
 .school-management-import-info-card h4 {
   margin: 0;
+}
+
+.school-management-import-info-card h4:where(:not(.anm-migrated)) {
   font-size: 16px;
   color: #173252;
 }
 
 .school-management-import-info-card p {
   margin: 0;
+}
+
+.school-management-import-info-card p:where(:not(.anm-migrated)) {
   color: #51657f;
   line-height: 1.45;
 }
@@ -802,18 +954,21 @@ button:disabled {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
+}
+
+.school-management-import-info-callout:where(:not(.anm-migrated)) {
   border: 1px solid #d8e6fb;
   border-radius: 12px;
   background: #f4f8ff;
   color: #29476d;
 }
 
-.school-management-import-info-callout strong {
+.school-management-import-info-callout strong:where(:not(.anm-migrated)) {
   font-size: 13px;
   color: #173252;
 }
 
-.school-management-import-info-callout span {
+.school-management-import-info-callout span:where(:not(.anm-migrated)) {
   font-size: 13px;
   line-height: 1.45;
 }
@@ -826,30 +981,36 @@ button:disabled {
 .school-management-import-info-code {
   margin: 0;
   padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.school-management-import-info-code:where(:not(.anm-migrated)) {
   border-radius: 12px;
   border: 1px solid #dbe4f0;
   background: #f6f9ff;
   color: #1e3555;
   font: 12px/1.45 "Consolas", "Courier New", monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .school-management-import-info-inline-note {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
+}
+
+.school-management-import-info-inline-note:where(:not(.anm-migrated)) {
   border-radius: 12px;
   border: 1px solid #cfe0f5;
   background: #f9fbfe;
 }
 
-.school-management-import-info-inline-note strong {
+.school-management-import-info-inline-note strong:where(:not(.anm-migrated)) {
   color: #173252;
   font-size: 13px;
 }
 
-.school-management-import-info-inline-note span {
+.school-management-import-info-inline-note span:where(:not(.anm-migrated)) {
   color: #51657f;
   font-size: 13px;
   line-height: 1.45;
@@ -857,6 +1018,9 @@ button:disabled {
 
 .school-management-import-info-note {
   padding: 12px 14px;
+}
+
+.school-management-import-info-note:where(:not(.anm-migrated)) {
   border-radius: 14px;
   border: 1px solid #dbe4f0;
   background: #f8fbff;
@@ -865,6 +1029,9 @@ button:disabled {
 
 .school-management-import-info-note p {
   margin: 0;
+}
+
+.school-management-import-info-note p:where(:not(.anm-migrated)) {
   line-height: 1.45;
 }
 
@@ -873,6 +1040,9 @@ button:disabled {
   max-height: none;
   grid-template-rows: auto auto auto;
   gap: 16px;
+}
+
+.school-management-danger-modal:where(:not(.anm-migrated)) {
   border-color: #f0c7cb;
   background: linear-gradient(180deg, #fffefe 0%, #fff7f7 100%);
 }
@@ -886,12 +1056,18 @@ button:disabled {
 
 .school-management-danger-hero h3 {
   margin: 0 0 4px;
+}
+
+.school-management-danger-hero h3:where(:not(.anm-migrated)) {
   font-size: 21px;
   color: #7d1f28;
 }
 
 .school-management-danger-hero p {
   margin: 0;
+}
+
+.school-management-danger-hero p:where(:not(.anm-migrated)) {
   color: #7c4d54;
   line-height: 1.45;
 }
@@ -899,10 +1075,13 @@ button:disabled {
 .school-management-danger-badge {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.school-management-danger-badge:where(:not(.anm-migrated)) {
+  border-radius: 14px;
   background: linear-gradient(180deg, #ffdbde 0%, #ffc7cc 100%);
   color: #9f2430;
   font-size: 26px;
@@ -916,19 +1095,25 @@ button:disabled {
   gap: 6px;
   align-items: baseline;
   padding: 12px 14px;
+}
+
+.school-management-danger-summary:where(:not(.anm-migrated)) {
   border: 1px solid #f3d7da;
   border-radius: 14px;
   background: #fff;
   color: #6a3f45;
 }
 
-.school-management-danger-summary strong {
+.school-management-danger-summary strong:where(:not(.anm-migrated)) {
   font-size: 18px;
   color: #9f2430;
 }
 
 .school-management-danger-list {
   padding: 14px 16px;
+}
+
+.school-management-danger-list:where(:not(.anm-migrated)) {
   border-radius: 14px;
   background: #fff;
   border: 1px solid #f3d7da;
@@ -937,6 +1122,9 @@ button:disabled {
 
 .school-management-danger-list p {
   margin: 0 0 8px;
+}
+
+.school-management-danger-list p:where(:not(.anm-migrated)) {
   font-weight: 700;
   color: #7d1f28;
 }
@@ -950,12 +1138,12 @@ button:disabled {
   margin-top: 6px;
 }
 
-.school-management-danger-button {
+.school-management-danger-button:where(:not(.anm-migrated)) {
   background: #c73d4a;
   border-color: #c73d4a;
 }
 
-.school-management-danger-button:hover:not(:disabled) {
+.school-management-danger-button:hover:not(:disabled):where(:not(.anm-migrated)) {
   background: #ac2a37;
   border-color: #ac2a37;
 }
@@ -969,12 +1157,15 @@ button:disabled {
   min-height: 0;
   overflow: auto;
   padding: 16px;
+  white-space: pre-wrap;
+}
+
+.school-management-import-result-body:where(:not(.anm-migrated)) {
   border-radius: 14px;
   background: #f6f9ff;
   border: 1px solid #dbe4f0;
   color: #24344c;
   font: 13px/1.5 "Consolas", "Courier New", monospace;
-  white-space: pre-wrap;
 }
 
 @media (max-width: 900px) {

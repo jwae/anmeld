@@ -7,6 +7,7 @@ import { useAuth } from "./composables/useAuth";
 import { authService } from "./services/apiService";
 import appStructureImage from "./assets/app_struktur.png";
 
+import LoginIcon from "./components/LoginIcon.vue";
 import APPManagement from "./components/APPManagement.vue";
 import LoginCredentialsPage from "./components/LoginCredentialsPage.vue";
 
@@ -156,3 +157,4 @@ onMounted(async () => {
 
 <template src="./App.html"></template>
 <style scoped src="./App.css"></style>
+<style scoped src="./Login.css"></style>

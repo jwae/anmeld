@@ -1,0 +1,140 @@
+/* Login-only layout. Shared controls come from styles/components.css. */
+.page-login {
+  min-height: 100dvh;
+  max-width: none;
+  padding: clamp(24px, 6vh, 64px) 16px;
+}
+
+.app-login-card,
+.app-structure-card {
+  width: 100%;
+  max-width: 36rem;
+  margin: 0 auto;
+}
+
+.app-login-header {
+  display: grid;
+  gap: var(--anm-space-4);
+  margin-bottom: var(--anm-space-6);
+}
+
+.eyebrow {
+  margin: 0 0 var(--anm-space-2);
+  color: var(--anm-brand-hover);
+  font-size: var(--anm-text-xs);
+  font-weight: var(--anm-weight-bold);
+}
+
+.app-login-header h1 {
+  margin: 0 0 var(--anm-space-3);
+  text-wrap: balance;
+}
+
+.app-login-intro {
+  margin: 0;
+}
+
+.app-login-form,
+.login-fields-row {
+  display: grid;
+  gap: var(--anm-space-4);
+}
+
+.login-inputs {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.password-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--anm-space-2);
+}
+
+.connection-settings-toggle[aria-expanded="true"] {
+  border-color: var(--anm-brand);
+  color: var(--anm-brand-hover);
+  background: var(--anm-brand-soft);
+}
+
+.connection-settings-slide {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: var(--anm-space-4);
+}
+
+.connection-settings-clip { min-height: 0; }
+.settings-slide-enter-active .connection-settings-clip,
+.settings-slide-leave-active .connection-settings-clip { overflow: hidden; }
+
+.settings-slide-enter-active,
+.settings-slide-leave-active {
+  transition: grid-template-rows var(--anm-duration) var(--anm-easing), margin-top var(--anm-duration) var(--anm-easing), opacity var(--anm-duration) var(--anm-easing);
+}
+
+.settings-slide-enter-from,
+.settings-slide-leave-to {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  opacity: 0;
+}
+
+.connection-settings {
+  padding: var(--anm-space-4);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface-muted);
+}
+
+.connection-settings p {
+  margin: 0 0 var(--anm-space-4);
+  color: var(--anm-text-muted);
+  font-size: var(--anm-text-xs);
+}
+
+.connection-settings-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--anm-space-4);
+  align-items: end;
+}
+
+.connection-settings-fields + .connection-settings-fields { margin-top: var(--anm-space-4); }
+
+.app-login-form > .login-actions > .anm-button--primary { flex: 1 1 100%; }
+
+.login-status-chip { display: flex; padding: var(--anm-space-3); }
+
+.connection-settings-toggle .login-chevron {
+  display: block;
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--anm-duration) var(--anm-easing);
+}
+
+.connection-settings-toggle .login-chevron.is-open {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.login-error { margin-top: var(--anm-space-4); }
+
+.app-structure-card { margin-top: var(--anm-space-6); }
+.app-structure-card h2 { margin: 0 0 var(--anm-space-4); font-size: var(--anm-text-base); font-weight: var(--anm-weight-bold); }
+.app-structure-image { display: block; width: 100%; height: auto; }
+
+@media (max-width: 30rem) {
+  .connection-settings-fields { grid-template-columns: minmax(0, 1fr); }
+  .login-actions > .anm-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-slide-enter-active, .settings-slide-leave-active,
+  .connection-settings-toggle .login-chevron { transition: none; }
+}

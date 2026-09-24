@@ -1,10 +1,10 @@
 <section class="school-group-page">
-  <div v-if="!isManagementSessionActive" class="feedback-panel feedback-panel-error">
+  <div v-if="!isManagementSessionActive" class="anm-alert anm-status--danger anm-migrated" role="alert">
     <p class="error">Bitte zuerst die Verwaltung laden, damit die Schulen fuer Schulgruppen verfuegbar sind.</p>
   </div>
 
   <template v-else>
-    <section class="user-management-panel school-group-form-card">
+    <section class="user-management-panel school-group-form-card anm-card anm-migrated">
       <div class="user-management-panel-head">
         <div>
           <h3>Gruppe anlegen</h3>
@@ -13,18 +13,18 @@
       </div>
 
       <div class="user-management-form-grid school-group-form-grid">
-        <label class="field-block school-group-field-name">
-          <span class="field-label">Name</span>
-          <input v-model="groupForm.name" :disabled="managementSaving" />
+        <label class="school-group-field-name anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Name</span>
+          <input v-model="groupForm.name" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block school-group-field-description">
-          <span class="field-label">Beschreibung</span>
-          <input v-model="groupForm.beschreibung" :disabled="managementSaving" />
+        <label class="school-group-field-description anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Beschreibung</span>
+          <input v-model="groupForm.beschreibung" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <div class="field-block user-management-checkbox-field school-group-field-active">
-          <span class="field-label">Aktiv</span>
+        <div class="user-management-checkbox-field school-group-field-active anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Aktiv</span>
           <label class="user-management-checkbox user-management-checkbox-card">
             <input v-model="groupForm.aktiv" type="checkbox" :disabled="managementSaving" />
             <span>Gruppe aktiv</span>
@@ -33,7 +33,7 @@
       </div>
 
       <div class="user-management-inline-actions">
-        <button class="btn-primary" type="button" :disabled="managementSaving" @click="saveGroup">
+        <button class="anm-button anm-button--primary anm-migrated" type="button" :disabled="managementSaving" @click="saveGroup">
           {{ managementSaving ? "Speichere..." : "Gruppe speichern" }}
         </button>
       </div>
@@ -41,13 +41,13 @@
       <transition name="feedback-fade" mode="out-in">
         <div
           v-if="localFeedbackError"
-          class="feedback-panel feedback-panel-error user-management-inline-feedback"
+          class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
         >
           <p class="error">{{ localFeedbackError }}</p>
         </div>
         <div
           v-else-if="localFeedbackNotice"
-          class="feedback-panel feedback-panel-success user-management-inline-feedback"
+          class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
         >
           <p>{{ localFeedbackNotice }}</p>
         </div>
@@ -63,9 +63,9 @@
       </div>
 
       <div class="user-management-inline-actions">
-        <label class="field-block school-group-select-field">
-          <span class="field-label">Schulgruppe auswaehlen</span>
-          <select v-model="selectedGroupId" :disabled="managementSaving">
+        <label class="school-group-select-field anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Schulgruppe auswaehlen</span>
+          <select v-model="selectedGroupId" :disabled="managementSaving" class="anm-input anm-migrated">
             <option value="">Bitte waehlen</option>
             <option v-for="group in sortedGroups" :key="`school-group-${group.id}`" :value="group.id">
               {{ group.name }}{{ group.aktiv ? "" : " (inaktiv)" }}
@@ -74,7 +74,7 @@
         </label>
 
         <div class="school-group-inline-actions-right">
-          <button class="btn-primary school-group-delete-button school-group-danger-button" type="button" :disabled="managementSaving || !selectedGroup" @click="deleteSelectedGroup">
+          <button class="school-group-delete-button school-group-danger-button anm-button anm-button--danger anm-migrated" type="button" :disabled="managementSaving || !selectedGroup" @click="deleteSelectedGroup">
             Gruppe loeschen
           </button>
         </div>
@@ -182,7 +182,7 @@
       class="school-group-modal-overlay"
       @click.self="closeDeleteGroupConfirm"
     >
-      <section class="school-group-modal school-group-danger-modal" role="dialog" aria-modal="true" aria-label="Schulgruppe loeschen">
+      <section class="school-group-modal school-group-danger-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Schulgruppe loeschen">
         <div class="school-group-danger-hero">
           <div class="school-group-danger-badge" aria-hidden="true">!</div>
           <div>
@@ -208,10 +208,10 @@
         </div>
 
         <div class="school-group-modal-actions">
-          <button class="btn-secondary" type="button" @click="closeDeleteGroupConfirm" :disabled="managementSaving">
+          <button class="anm-button anm-button--danger anm-migrated" type="button" @click="closeDeleteGroupConfirm" :disabled="managementSaving">
             Abbrechen
           </button>
-          <button class="btn-primary school-group-danger-button-strong" type="button" @click="confirmDeleteSelectedGroup" :disabled="managementSaving">
+          <button class="school-group-danger-button-strong anm-button anm-button--danger anm-migrated" type="button" @click="confirmDeleteSelectedGroup" :disabled="managementSaving">
             {{ managementSaving ? "Loesche..." : "Endgueltig loeschen" }}
           </button>
         </div>

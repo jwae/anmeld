@@ -1,0 +1,141 @@
+/* SVWS-inspired application primitives. See public/licenses/svws-ui.txt.
+   Explicit anm-* classes avoid changing legacy Bootstrap screens. */
+.anm-theme {
+  color-scheme: light;
+  font-family: var(--anm-font);
+  font-size: var(--anm-text-base);
+  line-height: var(--anm-leading);
+  color: var(--anm-text);
+  background: var(--anm-surface-muted);
+}
+.anm-theme, .anm-theme *, .anm-theme *::before, .anm-theme *::after { box-sizing: border-box; }
+.anm-card {
+  padding: var(--anm-space-8);
+  background: var(--anm-surface);
+  color: var(--anm-text);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  box-shadow: var(--anm-shadow-none);
+  min-width: 0;
+}
+.anm-heading { font-size: var(--anm-text-heading); line-height: var(--anm-leading-heading); font-weight: var(--anm-weight-bold); }
+.anm-muted { color: var(--anm-text-muted); }
+.anm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--anm-space-2); }
+.anm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--anm-space-2);
+  min-height: var(--anm-control-height);
+  padding: var(--anm-space-2) var(--anm-space-4);
+  border: var(--anm-border-width) solid var(--anm-border-control);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface);
+  color: var(--anm-text);
+  font: inherit;
+  font-size: var(--anm-text-button);
+  font-weight: var(--anm-weight-bold);
+  line-height: 1.33;
+  text-decoration: none;
+  cursor: pointer;
+}
+.anm-button:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--anm-brand);
+  color: var(--anm-brand-hover);
+  background: var(--anm-brand-soft);
+}
+.anm-button--primary { background: var(--anm-brand); border-color: var(--anm-brand); color: var(--anm-onbrand); }
+.anm-button--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--anm-brand-hover); border-color: var(--anm-brand-hover); color: var(--anm-onbrand);
+}
+.anm-button--danger { background: var(--anm-danger); border-color: var(--anm-danger); color: var(--anm-onbrand); }
+.anm-button--danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--anm-danger-hover); border-color: var(--anm-danger-hover); color: var(--anm-onbrand);
+}
+.anm-button--icon { width: var(--anm-control-height); padding: 0; flex: 0 0 auto; }
+.anm-button:disabled, .anm-button[aria-disabled="true"] {
+  background: var(--anm-disabled-bg); color: var(--anm-disabled-text); border-color: var(--anm-border); cursor: not-allowed;
+}
+.anm-button[aria-busy="true"] { cursor: progress; }
+.anm-field { display: grid; gap: var(--anm-space-2); min-width: 0; }
+.anm-label { display: flex; align-items: center; gap: var(--anm-space-2); color: var(--anm-text); font-size: var(--anm-text-xs); font-weight: var(--anm-weight-medium); }
+.anm-input {
+  width: 100%; min-width: 0; min-height: var(--anm-control-height);
+  padding: var(--anm-space-2) var(--anm-space-3);
+  border: var(--anm-border-width) solid var(--anm-border-control);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface); color: var(--anm-text); font: inherit;
+}
+textarea.anm-input { min-height: 6rem; resize: vertical; }
+.anm-input::placeholder { color: var(--anm-text-muted); opacity: 1; }
+.anm-input:hover:not(:disabled):not([readonly]) { border-color: var(--anm-brand); }
+.anm-input:disabled, .anm-input[readonly] { background: var(--anm-disabled-bg); }
+.anm-input:disabled { cursor: not-allowed; }
+.anm-input[aria-invalid="true"] { border-color: var(--anm-danger); border-width: 2px; }
+.anm-field-error { color: var(--anm-danger); font-size: var(--anm-text-xs); }
+.anm-check { display: flex; align-items: center; gap: var(--anm-space-2); min-height: var(--anm-control-height); cursor: pointer; }
+.anm-check input { width: 1.125rem; height: 1.125rem; accent-color: var(--anm-brand); flex: 0 0 auto; }
+.anm-nav { display: flex; gap: var(--anm-space-1); overflow-x: auto; padding: var(--anm-space-2); border-bottom: var(--anm-border-width) solid var(--anm-border); }
+.anm-nav-item {
+  display: inline-flex; align-items: center; gap: var(--anm-space-2); flex: 0 0 auto;
+  min-height: var(--anm-control-height); padding: var(--anm-space-2) var(--anm-space-4);
+  background: transparent; color: var(--anm-text-muted); border: 0; border-bottom: 3px solid transparent;
+  font: inherit; text-decoration: none; cursor: pointer;
+}
+.anm-nav-item:hover:not(:disabled) { color: var(--anm-brand-hover); background: var(--anm-surface-muted); }
+.anm-nav-item[aria-current="page"], .anm-nav-item[aria-selected="true"] {
+  border-bottom-color: var(--anm-brand); color: var(--anm-brand-hover); font-weight: var(--anm-weight-bold);
+}
+.anm-nav-item:disabled { color: var(--anm-disabled-text); cursor: not-allowed; }
+.anm-table-wrap { max-width: 100%; overflow: auto; border: var(--anm-border-width) solid var(--anm-border); border-radius: var(--anm-radius-control); }
+.anm-table { width: 100%; border-collapse: collapse; background: var(--anm-surface); color: var(--anm-text); font-size: var(--anm-text-button); font-variant-numeric: tabular-nums; }
+.anm-table caption { color: var(--anm-text-muted); padding: var(--anm-space-3); text-align: left; caption-side: top; }
+.anm-table th, .anm-table td { padding: var(--anm-space-3); border-bottom: var(--anm-border-width) solid var(--anm-border); vertical-align: top; }
+.anm-table th { background: var(--anm-surface-muted); color: var(--anm-text); font-weight: var(--anm-weight-bold); text-align: left; }
+.anm-table tbody tr:hover, .anm-table tbody tr:focus-within { background: var(--anm-surface-muted); }
+.anm-table tbody tr[aria-selected="true"] { background: var(--anm-selected); }
+.anm-table tbody tr:last-child td { border-bottom: 0; }
+.anm-dialog {
+  box-sizing: border-box; width: calc(100% - 2rem); max-width: var(--anm-dialog-sm);
+  max-height: calc(100dvh - 2rem); overflow: auto; margin: auto; padding: var(--anm-space-6);
+  color-scheme: light; font-family: var(--anm-font); font-size: var(--anm-text-base); line-height: var(--anm-leading);
+  border: var(--anm-border-width) solid var(--anm-border); border-radius: var(--anm-radius-card);
+  background: var(--anm-surface); color: var(--anm-text); box-shadow: var(--anm-shadow-dialog);
+}
+.anm-dialog::backdrop { background: var(--anm-overlay); }
+.anm-dialog--md { max-width: var(--anm-dialog-md); }
+.anm-dialog--lg { max-width: var(--anm-dialog-lg); }
+.anm-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: var(--anm-space-4); margin-bottom: var(--anm-space-4); }
+.anm-dialog-title { margin: 0; font-size: var(--anm-text-lg); font-weight: var(--anm-weight-bold); }
+.anm-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--anm-space-2); margin-top: var(--anm-space-6); }
+.anm-alert, .anm-badge {
+  --anm-status-text: var(--anm-info); --anm-status-bg: var(--anm-info-soft);
+  background: var(--anm-status-bg); color: var(--anm-status-text);
+  border: var(--anm-border-width) solid currentColor; border-radius: var(--anm-radius-control);
+  overflow-wrap: anywhere; font-size: var(--anm-text-xs);
+}
+.anm-alert { padding: var(--anm-space-3) var(--anm-space-4); }
+.anm-alert p { margin: 0; }
+.anm-alert p + p { margin-top: var(--anm-space-2); }
+.anm-alert-title { font-weight: var(--anm-weight-bold); }
+.anm-badge { display: inline-flex; align-items: center; gap: var(--anm-space-2); padding: var(--anm-space-1) var(--anm-space-2); }
+.anm-status--success { --anm-status-text: var(--anm-success); --anm-status-bg: var(--anm-success-soft); }
+.anm-status--danger { --anm-status-text: var(--anm-danger); --anm-status-bg: var(--anm-danger-soft); }
+.anm-status--warning { --anm-status-text: var(--anm-warning); --anm-status-bg: var(--anm-warning-soft); }
+.anm-status--neutral { --anm-status-text: var(--anm-text-muted); --anm-status-bg: var(--anm-surface-muted); }
+.anm-button:focus-visible, .anm-input:focus-visible, .anm-check input:focus-visible,
+.anm-nav-item:focus-visible, .anm-table-wrap:focus-visible, .anm-dialog:focus-visible {
+  outline: var(--anm-focus-width) solid var(--anm-focus); outline-offset: var(--anm-focus-offset);
+}
+@media (max-width: 30rem) {
+  .anm-card { padding: var(--anm-space-6); }
+  .anm-dialog { padding: var(--anm-space-4); }
+  .anm-dialog-actions > .anm-button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anm-theme { --anm-duration: 0ms; }
+}
+@media (forced-colors: active) {
+  .anm-button, .anm-input, .anm-alert, .anm-badge { border-color: ButtonText; }
+  .anm-nav-item[aria-selected="true"], .anm-nav-item[aria-current="page"] { border-bottom-color: Highlight; }
+}

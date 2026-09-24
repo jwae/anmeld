@@ -1,4 +1,4 @@
-<div class="page" :class="{ 'page-anm-route': isAnmRoute }">
+<div class="page" :class="{ 'page-anm-route': isAnmRoute, 'page-login anm-theme': !isAuthenticated && !(showAppManagement && pendingLogin && canPendingManageApp) }">
   <template v-if="showAppManagement && pendingLogin && canPendingManageApp">
     <APPManagement
       :token="pendingLogin?.token || ''"
@@ -13,35 +13,35 @@
   </template>
 
   <template v-else-if="!isAuthenticated">
-    <section class="card login-card app-login-card">
+    <section class="anm-card app-login-card" aria-labelledby="login-title">
       <div class="app-login-header">
         <div>
           <p class="eyebrow">{{ pendingLogin ? 'Anwendungsbereiche' : 'Anmeldung' }}</p>
-          <h2>{{ pendingLogin ? 'Bereich auswählen' : 'Anmeldeverfahren für Schulen' }}</h2>
-          <p class="app-login-intro">
+          <h1 id="login-title" class="anm-heading">{{ pendingLogin ? 'Bereich auswählen' : 'Anmeldeverfahren für Schulen' }}</h1>
+          <p class="app-login-intro anm-muted">
             {{ pendingLogin ? 'Wähle den gewünschten Bereich.' : 'Melde dich mit deinem Benutzerkonto an.' }}
           </p>
         </div>
-        <div v-if="pendingLogin" class="login-status-chip login-status-chip-success">
-          <i class="bi bi-person-check"></i>
+        <div v-if="pendingLogin" class="anm-badge anm-status--success login-status-chip">
+          <LoginIcon name="user" />
           <strong>{{ pendingLoginUserLabel }}</strong>
         </div>
       </div>
 
-      <form v-if="!pendingLogin" class="login-form app-login-form" @submit.prevent="login">
+      <form v-if="!pendingLogin" class="app-login-form" :aria-busy="loginBusy" @submit.prevent="login">
         <fieldset class="login-inputs" :disabled="loginBusy">
           <div class="login-fields-row">
-            <label class="field-block field-fixed-240">
-              <span class="field-label">Benutzername</span>
-              <input v-model="loginUsername" autocomplete="username" required />
+            <label class="anm-field">
+              <span class="anm-label"><LoginIcon name="user" /> Benutzername</span>
+              <input class="anm-input" v-model="loginUsername" autocomplete="username" required />
             </label>
             <div class="password-settings-row">
-              <label class="field-block field-fixed-240">
-                <span class="field-label">Passwort</span>
-                <input v-model="loginPassword" type="password" autocomplete="current-password" required />
+              <label class="anm-field">
+                <span class="anm-label"><LoginIcon name="lock" /> Passwort</span>
+                <input class="anm-input" v-model="loginPassword" type="password" autocomplete="current-password" required />
               </label>
               <button
-                class="btn-secondary connection-settings-toggle"
+                class="anm-button anm-button--secondary anm-button--icon connection-settings-toggle"
                 type="button"
                 :aria-expanded="showConnectionSettings"
                 :aria-label="showConnectionSettings ? 'Einstellungen ausblenden' : 'Einstellungen anzeigen'"
@@ -49,7 +49,7 @@
                 aria-controls="login-connection-settings"
                 @click="showConnectionSettings = !showConnectionSettings"
               >
-                <i class="bi bi-gear" aria-hidden="true"></i>
+                <span class="login-chevron" :class="{ 'is-open': showConnectionSettings }" aria-hidden="true"></span>
               </button>
             </div>
           </div>
@@ -59,35 +59,38 @@
               <div class="connection-settings-clip">
                 <div id="login-connection-settings" class="connection-settings">
                   <p>Verbindung zur Anwendungsdatenbank. Diese Zugangsdaten gehören zum Datenbankkonto.</p>
-                  <div class="connection-settings-fields connection-server-fields">
-                    <label class="field-block">
-                      <span class="field-label">Server</span>
-                      <input v-model="host" autocomplete="off" placeholder="z. B. localhost" required />
+                  <div class="connection-settings-fields">
+                    <label class="anm-field">
+                      <span class="anm-label">Server</span>
+                      <input class="anm-input" v-model="host" autocomplete="off" placeholder="z. B. localhost" required />
                     </label>
-                    <label class="field-block">
-                      <span class="field-label">Port</span>
-                      <input v-model.number="port" type="number" min="1" max="65535" required />
+                    <label class="anm-field">
+                      <span class="anm-label">Port</span>
+                      <input class="anm-input" v-model.number="port" type="number" min="1" max="65535" required />
                     </label>
-                    <label class="field-block">
-                      <span class="field-label">Datenbank</span>
-                      <input v-model="database" autocomplete="off" required />
+                    <label class="anm-field">
+                      <span class="anm-label">Datenbank</span>
+                      <input class="anm-input" v-model="database" autocomplete="off" required />
                     </label>
                     <button
-                      class="btn-secondary db-test-button"
+                      class="anm-button anm-button--secondary"
                       type="button"
                       title="Testet, ob die DB erreichbar ist."
                       :disabled="loginBusy"
                       @click="testConnection"
-                    >{{ testing ? 'Teste...' : 'DB-Test' }}</button>
+                    >
+                      <LoginIcon name="database" />
+                      {{ testing ? 'Teste...' : 'DB-Test' }}
+                    </button>
                   </div>
                   <div class="connection-settings-fields">
-                    <label class="field-block">
-                      <span class="field-label">DB-Benutzer</span>
-                      <input v-model="dbUsername" autocomplete="off" required />
+                    <label class="anm-field">
+                      <span class="anm-label">DB-Benutzer</span>
+                      <input class="anm-input" v-model="dbUsername" autocomplete="off" required />
                     </label>
-                    <label class="field-block">
-                      <span class="field-label">DB-Passwort</span>
-                      <input v-model="dbPassword" type="password" autocomplete="off" />
+                    <label class="anm-field">
+                      <span class="anm-label">DB-Passwort</span>
+                      <input class="anm-input" v-model="dbPassword" type="password" autocomplete="off" />
                     </label>
                   </div>
                 </div>
@@ -96,57 +99,58 @@
           </Transition>
         </fieldset>
 
-        <div class="login-actions">
-          <button class="btn-primary" :disabled="loginBusy" type="submit">
+        <div class="anm-actions login-actions">
+          <button class="anm-button anm-button--primary" :disabled="loginBusy" type="submit">
+            <LoginIcon name="login" />
             {{ initializing ? 'Lade Verbindung...' : connecting ? 'Verbinde...' : loginLoading ? 'Anmelden...' : 'Anmelden' }}
           </button>
         </div>
-        <div v-if="testSuccess && !error" class="feedback-panel feedback-panel-success" role="status">
-          Die Datenbank ist erreichbar.
+        <div v-if="testSuccess && !error" class="anm-alert anm-status--success" role="status">
+          <LoginIcon name="check" /> Die Datenbank ist erreichbar.
         </div>
-        <div v-if="error" class="feedback-panel feedback-panel-error" role="alert">
-          <p class="feedback-title">Verbindung fehlgeschlagen</p>
-          <p class="error">{{ error }}</p>
+        <div v-if="error" class="anm-alert anm-status--danger" role="alert">
+          <p class="anm-alert-title"><LoginIcon name="alert" /> Verbindung fehlgeschlagen</p>
+          <p>{{ error }}</p>
           <p v-if="errorDetails">{{ errorDetails }}</p>
           <p v-if="errorCode">Code: {{ errorCode }}</p>
         </div>
       </form>
 
-      <div v-else class="login-form app-login-form">
+      <div v-else class="app-login-form" :aria-busy="managementSessionLoading">
         <p v-if="!canPendingViewProcedures && !canPendingManageApp" role="status">
           Für dieses Konto ist kein Anwendungsbereich freigeschaltet.
         </p>
-        <div class="login-actions">
+        <div class="anm-actions login-actions">
           <button
             v-if="canPendingViewProcedures"
-            class="btn-primary"
+            class="anm-button anm-button--primary"
             type="button"
             :disabled="managementSessionLoading"
             @click="openAnmeldeverfahren"
-          >Zum Anmeldeverfahren</button>
+          ><LoginIcon name="login" /> Zum Anmeldeverfahren</button>
           <button
             v-if="canPendingManageApp"
-            class="btn-secondary"
+            class="anm-button anm-button--secondary"
             type="button"
             :disabled="managementSessionLoading"
             @click="openAppManagement"
-          >App-Verwaltung</button>
+          ><LoginIcon name="settings" /> App-Verwaltung</button>
           <button
-            class="btn-secondary"
+            class="anm-button anm-button--secondary"
             type="button"
             :disabled="managementSessionLoading"
             @click="logoutFromAreaSelection"
-          ><i class="bi bi-power" aria-hidden="true"></i> Abmelden</button>
+          ><LoginIcon name="logout" /> Abmelden</button>
         </div>
       </div>
 
-      <div v-if="loginError" class="feedback-panel feedback-panel-error login-error" role="alert">
-        <p class="feedback-title">{{ pendingLogin ? 'Bereich konnte nicht geöffnet werden' : 'Anmeldung fehlgeschlagen' }}</p>
-        <p class="error">{{ loginError }}</p>
+      <div v-if="loginError" class="anm-alert anm-status--danger login-error" role="alert">
+        <p class="anm-alert-title"><LoginIcon name="alert" /> {{ pendingLogin ? 'Bereich konnte nicht geöffnet werden' : 'Anmeldung fehlgeschlagen' }}</p>
+        <p>{{ loginError }}</p>
       </div>
     </section>
-    <section v-if="!pendingLogin" class="card app-structure-card" aria-labelledby="app-structure-title">
-      <h3 id="app-structure-title">Struktur der App</h3>
+    <section v-if="!pendingLogin" class="anm-card app-structure-card" aria-labelledby="app-structure-title">
+      <h2 id="app-structure-title">Struktur der App</h2>
       <img :src="appStructureImage" alt="Struktur der App" class="app-structure-image" />
     </section>
   </template>

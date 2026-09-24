@@ -4,7 +4,7 @@
   </div>
 
   <template v-else>
-    <section class="user-management-panel school-management-form-card">
+    <section class="user-management-panel school-management-form-card anm-card anm-migrated">
       <div class="user-management-panel-head">
         <div class="school-management-form-title-block">
           <h3>{{ selectedManagementSchoolSourceId ? "Schule bearbeiten" : "Neue Schule hinzufuegen" }}</h3>
@@ -12,7 +12,7 @@
         </div>
         <div class="school-management-form-actions">
           <button
-            class="btn-secondary school-management-table-head-action school-management-help-button"
+            class="school-management-table-head-action school-management-help-button anm-button anm-migrated"
             type="button"
             @click="openHelpOverlay"
           >
@@ -20,7 +20,7 @@
           </button>
           <button
             v-if="selectedManagementSchoolSourceId"
-            class="btn-secondary"
+            class="anm-button anm-migrated"
             type="button"
             @click="resetSchoolSourceForm"
             :disabled="managementSaving"
@@ -39,63 +39,63 @@
       />
 
       <div class="user-management-form-grid school-management-form-grid">
-        <label class="field-block">
-          <span class="field-label">SNR</span>
-          <input v-model="schoolSourceForm.snr" maxlength="6" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">SNR</span>
+          <input v-model="schoolSourceForm.snr" maxlength="6" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Name</span>
-          <input v-model="schoolSourceForm.name" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Name</span>
+          <input v-model="schoolSourceForm.name" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">PLZ</span>
-          <input v-model="schoolSourceForm.plz" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">PLZ</span>
+          <input v-model="schoolSourceForm.plz" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Ort</span>
-          <input v-model="schoolSourceForm.ort" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Ort</span>
+          <input v-model="schoolSourceForm.ort" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Strasse</span>
-          <input v-model="schoolSourceForm.strasse" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Strasse</span>
+          <input v-model="schoolSourceForm.strasse" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Latitude</span>
-          <input v-model="schoolSourceForm.latitude" inputmode="decimal" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Latitude</span>
+          <input v-model="schoolSourceForm.latitude" inputmode="decimal" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Longitude</span>
-          <input v-model="schoolSourceForm.longitude" inputmode="decimal" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Longitude</span>
+          <input v-model="schoolSourceForm.longitude" inputmode="decimal" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
-        <label class="field-block">
-          <span class="field-label">Schulform (sf)</span>
-          <input v-model="schoolSourceForm.sf_id" :disabled="managementSaving" />
-        </label>
-
-        <label class="field-block">
-          <span class="field-label">db_host</span>
-          <input v-model="schoolSourceForm.db_host" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">Schulform (sf)</span>
+          <input v-model="schoolSourceForm.sf_id" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">db_name</span>
-          <input v-model="schoolSourceForm.db_name" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">db_host</span>
+          <input v-model="schoolSourceForm.db_host" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">db_user</span>
-          <input v-model="schoolSourceForm.db_user" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">db_name</span>
+          <input v-model="schoolSourceForm.db_name" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">db_password_enc</span>
-          <input v-model="schoolSourceForm.db_password_enc" type="password" :disabled="managementSaving" />
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">db_user</span>
+          <input v-model="schoolSourceForm.db_user" :disabled="managementSaving" class="anm-input anm-migrated" />
+        </label>
+
+        <label class="anm-field anm-migrated">
+          <span class="anm-label anm-migrated">db_password_enc</span>
+          <input v-model="schoolSourceForm.db_password_enc" type="password" :disabled="managementSaving" class="anm-input anm-migrated" />
         </label>
       </div>
 
@@ -105,11 +105,11 @@
       </label>
 
       <div class="user-management-inline-actions">
-        <button class="btn-primary" type="button" @click="saveManagementSchoolSource" :disabled="managementSaving">
+        <button class="anm-button anm-button--primary anm-migrated" type="button" @click="saveManagementSchoolSource" :disabled="managementSaving">
           {{ managementSaving ? "Speichere..." : (selectedManagementSchoolSourceId ? "Aenderungen speichern" : "Schule hinzufuegen") }}
         </button>
         <button
-          class="btn-secondary"
+          class="anm-button anm-migrated"
           type="button"
           @click="testManagementSchoolSource"
           :disabled="managementSaving || !canTestSchoolSource"
@@ -118,14 +118,14 @@
         </button>
         <div class="school-management-inline-actions-right">
           <button
-            class="btn-secondary school-management-import-info-button"
+            class="school-management-import-info-button anm-button anm-migrated"
             type="button"
             @click="openImportInfoOverlay"
           >
             ? Info zum Import
           </button>
           <button
-            class="btn-secondary"
+            class="anm-button anm-migrated"
             type="button"
             @click="openSchoolTableImportPicker"
             :disabled="managementSaving"
@@ -133,7 +133,7 @@
             Schulen importieren
           </button>
           <button
-            class="btn-secondary"
+            class="anm-button anm-migrated"
             type="button"
             @click="geocodeMissingManagementSchoolSources"
             :disabled="managementSaving || !managementSchoolSources.length"
@@ -141,14 +141,14 @@
             Fehlende Koordinaten berechnen
           </button>
           <button
-            class="btn-secondary school-management-import-info-button"
+            class="school-management-import-info-button anm-button anm-migrated"
             type="button"
             @click="openGeocodeInfoOverlay"
           >
             ? Info Geocodes
           </button>
           <button
-            class="btn-secondary school-management-delete-all"
+            class="school-management-delete-all anm-button anm-button--danger anm-migrated"
             type="button"
             @click="deleteAllManagementSchools"
             :disabled="managementSaving || !managementSchoolSources.length"
@@ -161,13 +161,13 @@
       <transition name="feedback-fade" mode="out-in">
         <div
           v-if="localFeedbackError"
-          class="feedback-panel feedback-panel-error user-management-inline-feedback"
+          class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
         >
           <p class="error">{{ localFeedbackError }}</p>
         </div>
         <div
           v-else-if="localFeedbackNotice"
-          class="feedback-panel feedback-panel-success user-management-inline-feedback"
+          class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
         >
           <p>{{ localFeedbackNotice }}</p>
         </div>
@@ -273,23 +273,23 @@
             <h3>Schule auswaehlen</h3>
             <p>Filter auf SNR, Schulname und Ort. Auswahl mit Klick auf eine Zeile.</p>
           </div>
-          <button class="btn-secondary" type="button" @click="closeSchoolSelectionModal">
+          <button class="anm-button anm-migrated" type="button" @click="closeSchoolSelectionModal">
             Schliessen
           </button>
         </div>
 
         <div class="school-management-modal-filters">
-          <label class="field-block">
-            <span class="field-label">SNR</span>
-            <input v-model="schoolSelectionFilters.snr" type="text" placeholder="z. B. 123456" />
+          <label class="anm-field anm-migrated">
+            <span class="anm-label anm-migrated">SNR</span>
+            <input v-model="schoolSelectionFilters.snr" type="text" placeholder="z. B. 123456" class="anm-input anm-migrated" />
           </label>
-          <label class="field-block">
-            <span class="field-label">Name</span>
-            <input v-model="schoolSelectionFilters.name" type="text" placeholder="Schulname filtern" />
+          <label class="anm-field anm-migrated">
+            <span class="anm-label anm-migrated">Name</span>
+            <input v-model="schoolSelectionFilters.name" type="text" placeholder="Schulname filtern" class="anm-input anm-migrated" />
           </label>
-          <label class="field-block">
-            <span class="field-label">Ort</span>
-            <input v-model="schoolSelectionFilters.city" type="text" placeholder="Ort filtern" />
+          <label class="anm-field anm-migrated">
+            <span class="anm-label anm-migrated">Ort</span>
+            <input v-model="schoolSelectionFilters.city" type="text" placeholder="Ort filtern" class="anm-input anm-migrated" />
           </label>
         </div>
 
@@ -336,7 +336,7 @@
             <p>Die Datei <strong>{{ schoolTableImportFileName }}</strong> enthaelt {{ schoolTableImportSummary.total_rows }} gelesene Zeile(n).</p>
             <p>{{ schoolTableImportSummary.valid_rows }} gueltig, {{ schoolTableImportSummary.invalid_rows }} fehlerhaft, {{ schoolTableImportSummary.selected_rows }} ausgewaehlt.</p>
           </div>
-          <button class="btn-secondary" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
             Schliessen
           </button>
         </div>
@@ -345,13 +345,13 @@
           <transition name="feedback-fade" mode="out-in">
             <div
               v-if="localFeedbackError"
-              class="feedback-panel feedback-panel-error school-management-modal-feedback"
+              class="school-management-modal-feedback anm-alert anm-status--danger anm-migrated" role="alert"
             >
               <p class="error">{{ localFeedbackError }}</p>
             </div>
             <div
               v-else-if="localFeedbackNotice"
-              class="feedback-panel feedback-panel-success school-management-modal-feedback"
+              class="school-management-modal-feedback anm-alert anm-status--success anm-migrated" role="status"
             >
               <p>{{ localFeedbackNotice }}</p>
             </div>
@@ -423,11 +423,11 @@
         </div>
 
         <div class="school-management-modal-actions">
-          <button class="btn-secondary" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
             Abbrechen
           </button>
           <button
-            class="btn-primary"
+            class="anm-button anm-button--primary anm-migrated"
             type="button"
             @click="confirmSchoolTableImport"
             :disabled="managementSaving || !schoolTableImportPreviewData.some((row) => row?.selected && row?.status !== 'Fehler')"
@@ -450,7 +450,7 @@
             <p>Es werden nur Zugangsdaten für schon vorhandene Schulen mit SNr. importiert.</p>
             <p>Die Datei <strong>{{ schoolImportFileName }}</strong> enthaelt {{ schoolImportPreviewData.length }} gueltige Zeile(n).</p>
           </div>
-          <button class="btn-secondary" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
             Schliessen
           </button>
         </div>
@@ -477,13 +477,13 @@
           <transition name="feedback-fade" mode="out-in">
             <div
               v-if="localFeedbackError"
-              class="feedback-panel feedback-panel-error school-management-modal-feedback"
+              class="school-management-modal-feedback anm-alert anm-status--danger anm-migrated" role="alert"
             >
               <p class="error">{{ localFeedbackError }}</p>
             </div>
             <div
               v-else-if="localFeedbackNotice"
-              class="feedback-panel feedback-panel-success school-management-modal-feedback"
+              class="school-management-modal-feedback anm-alert anm-status--success anm-migrated" role="status"
             >
               <p>{{ localFeedbackNotice }}</p>
             </div>
@@ -534,11 +534,11 @@
         </div>
 
         <div class="school-management-modal-actions">
-          <button class="btn-secondary" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
             Abbrechen
           </button>
           <button
-            class="btn-primary"
+            class="anm-button anm-button--primary anm-migrated"
             type="button"
             @click="confirmSchoolImport"
             :disabled="managementSaving || !schoolImportPreviewData.some((row) => row?.selected)"
@@ -563,13 +563,13 @@
       class="school-management-modal-overlay"
       @click.self="closeImportInfoOverlay"
     >
-      <section class="school-management-modal school-management-import-info-modal" role="dialog" aria-modal="true" aria-label="Info zum Import">
+      <section class="school-management-modal school-management-import-info-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Info zum Import">
         <div class="school-management-modal-head">
           <div>
             <h3>Info zum Import</h3>
             <p>So muss die CSV-Datei fuer den Import in <code>anm_schulen</code> aufgebaut sein.</p>
           </div>
-          <button class="btn-secondary" type="button" @click="closeImportInfoOverlay">
+          <button class="anm-button anm-migrated" type="button" @click="closeImportInfoOverlay">
             Schliessen
           </button>
         </div>
@@ -608,13 +608,13 @@
       class="school-management-modal-overlay"
       @click.self="closeGeocodeInfoOverlay"
     >
-      <section class="school-management-modal school-management-import-info-modal" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
+      <section class="school-management-modal school-management-import-info-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
         <div class="school-management-modal-head">
           <div>
             <h3>Info zur Geocodes-Berechnung</h3>
             <p>So werden fehlende Koordinaten fuer Schulen ermittelt.</p>
           </div>
-          <button class="btn-secondary" type="button" @click="closeGeocodeInfoOverlay">
+          <button class="anm-button anm-migrated" type="button" @click="closeGeocodeInfoOverlay">
             Schliessen
           </button>
         </div>
@@ -651,7 +651,7 @@
       class="school-management-modal-overlay"
       @click.self="closeDeleteAllSchoolsConfirm"
     >
-      <section class="school-management-modal school-management-danger-modal" role="dialog" aria-modal="true" aria-label="Alle Schulen loeschen">
+      <section class="school-management-modal school-management-danger-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Alle Schulen loeschen">
         <div class="school-management-danger-hero">
           <div class="school-management-danger-badge" aria-hidden="true">!</div>
           <div>
@@ -675,10 +675,10 @@
         </div>
 
         <div class="school-management-modal-actions">
-          <button class="btn-secondary" type="button" @click="closeDeleteAllSchoolsConfirm" :disabled="managementSaving">
+          <button class="anm-button anm-button--danger anm-migrated" type="button" @click="closeDeleteAllSchoolsConfirm" :disabled="managementSaving">
             Abbrechen
           </button>
-          <button class="btn-primary school-management-danger-button" type="button" @click="confirmDeleteAllManagementSchools" :disabled="managementSaving">
+          <button class="school-management-danger-button anm-button anm-button--danger anm-migrated" type="button" @click="confirmDeleteAllManagementSchools" :disabled="managementSaving">
             {{ managementSaving ? "Loesche..." : "Endgueltig loeschen" }}
           </button>
         </div>
@@ -690,13 +690,13 @@
       class="school-management-modal-overlay"
       @click.self="closeImportResultDialog"
     >
-      <section class="school-management-modal school-management-import-result-modal" role="dialog" aria-modal="true" :aria-label="importResultDialogTitle">
+      <section class="school-management-modal school-management-import-result-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" :aria-label="importResultDialogTitle">
         <div class="school-management-modal-head">
           <div>
             <h3>{{ importResultDialogTitle }}</h3>
             <p>Ergebnis des CSV-Imports fuer den Bereich Schulen.</p>
           </div>
-          <button class="btn-secondary" type="button" @click="closeImportResultDialog">
+          <button class="anm-button anm-migrated" type="button" @click="closeImportResultDialog">
             Schliessen
           </button>
         </div>

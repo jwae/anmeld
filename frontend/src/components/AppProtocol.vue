@@ -217,16 +217,16 @@ onMounted(() => void loadProtocol());
         <h3>App-Protokoll</h3>
         <p>Neueste {{ rows.length }} von insgesamt {{ total }} Einträgen.</p>
       </div>
-      <button class="app-protocol-refresh" type="button" :disabled="loading" @click="loadProtocol">
+      <button class="app-protocol-refresh anm-button anm-migrated" type="button" :disabled="loading" @click="loadProtocol" aria-label="Aktion ausführen">
         <i class="bi bi-arrow-clockwise" :class="{ 'is-spinning': loading }" aria-hidden="true"></i>
         <span>{{ loading ? "Lade..." : "Aktualisieren" }}</span>
       </button>
       <div v-if="canDeleteProtocol" class="app-protocol-delete">
         <label>
           <span>Eintraege vor</span>
-          <input v-model="deleteBeforeDate" type="date" :disabled="deleting" />
+          <input v-model="deleteBeforeDate" type="date" :disabled="deleting" class="anm-input anm-migrated" />
         </label>
-        <button type="button" :disabled="!deleteBeforeDate || deleting" @click="deleteProtocolBeforeDate">
+        <button type="button" :disabled="!deleteBeforeDate || deleting" @click="deleteProtocolBeforeDate" class="anm-button anm-button--danger anm-migrated">
           <i class="bi bi-trash3" aria-hidden="true"></i>
           {{ deleting ? "Loesche..." : "Protokoll loeschen" }}
         </button>
@@ -257,8 +257,8 @@ onMounted(() => void loadProtocol());
 
     <Teleport to="body">
       <div v-if="deleteConfirmOpen" class="app-protocol-confirm-backdrop" @click.self="cancelDeleteProtocol">
-        <section class="app-protocol-confirm" role="dialog" aria-modal="true" aria-labelledby="app-protocol-confirm-title">
-          <button class="app-protocol-confirm-x" type="button" aria-label="Overlay schließen" :disabled="deleting" @click="cancelDeleteProtocol">×</button>
+        <section class="app-protocol-confirm anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-labelledby="app-protocol-confirm-title">
+          <button class="app-protocol-confirm-x anm-button anm-button--danger anm-migrated" type="button" aria-label="Overlay schließen" :disabled="deleting" @click="cancelDeleteProtocol">×</button>
           <div class="app-protocol-confirm-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
           <div>
             <h4 id="app-protocol-confirm-title">Protokolleinträge löschen?</h4>
@@ -270,19 +270,19 @@ onMounted(() => void loadProtocol());
           </div>
           <footer>
             <template v-if="!deleteConfirmResult">
-              <button type="button" class="app-protocol-confirm-delete" :disabled="deleting" @click="confirmDeleteProtocol">
+              <button type="button" class="app-protocol-confirm-delete anm-button anm-button--danger anm-migrated" :disabled="deleting" @click="confirmDeleteProtocol">
                 <i class="bi bi-trash3" aria-hidden="true"></i>
                 {{ deleting ? "Lösche..." : "Endgültig löschen" }}
               </button>
             </template>
-            <button v-else type="button" class="app-protocol-confirm-close" @click="cancelDeleteProtocol">Schließen</button>
+            <button v-else type="button" class="app-protocol-confirm-close anm-button anm-button--danger anm-migrated" @click="cancelDeleteProtocol">Schließen</button>
           </footer>
         </section>
       </div>
     </Teleport>
 
-    <div v-if="errorMessage" class="app-protocol-message is-error">{{ errorMessage }}</div>
-    <div v-if="loading" class="app-protocol-message">Protokoll wird geladen...</div>
+    <div v-if="errorMessage" class="app-protocol-message is-error anm-alert anm-status--danger anm-migrated" role="alert">{{ errorMessage }}</div>
+    <div v-if="loading" class="app-protocol-message anm-alert anm-migrated" role="status">Protokoll wird geladen...</div>
 
     <div v-else class="app-protocol-table-wrap">
       <table class="app-protocol-table">

@@ -17,7 +17,7 @@
 
       <div v-if="isManagementSessionActive && !hasExternalManagementSession" class="user-management-toolbar">
         <button
-          class="btn-secondary"
+          class="anm-button anm-migrated"
           type="button"
           @click="clearManagementSession"
           :disabled="managementLoading || managementSaving"
@@ -30,13 +30,13 @@
     <transition name="feedback-fade" mode="out-in">
       <div
         v-if="managementError && (!isManagementSessionActive || activeManagementTab === 'schools')"
-        class="feedback-panel feedback-panel-error"
+        class="anm-alert anm-status--danger anm-migrated" role="alert"
       >
         <p class="error">{{ managementError }}</p>
       </div>
       <div
         v-else-if="managementNotice && (!isManagementSessionActive || activeManagementTab === 'schools')"
-        class="feedback-panel feedback-panel-success"
+        class="anm-alert anm-status--success anm-migrated" role="status"
       >
         <p>{{ managementNotice }}</p>
       </div>
@@ -45,7 +45,7 @@
     <div class="user-management-toolbar user-management-toolbar-primary">
       <button
         v-if="!hasExternalManagementSession"
-        class="btn-primary"
+        class="anm-button anm-button--primary anm-migrated"
         type="button"
         @click="authenticateUserManagement"
         :disabled="managementLoading || !canLoadUserManagement"
@@ -68,7 +68,7 @@
 
     <template v-if="isManagementSessionActive">
       <div class="user-management-summary">
-          <article class="user-management-stat">
+          <article class="user-management-stat anm-card anm-migrated">
             <span class="user-management-stat-label">Benutzer</span>
             <strong>
               {{ managementStats.total_users }}
@@ -79,7 +79,7 @@
               </small>
             </strong>
           </article>
-          <article class="user-management-stat">
+          <article class="user-management-stat anm-card anm-migrated">
             <span class="user-management-stat-label">Gruppen</span>
             <strong>
               {{ managementStats.total_groups }}
@@ -90,7 +90,7 @@
               </small>
             </strong>
           </article>
-          <article class="user-management-stat">
+          <article class="user-management-stat anm-card anm-migrated">
             <span class="user-management-stat-label">Schulserver</span>
             <strong>
               {{ managementStats.total_school_sources }}
@@ -101,7 +101,7 @@
               </small>
             </strong>
           </article>
-          <article class="user-management-stat">
+          <article class="user-management-stat anm-card anm-migrated">
             <span class="user-management-stat-label">Snapshots</span>
             <strong>
               {{ managementStats.total_snapshots }}
@@ -110,10 +110,10 @@
           </article>
       </div>
 
-      <div class="user-management-tabs" role="tablist" aria-label="Benutzerverwaltung Bereiche">
+      <div class="user-management-tabs anm-nav anm-migrated" role="tablist" aria-label="Benutzerverwaltung Bereiche">
         <button
           v-if="canManageUsers"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'users' }"
           type="button"
           role="tab"
@@ -126,7 +126,7 @@
         </button>
         <button
           v-if="canManageGroups"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'groups' }"
           type="button"
           role="tab"
@@ -139,7 +139,7 @@
         </button>
         <button
           v-if="canManageProcedure"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'schools' }"
           type="button"
           role="tab"
@@ -152,7 +152,7 @@
         </button>
         <button
           v-if="canManageProcedure"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'school-groups' }"
           type="button"
           role="tab"
@@ -165,7 +165,7 @@
         </button>
         <button
           v-if="canViewCatalogs"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'catalogs' }"
           type="button"
           role="tab"
@@ -178,7 +178,7 @@
         </button>
         <button
           v-if="canViewProtocol"
-          class="user-management-tab"
+          class="user-management-tab anm-nav-item anm-migrated"
           :class="{ 'is-active': activeManagementTab === 'protocol' }"
           type="button"
           role="tab"
@@ -193,46 +193,46 @@
 
       <div v-if="activeManagementTab === 'users' && canManageUsers" class="user-management-tab-panel" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
-          <section class="user-management-panel">
+          <section class="user-management-panel anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
                 <h3>Benutzerverwaltung</h3>
               </div>
-              <button class="btn-secondary" type="button" @click="resetUserForm" :disabled="managementSaving">
+              <button class="anm-button anm-migrated" type="button" @click="resetUserForm" :disabled="managementSaving">
                 Neuer Benutzer
               </button>
             </div>
 
             <div class="user-management-form-grid user-management-user-form-grid">
-              <label class="field-block">
-                <span class="field-label">Loginname</span>
-                <input v-model="userForm.username" :disabled="managementSaving" />
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Loginname</span>
+                <input v-model="userForm.username" :disabled="managementSaving" class="anm-input anm-migrated" />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">Name</span>
-                <input v-model="userForm.user_fullname" :disabled="managementSaving" />
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Name</span>
+                <input v-model="userForm.user_fullname" :disabled="managementSaving" class="anm-input anm-migrated" />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">
                   {{ selectedManagementUserId ? "Neues Passwort (optional)" : "Passwort" }}
                 </span>
                 <input
                   v-model="userForm.password"
                   type="password"
-                  :disabled="managementSaving"
+                  :disabled="managementSaving" class="anm-input anm-migrated"
                 />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">E-Mail</span>
-                <input v-model="userForm.email" :disabled="managementSaving" />
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">E-Mail</span>
+                <input v-model="userForm.email" :disabled="managementSaving" class="anm-input anm-migrated" />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">Gruppe</span>
-                <select v-model="userForm.group_id" :disabled="managementSaving">
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Gruppe</span>
+                <select v-model="userForm.group_id" :disabled="managementSaving" class="anm-input anm-migrated">
                   <option value="" disabled>Gruppe waehlen</option>
                   <option v-for="group in activeManagementGroups" :key="`group-option-${group.group_id}`" :value="String(group.group_id)">
                     {{ group.group_name }}
@@ -240,8 +240,8 @@
                 </select>
               </label>
 
-              <div class="field-block user-management-checkbox-field">
-                <span class="field-label">Aktiv</span>
+              <div class="user-management-checkbox-field anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Aktiv</span>
                 <label class="user-management-checkbox user-management-checkbox-card">
                   <input
                     v-model="userForm.is_active"
@@ -254,7 +254,7 @@
             </div>
 
             <div class="user-management-user-actions">
-              <button class="btn-primary" type="button" @click="saveManagementUser" :disabled="managementSaving">
+              <button class="anm-button anm-button--primary anm-migrated" type="button" @click="saveManagementUser" :disabled="managementSaving">
                 {{ managementSaving ? "Speichere..." : (selectedManagementUserId ? "Benutzer aktualisieren" : "Benutzer anlegen") }}
               </button>
             </div>
@@ -262,13 +262,13 @@
             <transition name="feedback-fade" mode="out-in">
               <div
                 v-if="managementError"
-                class="feedback-panel feedback-panel-error user-management-inline-feedback"
+                class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
               >
                 <p class="error">{{ managementError }}</p>
               </div>
               <div
                 v-else-if="managementNotice"
-                class="feedback-panel feedback-panel-success user-management-inline-feedback"
+                class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
               >
                 <p>{{ managementNotice }}</p>
               </div>
@@ -277,7 +277,7 @@
         </div>
 
         <div class="user-management-lists user-management-lists-single">
-          <section class="user-management-list-card">
+          <section class="user-management-list-card anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
                 <h3>Benutzerübersicht</h3>
@@ -287,33 +287,33 @@
               <article
                 v-for="user in managementUsers"
                 :key="`list-user-${user.user_id}`"
-                class="user-management-list-item user-management-user-card"
+                class="user-management-list-item user-management-user-card anm-card anm-migrated"
                 :class="{ 'has-administration-permissions': managedUserHasAdministrationPermissions(user) }"
               >
                 <div class="user-management-list-row">
                   <strong>{{ user.username }}</strong>
-                  <span class="user-management-state" :class="{ 'is-inactive': !user.is_active }">
+                  <span class="user-management-state anm-badge anm-status--success anm-migrated" :class="{ 'is-inactive': !user.is_active }">
                     {{ user.is_active ? "Aktiv" : "Inaktiv" }}
                   </span>
                 </div>
                 <p>{{ user.user_fullname || "Ohne Vollname" }}</p>
                 <small>{{ user.group_name }}{{ user.email ? ` - ${user.email}` : "" }}</small>
                 <div class="user-management-list-actions">
-                  <button class="btn-secondary" type="button" @click="editManagementUser(user.user_id)" :disabled="managementSaving">
+                  <button class="anm-button anm-migrated" type="button" @click="editManagementUser(user.user_id)" :disabled="managementSaving" aria-label="Bearbeiten">
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                   </button>
                   <button
                     v-if="String(user.user_id) !== currentManagedUserId"
-                    class="btn-secondary"
+                    class="anm-button anm-button--danger anm-migrated"
                     type="button"
                     @click="deleteManagementUser(user)"
-                    :disabled="managementSaving"
+                    :disabled="managementSaving" aria-label="Löschen"
                   >
                     <i class="bi bi-trash" aria-hidden="true"></i>
                   </button>
                   <button
                     v-if="String(user.user_id) !== currentManagedUserId"
-                    class="btn-secondary"
+                    class="anm-button anm-migrated"
                     type="button"
                     @click="toggleManagementUserActive(user)"
                     :disabled="managementSaving"
@@ -329,30 +329,30 @@
 
       <div v-else-if="activeManagementTab === 'groups' && canManageGroups" class="user-management-tab-panel" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
-          <section class="user-management-panel">
+          <section class="user-management-panel anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
                 <h3>Gruppenverwaltung</h3>
                 <p>Gruppen steuern die Berechtigungen ihrer Benutzer.</p>
               </div>
-              <button class="btn-secondary" type="button" @click="resetGroupForm" :disabled="managementSaving">
+              <button class="anm-button anm-migrated" type="button" @click="resetGroupForm" :disabled="managementSaving">
                 Neue Gruppe
               </button>
             </div>
 
             <div class="user-management-form-grid user-management-group-form-grid">
-              <label class="field-block">
-                <span class="field-label">Gruppenname</span>
-                <input v-model="groupForm.group_name" :disabled="managementSaving" />
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Gruppenname</span>
+                <input v-model="groupForm.group_name" :disabled="managementSaving" class="anm-input anm-migrated" />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">Beschreibung</span>
-                <input v-model="groupForm.group_description" :disabled="managementSaving" />
+              <label class="anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Beschreibung</span>
+                <input v-model="groupForm.group_description" :disabled="managementSaving" class="anm-input anm-migrated" />
               </label>
 
-              <div class="field-block user-management-checkbox-field">
-                <span class="field-label">Aktiv</span>
+              <div class="user-management-checkbox-field anm-field anm-migrated">
+                <span class="anm-label anm-migrated">Aktiv</span>
                 <label class="user-management-checkbox user-management-checkbox-card">
                   <input v-model="groupForm.is_active" type="checkbox" :disabled="managementSaving" />
                   <span>Gruppe aktiv</span>
@@ -361,7 +361,7 @@
             </div>
 
             <div class="user-management-checklist">
-              <p class="field-label">Berechtigungen</p>
+              <p class="anm-label anm-migrated">Berechtigungen</p>
               <label
                 v-for="permission in managementPermissions"
                 :key="permission.permission_id"
@@ -377,20 +377,20 @@
               </label>
             </div>
 
-            <button class="btn-primary" type="button" @click="saveManagementGroup" :disabled="managementSaving">
+            <button class="anm-button anm-button--primary anm-migrated" type="button" @click="saveManagementGroup" :disabled="managementSaving">
               {{ managementSaving ? "Speichere..." : (selectedManagementGroupId ? "Gruppe aktualisieren" : "Gruppe anlegen") }}
             </button>
 
             <transition name="feedback-fade" mode="out-in">
               <div
                 v-if="managementError"
-                class="feedback-panel feedback-panel-error user-management-inline-feedback"
+                class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
               >
                 <p class="error">{{ managementError }}</p>
               </div>
               <div
                 v-else-if="managementNotice"
-                class="feedback-panel feedback-panel-success user-management-inline-feedback"
+                class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
               >
                 <p>{{ managementNotice }}</p>
               </div>
@@ -399,17 +399,17 @@
         </div>
 
         <div class="user-management-lists user-management-lists-single user-management-group-lists">
-          <section class="user-management-list-card">
+          <section class="user-management-list-card anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
                 <h3>Gruppenübersicht</h3>
               </div>
             </div>
             <div class="user-management-list user-management-group-card-list">
-              <article v-for="group in managementGroups" :key="`list-group-${group.group_id}`" class="user-management-list-item">
+              <article v-for="group in managementGroups" :key="`list-group-${group.group_id}`" class="user-management-list-item anm-card anm-migrated">
                 <div class="user-management-list-row">
                   <strong>{{ group.group_name }}</strong>
-                  <span class="user-management-state" :class="{ 'is-inactive': !group.is_active }">
+                  <span class="user-management-state anm-badge anm-status--success anm-migrated" :class="{ 'is-inactive': !group.is_active }">
                     {{ group.is_active ? "Aktiv" : "Inaktiv" }}
                   </span>
                 </div>
@@ -418,13 +418,13 @@
                   {{ Array.isArray(group.permissions) && group.permissions.length ? group.permissions.map((entry) => entry.permission_name).join(", ") : "Keine Berechtigungen" }}
                 </small>
                 <div class="user-management-list-actions">
-                  <button class="btn-secondary" type="button" @click="editManagementGroup(group.group_id)" :disabled="managementSaving">
+                  <button class="anm-button anm-migrated" type="button" @click="editManagementGroup(group.group_id)" :disabled="managementSaving" aria-label="Bearbeiten">
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                   </button>
-                  <button class="btn-secondary" type="button" @click="deleteManagementGroup(group)" :disabled="managementSaving">
+                  <button class="anm-button anm-button--danger anm-migrated" type="button" @click="deleteManagementGroup(group)" :disabled="managementSaving" aria-label="Löschen">
                     <i class="bi bi-trash" aria-hidden="true"></i>
                   </button>
-                  <button class="btn-secondary" type="button" @click="toggleManagementGroupActive(group)" :disabled="managementSaving">
+                  <button class="anm-button anm-migrated" type="button" @click="toggleManagementGroupActive(group)" :disabled="managementSaving">
                     {{ group.is_active ? "Deaktivieren" : "Aktivieren" }}
                   </button>
                 </div>
