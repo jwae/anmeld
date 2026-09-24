@@ -140,6 +140,117 @@ button:disabled {
   gap: 14px;
 }
 
+.app-structure-card {
+  max-width: 760px;
+  margin: 0 auto 48px;
+  padding: 22px;
+  border-color: #dbe4f0;
+}
+
+.app-structure-card h3 {
+  margin: 0 0 16px;
+  color: #173252;
+  font-size: 18px;
+}
+
+.app-structure-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+.login-inputs {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.connection-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.password-settings-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  min-width: 0;
+}
+
+.connection-settings-slide {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: 16px;
+}
+
+.connection-settings-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-slide-enter-active,
+.settings-slide-leave-active {
+  transition: grid-template-rows 240ms ease, margin-top 240ms ease, opacity 240ms ease;
+}
+
+.settings-slide-enter-from,
+.settings-slide-leave-to {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-slide-enter-active,
+  .settings-slide-leave-active {
+    transition: none;
+  }
+}
+
+.connection-settings {
+  padding: 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  background: #f5f8fc;
+}
+
+.connection-settings p {
+  margin: 0 0 14px;
+  color: #4e6078;
+}
+
+.connection-settings-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.connection-server-fields {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.db-test-button {
+  white-space: nowrap;
+}
+
+.connection-settings-fields + .connection-settings-fields {
+  margin-top: 14px;
+}
+
+.login-error {
+  margin-top: 14px;
+}
+
 .login-fields-row {
   display: flex;
   gap: 14px;
@@ -237,6 +348,14 @@ button:disabled {
 }
 
 @media (max-width: 820px) {
+  .password-settings-row .field-block {
+    flex: 1;
+  }
+
+  .connection-settings-fields {
+    grid-template-columns: 1fr;
+  }
+
   .login-fields-row {
     display: grid;
     grid-template-columns: 1fr;

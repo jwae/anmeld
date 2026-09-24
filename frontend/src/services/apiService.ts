@@ -16,8 +16,10 @@ export const authService = {
     return resp.data;
   },
 
-  async logout() {
-    return apiClient.post("/api/auth/logout");
+  async logout(token?: string) {
+    return apiClient.post("/api/auth/logout", {}, token ? {
+      headers: { Authorization: `Bearer ${token}` },
+    } : undefined);
   },
 
   async loginManagementArea(token: string) {
@@ -34,6 +36,11 @@ export const authService = {
 };
 
 export const connectionService = {
+  async test(payload: { host: string; port: number; database: string; username: string; password: string }) {
+    const resp = await apiClient.post<{ connected: boolean }>("/api/connection/test", payload);
+    return resp.data;
+  },
+
   async getStatus() {
     const resp = await apiClient.get<ConnectionStatus>("/api/connection/status");
     return resp.data;

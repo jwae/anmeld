@@ -5,16 +5,17 @@ import { APP_PATHS, isAnmRoutePath, navigateTo, replaceRoute, routeState } from 
 import { useDatabaseLogin } from "./composables/useDatabaseLogin";
 import { useAuth } from "./composables/useAuth";
 import { authService } from "./services/apiService";
+import appStructureImage from "./assets/app_struktur.png";
 
-import DatabaseConnectPanel from "./components/DatabaseConnectPanel.vue";
 import APPManagement from "./components/APPManagement.vue";
 import LoginCredentialsPage from "./components/LoginCredentialsPage.vue";
 
 const {
   host, port, database, username: dbUsername, password: dbPassword,
-  error, errorDetails, errorCode, connecting, serverConnected, serverStatus,
+  error, errorDetails, errorCode, connecting,
+  testing, testSuccess, testConnection,
   connectedHost, connectedPort, connectedDatabase,
-  applyDefaults: applyDbDefaults, connect: connectDb, isConfigured: isDbConfigured, loadStatus,
+  connect: connectDb, isConfigured: isDbConfigured, loadStatus,
 } = useDatabaseLogin();
 
 const {
@@ -24,22 +25,46 @@ const {
   testLoginPassword,
 } = useAuth();
 
-const databaseConnectionConfirmed = ref<boolean>(false);
+const initializing = ref(true);
+const showConnectionSettings = ref(false);
+const connectedSettings = ref("");
+const connectionSettings = computed(() => JSON.stringify([
+  host.value.trim(), port.value, database.value.trim(), dbUsername.value.trim(), dbPassword.value,
+]));
+const loginBusy = computed(() => initializing.value || connecting.value || loginLoading.value || testing.value);
 const showAppManagement = ref<boolean>(false);
 const managementSessionLoading = ref<boolean>(false);
 
 const isDatabaseConfigured = computed<boolean>(() => isDbConfigured.value);
-const showDatabaseConnectStep = computed<boolean>(
-  () => !isDatabaseConfigured.value || !databaseConnectionConfirmed.value,
-);
 const currentPath = computed<string>(() => routeState.path);
 const isAnmRoute = computed<boolean>(() => isAnmRoutePath(currentPath.value));
 const canViewProcedures = computed<boolean>(() => can("verfahren.anzeigen"));
 
-applyDbDefaults();
 loadToken();
 
 async function login() {
+  if (loginBusy.value || pendingLogin.value) return;
+  loginError.value = "";
+  error.value = "";
+  errorDetails.value = "";
+  errorCode.value = "";
+  if (!host.value.trim()) {
+    showConnectionSettings.value = true;
+    error.value = "Bitte den Server in den Einstellungen angeben.";
+    return;
+  }
+  if (!loginUsername.value.trim() || !loginPassword.value) {
+    loginError.value = "Benutzername und Passwort sind erforderlich.";
+    return;
+  }
+  if (!isDatabaseConfigured.value || connectedSettings.value !== connectionSettings.value) {
+    const connected = await connectDb();
+    if (!connected) {
+      showConnectionSettings.value = true;
+      return;
+    }
+    connectedSettings.value = connectionSettings.value;
+  }
   await performLogin();
   showAppManagement.value = false;
 }
@@ -69,30 +94,6 @@ async function openAppManagement() {
   }
 }
 
-async function connectDatabase() {
-  const connected = await connectDb();
-  if (!connected) return;
-
-  await performLogout();
-  loginPassword.value = testLoginPassword;
-  showAppManagement.value = false;
-  databaseConnectionConfirmed.value = false;
-  navigateTo(APP_PATHS.home);
-}
-
-function continueAfterDatabaseConnect() {
-  if (!isDatabaseConfigured.value) return;
-  databaseConnectionConfirmed.value = true;
-}
-
-function backToDatabaseConnect() {
-  loginError.value = "";
-  loginPassword.value = testLoginPassword;
-  databaseConnectionConfirmed.value = false;
-  showAppManagement.value = false;
-  navigateTo(APP_PATHS.home);
-}
-
 async function logoutPendingManagementSession() {
   if (managementSessionLoading.value) return;
   const token = String(pendingLogin.value?.token || "").trim();
@@ -113,8 +114,18 @@ async function logoutPendingManagementSession() {
 async function logout() {
   await performLogout();
   showAppManagement.value = false;
-  databaseConnectionConfirmed.value = isDatabaseConfigured.value;
   navigateTo(APP_PATHS.home);
+}
+
+async function logoutFromAreaSelection() {
+  if (managementSessionLoading.value) return;
+  managementSessionLoading.value = true;
+  loginError.value = "";
+  try {
+    await logout();
+  } finally {
+    managementSessionLoading.value = false;
+  }
 }
 
 watch([currentPath, isAuthenticated, canViewProcedures], ([path, authenticated, mayView]) => {
@@ -125,9 +136,15 @@ watch([currentPath, isAuthenticated, canViewProcedures], ([path, authenticated, 
 
 onMounted(async () => {
   await loadStatus();
-  if (!isDatabaseConfigured.value || !isAuthenticated.value) return;
+  if (!host.value.trim() || error.value) showConnectionSettings.value = true;
+  if (isDatabaseConfigured.value) connectedSettings.value = connectionSettings.value;
+  initializing.value = false;
+  if (!isDatabaseConfigured.value) {
+    await performLogout();
+    return;
+  }
+  if (!isAuthenticated.value) return;
 
-  databaseConnectionConfirmed.value = true;
   if (canViewProcedures.value) {
     if (!isAnmRoute.value) replaceRoute(APP_PATHS.anmVerfahren);
     return;

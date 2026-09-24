@@ -100,6 +100,8 @@ export function useDatabaseLogin() {
   const errorDetails = ref<string>("");
   const errorCode = ref<string>("");
   const connecting = ref<boolean>(false);
+  const testing = ref(false);
+  const testSuccess = ref(false);
   const serverConnected = ref<boolean>(false);
   const serverStatus = ref<string>("");
   const connectedHost = ref<string>("");
@@ -203,6 +205,48 @@ export function useDatabaseLogin() {
     }
   }
 
+  watch([host, port, database, username, password], () => {
+    testSuccess.value = false;
+  });
+
+  watch(testSuccess, (success, _previous, onCleanup) => {
+    if (!success) return;
+    const timeout = setTimeout(() => {
+      testSuccess.value = false;
+    }, 4000);
+    onCleanup(() => clearTimeout(timeout));
+  });
+
+  async function testConnection() {
+    if (testing.value || connecting.value) return;
+    clearError();
+    testSuccess.value = false;
+    const payload = {
+      host: host.value.trim(),
+      port: Number(port.value),
+      database: database.value.trim(),
+      username: username.value.trim(),
+      password: password.value,
+    };
+    if (!payload.host || !payload.database || !payload.username || !payload.password) {
+      error.value = "Bitte Server, Datenbank, DB-Benutzer und DB-Passwort angeben.";
+      return;
+    }
+    if (!Number.isInteger(payload.port) || payload.port < 1 || payload.port > 65535) {
+      error.value = "Bitte einen gültigen Port zwischen 1 und 65535 angeben.";
+      return;
+    }
+    testing.value = true;
+    try {
+      const data = await connectionService.test(payload);
+      testSuccess.value = data.connected;
+    } catch (e: any) {
+      setRequestError(e, "Datenbank-Test fehlgeschlagen.");
+    } finally {
+      testing.value = false;
+    }
+  }
+
   async function connect(): Promise<boolean> {
     connecting.value = true;
     clearError();
@@ -268,6 +312,9 @@ export function useDatabaseLogin() {
     errorDetails,
     errorCode,
     connecting,
+    testing,
+    testSuccess,
+    testConnection,
     serverConnected,
     serverStatus,
     isConfigured,

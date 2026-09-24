@@ -88,12 +88,15 @@ export function useAuth() {
 
   async function logout() {
     try {
-      if (authStore.token) {
-        await authService.logout();
+      const token = pendingLogin.value?.token || authStore.token;
+      if (token) {
+        await authService.logout(token);
       }
     } catch {
       // still clear local session
     } finally {
+      pendingLogin.value = null;
+      loginPassword.value = "";
       clearToken();
     }
   }
