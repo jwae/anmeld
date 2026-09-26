@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import UserSessionCard from "./UserSessionCard.vue";
+import UserSessionCard from "./ManagementSessionCard.vue";
 import UserManagementPanel from "./UserManagementPanel.vue";
 
 const emit = defineEmits<{
@@ -37,3 +37,5 @@ async function requestClose() {
 
 <template src="./APPManagement.html"></template>
 <style scoped src="./APPManagement.css"></style>
+
+<style src="../styles/management.css"></style>

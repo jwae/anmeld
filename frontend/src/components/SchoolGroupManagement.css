@@ -3,70 +3,6 @@
   gap: 16px;
 }
 
-.feedback-panel {
-  padding: 12px 14px;
-}
-
-.feedback-panel:where(:not(.anm-migrated)) {
-  border-radius: 14px;
-}
-
-.feedback-panel-success:where(:not(.anm-migrated)) {
-  border: 1px solid #bfe5c9;
-  background: #eefaf2;
-  color: #1f5f37;
-}
-
-.feedback-panel-error:where(:not(.anm-migrated)) {
-  border: 1px solid #f0c2c8;
-  background: #fff4f6;
-}
-
-.feedback-panel .error {
-  margin: 0;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-}
-
-.btn-primary:where(:not(.anm-migrated)),
-.btn-secondary:where(:not(.anm-migrated)) {
-  border-radius: 10px;
-  border: 1px solid #c7d3e3;
-  font: inherit;
-}
-
-.btn-primary:where(:not(.anm-migrated)) {
-  background: #214c7a;
-  border-color: #214c7a;
-  color: #fff;
-}
-
-.btn-secondary:where(:not(.anm-migrated)) {
-  background: #f8fbff;
-  color: #1f3552;
-}
-
-.btn-primary:hover,
-.btn-secondary:hover {
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled,
-.btn-secondary:disabled {
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-primary:disabled:where(:not(.anm-migrated)),
-.btn-secondary:disabled:where(:not(.anm-migrated)) {
-  opacity: 0.6;
-}
-
 .field-label:where(:not(.anm-migrated)) {
   font-size: 12px;
   font-weight: 600;
@@ -82,11 +18,16 @@
 .field-block input,
 .field-block select,
 .field-block textarea {
+  box-sizing: border-box;
+  resize: none;
+}
+
+.field-block input:where(:not(.anm-migrated)),
+.field-block select:where(:not(.anm-migrated)),
+.field-block textarea:where(:not(.anm-migrated)) {
   width: 100%;
   min-width: 0;
-  box-sizing: border-box;
   padding: 6px 8px;
-  resize: none;
 }
 
 .field-block input:where(:not(.anm-migrated)),
@@ -97,8 +38,8 @@
   font: inherit;
 }
 
-.field-block input,
-.field-block select {
+.field-block input:where(:not(.anm-migrated)),
+.field-block select:where(:not(.anm-migrated)) {
   min-height: 34px;
 }
 
@@ -183,16 +124,19 @@
   align-self: end;
 }
 
-.school-group-field-active .user-management-checkbox {
+.school-group-field-active .user-management-checkbox:where(:not(.anm-migrated)) {
   min-height: 34px;
 }
 
 .school-group-field-active .user-management-checkbox-card {
+  display: inline-flex;
+  align-items: center;
+}
+
+.school-group-field-active .user-management-checkbox-card:where(:not(.anm-migrated)) {
   height: 34px;
   min-height: 34px;
   padding: 0 8px;
-  display: inline-flex;
-  align-items: center;
 }
 
 .school-group-field-active .user-management-checkbox-card:where(:not(.anm-migrated)) {
@@ -214,11 +158,14 @@
 }
 
 .user-management-checkbox-card {
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.user-management-checkbox-card:where(:not(.anm-migrated)) {
   min-height: 30px;
   width: 100%;
   padding: 4px 8px;
-  box-sizing: border-box;
-  text-align: left;
 }
 
 .user-management-checkbox-card:where(:not(.anm-migrated)) {
@@ -229,9 +176,12 @@
 
 .user-management-checkbox-card input {
   margin: 0;
+  flex: 0 0 13px;
+}
+
+.user-management-checkbox-card input:where(:not(.anm-migrated)) {
   width: 13px;
   height: 13px;
-  flex: 0 0 13px;
 }
 
 .user-management-checkbox-card span {
@@ -245,18 +195,24 @@
 
 .school-group-select-field {
   flex: 0 0 20%;
+}
+
+.school-group-select-field:where(:not(.anm-migrated)) {
   max-width: 20%;
   min-width: 160px;
 }
 
 .school-group-delete-button {
-  min-width: 180px;
-  height: 34px;
-  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.school-group-delete-button:where(:not(.anm-migrated)) {
+  min-width: 180px;
+  height: 34px;
+  min-height: 34px;
   padding: 0 12px;
 }
 
@@ -328,7 +284,7 @@
   position: relative;
 }
 
-.school-group-search-input-wrap input {
+.school-group-search-input-wrap input:where(:not(.anm-migrated)) {
   padding-right: 30px;
 }
 
@@ -600,22 +556,6 @@
   border-top: 1px solid #eadde0;
 }
 
-.school-group-modal-actions .btn-primary,
-.school-group-modal-actions .btn-secondary {
-  min-height: 34px;
-  padding: 8px 14px;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.school-group-modal-actions .btn-primary:where(:not(.anm-migrated)),
-.school-group-modal-actions .btn-secondary:where(:not(.anm-migrated)) {
-  line-height: 1.2;
-}
-
 .school-group-danger-button-strong:where(:not(.anm-migrated)) {
   background: #c65060;
   border-color: #c65060;
@@ -653,7 +593,7 @@
     justify-content: flex-start;
   }
 
-  .user-management-checkbox-card {
+  .user-management-checkbox-card:where(:not(.anm-migrated)) {
     width: 100%;
   }
 }

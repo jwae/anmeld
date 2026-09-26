@@ -641,37 +641,37 @@ function toggleSchuleFilter(schuleName: string) {
   <section class="abgleich-view">
     <div class="abgleich-toolbar">
       <div>
-        <p class="abgleich-eyebrow">Abgleich</p>
-        <h2>Abgleich auf Basis der Schuelerdaten</h2>
+        <p class="abgleich-eyebrow anm-procedure-copy anm-procedure-ui">Abgleich</p>
+        <h2 class="anm-procedure-title anm-procedure-ui">Abgleich auf Basis der Schuelerdaten</h2>
         
       </div>
-      <button class="btn-secondary btn-refresh" type="button" @click="loadData" :disabled="loading">
+      <button class="btn-refresh anm-button anm-procedure-ui" type="button" @click="loadData" :disabled="loading">
         <span class="btn-refresh-icon" aria-hidden="true">{{ loading ? "..." : "↻" }}</span>
         <span>{{ loading ? "Aktualisiere..." : "Aktualisieren" }}</span>
       </button>
     </div>
 
-    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning">
-      <p class="feedback-title">Kontext unvollstaendig</p>
-      <p>Waehle zuerst ein Verfahren und eine Runde, damit der Abgleich geladen werden kann.</p>
+    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kontext unvollstaendig</p>
+      <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit der Abgleich geladen werden kann.</p>
     </div>
 
-    <div v-else-if="errorMessage" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
+    <div v-else-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
     </div>
 
     <template v-else>
-      <div v-if="successMessage" class="feedback-panel feedback-panel-success">
-        <p class="feedback-title">Erfolg</p>
-        <p>{{ successMessage }}</p>
+      <div v-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Erfolg</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
 
       <section class="summary-card">
         <div class="section-head">
           <div>
             
-            <h3>Zusammenfassung</h3>
+            <h3 class="anm-procedure-title anm-procedure-ui">Zusammenfassung</h3>
           </div>
           <span class="summary-context">{{ context.verfahren }} | {{ context.runde }} | Datenquelle: anm_schueler</span>
         </div>
@@ -691,7 +691,7 @@ function toggleSchuleFilter(schuleName: string) {
         <div class="section-head">
           <div>
             
-            <h3>Schulen mit Anmeldungen</h3>
+            <h3 class="anm-procedure-title anm-procedure-ui">Schulen mit Anmeldungen</h3>
           </div>
           <span class="table-count">{{ schoolOverview.length }} Schulen | Datenquelle: Schüler und Rundendaten</span>
         </div>
@@ -828,12 +828,12 @@ function toggleSchuleFilter(schuleName: string) {
         <div class="section-head">
           <div>
             
-            <h3>Schuelerliste im Anmeldeverfahren</h3>
+            <h3 class="anm-procedure-title anm-procedure-ui">Schuelerliste im Anmeldeverfahren</h3>
           </div>
           <div class="section-head-actions">
             <span class="table-count">{{ sortedRows.length }} Treffer</span>
             <button
-              class="btn-secondary"
+              class="anm-button anm-procedure-ui"
               type="button"
               :disabled="isReadonly || loading || geocoding || !verfahrenId || !rundeId"
               @click="handleUpdateGeocoding"
@@ -945,30 +945,30 @@ function toggleSchuleFilter(schuleName: string) {
       </section>
 
       <div v-if="caseDialogOpen" class="dialog-backdrop" @click.self="resetCaseDialog">
-        <section class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="offener-fall-dialog-title">
+        <section class="case-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="offener-fall-dialog-title">
           <div class="case-dialog-head">
             <div>
-              <p class="section-eyebrow">Manueller Offener Fall</p>
-              <h3 id="offener-fall-dialog-title">Fall in Abgleich anlegen</h3>
-              <p class="case-dialog-student">
+              <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Manueller Offener Fall</p>
+              <h3 class="anm-procedure-title anm-procedure-ui" id="offener-fall-dialog-title">Fall in Abgleich anlegen</h3>
+              <p class="case-dialog-student anm-procedure-copy anm-procedure-ui">
                 {{ selectedCaseRow ? ([selectedCaseRow.nachname, selectedCaseRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
               </p>
             </div>
-            <button type="button" class="case-dialog-close" aria-label="Dialog schliessen" @click="resetCaseDialog">×</button>
+            <button type="button" class="case-dialog-close anm-button anm-procedure-ui" aria-label="Dialog schliessen" @click="resetCaseDialog">×</button>
           </div>
 
           <div class="case-dialog-body">
-            <label class="filter-field">
-              <span>Fallgrund</span>
-              <select v-model="caseFallgrundId">
+            <label class="filter-field anm-field anm-procedure-ui">
+              <span class="anm-label anm-procedure-ui">Fallgrund</span>
+              <select class="anm-input anm-procedure-ui" v-model="caseFallgrundId">
                 <option :value="0">Bitte waehlen</option>
                 <option v-for="option in fallgrundOptions" :key="option.id" :value="option.id">{{ option.code }}</option>
               </select>
             </label>
 
-            <label class="filter-field case-dialog-note">
-              <span>Bemerkung</span>
-              <textarea
+            <label class="filter-field case-dialog-note anm-field anm-procedure-ui">
+              <span class="anm-label anm-procedure-ui">Bemerkung</span>
+              <textarea class="anm-input anm-procedure-ui"
                 v-model="caseBemerkung"
                 rows="5"
                 placeholder="Optional eine Bearbeitungsnotiz zum Fall erfassen"
@@ -977,8 +977,8 @@ function toggleSchuleFilter(schuleName: string) {
           </div>
 
           <div class="case-dialog-actions">
-            <button type="button" class="btn-secondary" @click="resetCaseDialog">Abbrechen</button>
-            <button type="button" class="btn-primary" :disabled="caseDialogSaving || isReadonly" @click="submitOpenCase">
+            <button type="button" class="anm-button anm-procedure-ui" @click="resetCaseDialog">Abbrechen</button>
+            <button type="button" class="anm-button anm-button--primary anm-procedure-ui" :disabled="caseDialogSaving || isReadonly" @click="submitOpenCase">
               {{ caseDialogSaving ? "Speichere..." : "Fall anlegen" }}
             </button>
           </div>
@@ -986,19 +986,19 @@ function toggleSchuleFilter(schuleName: string) {
       </div>
 
       <div v-if="editDialogOpen" class="dialog-backdrop" @click.self="closeEditDialog">
-        <section class="case-dialog case-dialog-edit" role="dialog" aria-modal="true" aria-labelledby="schueler-edit-dialog-title">
+        <section class="case-dialog case-dialog-edit anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="schueler-edit-dialog-title">
           <div class="case-dialog-head">
             <div>
-              <p class="section-eyebrow">Schuelerdatensatz</p>
-              <h3 id="schueler-edit-dialog-title">Schuelerdatensatz bearbeiten</h3>
-              <p class="case-dialog-student">
+              <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Schuelerdatensatz</p>
+              <h3 class="anm-procedure-title anm-procedure-ui" id="schueler-edit-dialog-title">Schuelerdatensatz bearbeiten</h3>
+              <p class="case-dialog-student anm-procedure-copy anm-procedure-ui">
                 {{ selectedEditRow ? ([selectedEditRow.nachname, selectedEditRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
               </p>
             </div>
             <div class="edit-dialog-nav" aria-label="Datensatznavigation">
               <button
                 type="button"
-                class="edit-dialog-nav-button"
+                class="edit-dialog-nav-button anm-button anm-button--icon anm-procedure-ui"
                 :disabled="editDialogSaving || editDialogDeleting || !canEditPreviousRow"
                 aria-label="Vorherigen Schuelerdatensatz bearbeiten"
                 title="Vorheriger Datensatz"
@@ -1008,7 +1008,7 @@ function toggleSchuleFilter(schuleName: string) {
               </button>
               <button
                 type="button"
-                class="edit-dialog-nav-button"
+                class="edit-dialog-nav-button anm-button anm-button--icon anm-procedure-ui"
                 :disabled="editDialogSaving || editDialogDeleting || !canEditNextRow"
                 aria-label="Naechsten Schuelerdatensatz bearbeiten"
                 title="Naechster Datensatz"
@@ -1018,7 +1018,7 @@ function toggleSchuleFilter(schuleName: string) {
               </button>
               <button
                 type="button"
-                class="edit-dialog-nav-button"
+                class="edit-dialog-nav-button anm-button anm-button--icon anm-procedure-ui"
                 :disabled="editDialogSaving || editDialogDeleting"
                 aria-label="Dialog schliessen"
                 title="Dialog schliessen"
@@ -1032,18 +1032,18 @@ function toggleSchuleFilter(schuleName: string) {
           <div class="case-dialog-body case-dialog-body-edit">
             <section class="edit-form-section" aria-labelledby="edit-student-data-title">
               <div class="edit-form-grid">
-                <label>
-                  <span>Externe Schueler-ID</span>
-                  <input v-model="editForm.externe_schueler_id" type="text" disabled title="Externe IDs werden über die Identitäts- und Importlogik verwaltet." />
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Externe Schueler-ID</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.externe_schueler_id" type="text" disabled title="Externe IDs werden über die Identitäts- und Importlogik verwaltet." />
                 </label>
                 <div class="edit-birthdate-field">
-                  <label>
-                    <span>Geburtsdatum</span>
-                    <input v-model="editForm.geburtsdatum" type="date" />
+                  <label class="anm-field anm-procedure-ui">
+                    <span class="anm-label anm-procedure-ui">Geburtsdatum</span>
+                    <input class="anm-input anm-procedure-ui" v-model="editForm.geburtsdatum" type="date" />
                   </label>
                   <button
                     type="button"
-                    class="edit-delete-button"
+                    class="edit-delete-button anm-button anm-button--danger anm-procedure-ui"
                     title="Schuelerdatensatz loeschen"
                     aria-label="Schuelerdatensatz loeschen"
                     :disabled="editDialogSaving || editDialogDeleting || isReadonly"
@@ -1052,36 +1052,36 @@ function toggleSchuleFilter(schuleName: string) {
                     <i class="bi bi-trash" aria-hidden="true"></i>
                   </button>
                 </div>
-                <label>
-                  <span>Vorname</span>
-                  <input v-model="editForm.vorname" type="text" />
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Vorname</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.vorname" type="text" />
                 </label>
-                <label>
-                  <span>Nachname</span>
-                  <input v-model="editForm.nachname" type="text" />
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Nachname</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.nachname" type="text" />
                 </label>
-                <label>
-                  <span>Strasse</span>
-                  <input v-model="editForm.strasse" type="text" />
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Strasse</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.strasse" type="text" />
                 </label>
-                <label>
-                  <span>PLZ</span>
-                  <input v-model="editForm.plz" type="text" />
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">PLZ</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.plz" type="text" />
                 </label>
-                <label class="edit-form-full">
-                  <span>Ort</span>
-                  <input v-model="editForm.ort" type="text" />
+                <label class="edit-form-full anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Ort</span>
+                  <input class="anm-input anm-procedure-ui" v-model="editForm.ort" type="text" />
                 </label>
-                <label>
-                  <span>LE</span>
-                  <select v-model="editForm.foerderbedarf">
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">LE</span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.foerderbedarf">
                     <option value="0">Nein</option>
                     <option value="1">Ja</option>
                   </select>
                 </label>
-                <label>
-                  <span>ZD</span>
-                  <select v-model="editForm.zieldifferent">
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">ZD</span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.zieldifferent">
                     <option value="0">Nein</option>
                     <option value="1">Ja</option>
                   </select>
@@ -1091,31 +1091,31 @@ function toggleSchuleFilter(schuleName: string) {
 
             <section class="edit-form-section edit-form-assignment-section" aria-label="Anmeldung und Schule">
               <div class="edit-form-context-grid">
-                <label :title="fieldComment('herkunft') || undefined">
-                  <span>Herkunft <i v-if="fieldComment('herkunft')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
-                  <select v-model="editForm.herkunft">
+                <label class="anm-field anm-procedure-ui" :title="fieldComment('herkunft') || undefined">
+                  <span class="anm-label anm-procedure-ui">Herkunft <i v-if="fieldComment('herkunft')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.herkunft">
                     <option value="">Bitte waehlen</option>
                     <option v-for="option in herkunftEditOptions" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </label>
-                <label>
-                  <span>Aufnehmende Schule</span>
-                  <select v-model="editForm.schulnummer">
+                <label class="anm-field anm-procedure-ui">
+                  <span class="anm-label anm-procedure-ui">Aufnehmende Schule</span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.schulnummer">
                     <option value="">Bitte waehlen</option>
                     <option v-for="school in schoolsInProcedure" :key="school.snr" :value="school.snr">
                       {{ school.name }} ({{ school.snr }})
                     </option>
                   </select>
                 </label>
-                <label :title="fieldComment('anmeldestatus') || undefined">
-                  <span>Anmeldestatus <i v-if="fieldComment('anmeldestatus')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
-                  <select v-model="editForm.anmeldestatus">
+                <label class="anm-field anm-procedure-ui" :title="fieldComment('anmeldestatus') || undefined">
+                  <span class="anm-label anm-procedure-ui">Anmeldestatus <i v-if="fieldComment('anmeldestatus')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.anmeldestatus">
                     <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
                   </select>
                 </label>
-                <label :title="fieldComment('abgleich_status') || undefined">
-                  <span>Abgleichstatus <i v-if="fieldComment('abgleich_status')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
-                  <select v-model="editForm.abgleich_status">
+                <label class="anm-field anm-procedure-ui" :title="fieldComment('abgleich_status') || undefined">
+                  <span class="anm-label anm-procedure-ui">Abgleichstatus <i v-if="fieldComment('abgleich_status')" class="bi bi-info-circle edit-field-info" aria-hidden="true"></i></span>
+                  <select class="anm-input anm-procedure-ui" v-model="editForm.abgleich_status">
                     <option value="">Bitte waehlen</option>
                     <option value="Nur Pool">Nur Pool</option>
                     <option value="Nur Anmeldung">Nur Anmeldung</option>
@@ -1125,15 +1125,15 @@ function toggleSchuleFilter(schuleName: string) {
               </div>
             </section>
 
-            <label class="edit-form-remark">
-              <span>Bemerkung</span>
-              <textarea v-model="editForm.bemerkung" rows="4"></textarea>
+            <label class="edit-form-remark anm-field anm-procedure-ui">
+              <span class="anm-label anm-procedure-ui">Bemerkung</span>
+              <textarea class="anm-input anm-procedure-ui" v-model="editForm.bemerkung" rows="4"></textarea>
             </label>
           </div>
 
           <div class="case-dialog-actions">
-            <button type="button" class="btn-secondary" :disabled="editDialogSaving || editDialogDeleting" @click="closeEditDialog">Abbrechen</button>
-            <button type="button" class="btn-primary" :disabled="editDialogSaving || editDialogDeleting || isReadonly" @click="saveEditDialog">
+            <button type="button" class="anm-button anm-procedure-ui" :disabled="editDialogSaving || editDialogDeleting" @click="closeEditDialog">Abbrechen</button>
+            <button type="button" class="anm-button anm-button--primary anm-procedure-ui" :disabled="editDialogSaving || editDialogDeleting || isReadonly" @click="saveEditDialog">
               {{ editDialogSaving ? "Speichere..." : "Speichern" }}
             </button>
           </div>
@@ -1141,14 +1141,14 @@ function toggleSchuleFilter(schuleName: string) {
       </div>
 
       <div v-if="deleteDialogOpen" class="dialog-backdrop delete-dialog-backdrop" @click.self="closeDeleteDialog()">
-        <section class="case-dialog delete-student-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-student-dialog-title">
+        <section class="case-dialog delete-student-dialog anm-procedure-surface" role="alertdialog" aria-modal="true" aria-labelledby="delete-student-dialog-title">
           <div class="delete-dialog-head">
             <div class="delete-dialog-icon" aria-hidden="true">
               <i class="bi bi-trash"></i>
             </div>
             <div>
-              <h3 id="delete-student-dialog-title">Schuelerdatensatz wirklich loeschen?</h3>
-              <p>Diese Aktion kann nicht rueckgaengig gemacht werden.</p>
+              <h3 class="anm-procedure-title anm-procedure-ui" id="delete-student-dialog-title">Schuelerdatensatz wirklich loeschen?</h3>
+              <p class="anm-procedure-copy anm-procedure-ui">Diese Aktion kann nicht rueckgaengig gemacht werden.</p>
             </div>
           </div>
 
@@ -1158,8 +1158,8 @@ function toggleSchuleFilter(schuleName: string) {
           </div>
 
           <div class="case-dialog-actions">
-            <button type="button" class="btn-secondary" :disabled="editDialogDeleting" @click="closeDeleteDialog()">Abbrechen</button>
-            <button type="button" class="btn-danger" :disabled="editDialogDeleting || isReadonly" @click="deleteSelectedStudent">
+            <button type="button" class="anm-button anm-procedure-ui" :disabled="editDialogDeleting" @click="closeDeleteDialog()">Abbrechen</button>
+            <button type="button" class="anm-button anm-button--danger anm-procedure-ui" :disabled="editDialogDeleting || isReadonly" @click="deleteSelectedStudent">
               {{ editDialogDeleting ? "Loesche..." : "Endgueltig loeschen" }}
             </button>
           </div>
@@ -1204,9 +1204,13 @@ function toggleSchuleFilter(schuleName: string) {
 .abgleich-eyebrow,
 .section-eyebrow {
   margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.abgleich-eyebrow:where(:not(.anm-procedure-ui)),
+.section-eyebrow:where(:not(.anm-procedure-ui)) {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #6680a3;
 }
@@ -1214,6 +1218,10 @@ function toggleSchuleFilter(schuleName: string) {
 .abgleich-toolbar h2,
 .section-head h3 {
   margin: 0;
+}
+
+.abgleich-toolbar h2:where(:not(.anm-procedure-ui)),
+.section-head h3:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
@@ -1259,15 +1267,21 @@ function toggleSchuleFilter(schuleName: string) {
 .metric-card span,
 .summary-context,
 .table-count {
+  text-transform: uppercase;
+}
+
+.filter-field span:where(:not(.anm-procedure-ui)),
+.metric-card span:where(:not(.anm-procedure-ui)),
+.summary-context,
+.table-count {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: #6680a3;
 }
 
-.filter-field input,
-.filter-field select {
+.filter-field input:where(:not(.anm-procedure-ui)),
+.filter-field select:where(:not(.anm-procedure-ui)) {
   border: 1px solid #dbe4f0;
   border-radius: 10px;
   padding: 7px 10px;
@@ -1319,7 +1333,7 @@ function toggleSchuleFilter(schuleName: string) {
   background: linear-gradient(180deg, #fff7f7 0%, #fdecec 100%);
 }
 
-.metric-card-alert span,
+.metric-card-alert span:where(:not(.anm-procedure-ui)),
 .metric-card-alert strong {
   color: #b42318;
 }
@@ -1382,12 +1396,15 @@ function toggleSchuleFilter(schuleName: string) {
 }
 
 .detail-table th button {
+  cursor: pointer;
+}
+
+.detail-table th button:where(:not(.anm-procedure-ui)) {
   border: 0;
   background: transparent;
   padding: 0;
   font: inherit;
   color: inherit;
-  cursor: pointer;
 }
 
 .case-action-cell {
@@ -1463,7 +1480,7 @@ function toggleSchuleFilter(schuleName: string) {
   padding: 24px 12px;
 }
 
-.btn-secondary {
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
@@ -1476,6 +1493,9 @@ function toggleSchuleFilter(schuleName: string) {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+}
+
+.btn-refresh:where(:not(.anm-procedure-ui)) {
   padding: 11px 18px;
   border: 1px solid #c9daf1;
   background: linear-gradient(180deg, #f8fbff 0%, #e7f0fb 100%);
@@ -1489,7 +1509,7 @@ function toggleSchuleFilter(schuleName: string) {
     color 0.16s ease;
 }
 
-.btn-refresh:hover:not(:disabled) {
+.btn-refresh:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   border-color: #9cbce3;
   background: linear-gradient(180deg, #ffffff 0%, #dfeafb 100%);
@@ -1504,6 +1524,9 @@ function toggleSchuleFilter(schuleName: string) {
 .btn-refresh:disabled {
   cursor: wait;
   opacity: 0.78;
+}
+
+.btn-refresh:disabled:where(:not(.anm-procedure-ui)) {
   transform: none;
   box-shadow: none;
 }
@@ -1520,7 +1543,7 @@ function toggleSchuleFilter(schuleName: string) {
   line-height: 1;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
@@ -1608,12 +1631,12 @@ function toggleSchuleFilter(schuleName: string) {
   white-space: nowrap;
 }
 
-.feedback-panel-warning {
+.feedback-panel-warning:where(:not(.anm-procedure-ui)) {
   border: 1px solid #d9d9c8;
   background: #fffdf3;
 }
 
-.feedback-panel-success {
+.feedback-panel-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #b7e3c6;
   background: #f2fbf5;
   color: #21653a;
@@ -1657,17 +1680,26 @@ function toggleSchuleFilter(schuleName: string) {
 
 .case-dialog-head h3 {
   margin: 0;
+}
+
+.case-dialog-head h3:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
 .case-dialog-student {
   margin: 8px 0 0;
+}
+
+.case-dialog-student:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   font-weight: 600;
 }
 
 .case-dialog-close {
   width: 38px;
+}
+
+.case-dialog-close:where(:not(.anm-procedure-ui)) {
   height: 38px;
   border: 0;
   border-radius: 12px;
@@ -1685,19 +1717,22 @@ function toggleSchuleFilter(schuleName: string) {
 
 .edit-dialog-nav-button {
   width: 38px;
-  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.edit-dialog-nav-button:where(:not(.anm-procedure-ui)) {
+  height: 38px;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
-.edit-dialog-nav-button:hover:not(:disabled) {
+.edit-dialog-nav-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   background: #dbeafe;
 }
@@ -1774,20 +1809,23 @@ function toggleSchuleFilter(schuleName: string) {
 
 .edit-delete-button {
   width: 42px;
-  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.edit-delete-button:where(:not(.anm-procedure-ui)) {
+  height: 34px;
   border: 1px solid #f0a8a8;
   border-radius: 10px;
   background: #fff1f1;
   color: #b42318;
   font-size: 17px;
-  cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.edit-delete-button:hover:not(:disabled) {
+.edit-delete-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   border-color: #d92d20;
   background: #d92d20;
@@ -1807,10 +1845,15 @@ function toggleSchuleFilter(schuleName: string) {
 .edit-form-grid span,
 .edit-form-context-grid span,
 .edit-form-remark span {
+  text-transform: uppercase;
+}
+
+.edit-form-grid span:where(:not(.anm-procedure-ui)),
+.edit-form-context-grid span:where(:not(.anm-procedure-ui)),
+.edit-form-remark span:where(:not(.anm-procedure-ui)) {
   color: #5a7393;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
@@ -1825,6 +1868,12 @@ function toggleSchuleFilter(schuleName: string) {
 .edit-form-context-grid select,
 .edit-form-remark textarea {
   width: 100%;
+}
+
+.edit-form-grid input:where(:not(.anm-procedure-ui)),
+.edit-form-grid select:where(:not(.anm-procedure-ui)),
+.edit-form-context-grid select:where(:not(.anm-procedure-ui)),
+.edit-form-remark textarea:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   border: 1px solid #d7e2ef;
   border-radius: 10px;
@@ -1840,8 +1889,11 @@ function toggleSchuleFilter(schuleName: string) {
 }
 
 .edit-form-remark textarea {
-  min-height: 78px;
   resize: vertical;
+}
+
+.edit-form-remark textarea:where(:not(.anm-procedure-ui)) {
+  min-height: 78px;
 }
 
 .edit-form-full {
@@ -1849,6 +1901,10 @@ function toggleSchuleFilter(schuleName: string) {
 }
 
 .case-dialog-note textarea {
+  resize: vertical;
+}
+
+.case-dialog-note textarea:where(:not(.anm-procedure-ui)) {
   min-height: 130px;
   padding: 10px 12px;
   border: 1px solid #dbe4f0;
@@ -1856,7 +1912,6 @@ function toggleSchuleFilter(schuleName: string) {
   background: #fff;
   color: #17385f;
   font: inherit;
-  resize: vertical;
 }
 
 .case-dialog-actions {
@@ -1882,11 +1937,17 @@ function toggleSchuleFilter(schuleName: string) {
 
 .delete-dialog-head h3 {
   margin: 0;
+}
+
+.delete-dialog-head h3:where(:not(.anm-procedure-ui)) {
   color: #8a1c13;
 }
 
 .delete-dialog-head p {
   margin: 5px 0 0;
+}
+
+.delete-dialog-head p:where(:not(.anm-procedure-ui)) {
   color: #6f3b36;
 }
 
@@ -1916,7 +1977,7 @@ function toggleSchuleFilter(schuleName: string) {
   color: #8a1c13;
 }
 
-.btn-danger {
+.btn-danger:where(:not(.anm-procedure-ui)) {
   border: 0;
   border-radius: 999px;
   padding: 10px 16px;
@@ -1925,7 +1986,7 @@ function toggleSchuleFilter(schuleName: string) {
   font-weight: 700;
 }
 
-.btn-danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   background: #a91f16;
 }
 

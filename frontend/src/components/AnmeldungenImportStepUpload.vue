@@ -76,36 +76,36 @@ function downloadAnmeldungenExample() {
       @dragleave.prevent="handleDragLeave"
       @drop.prevent.stop="handleDrop"
     >
-      <p class="upload-title">CSV-Datei auswählen</p>
-      <p class="upload-copy">Datei per Drag & Drop ablegen oder über den Dateidialog auswählen.</p>
-      <button class="btn-primary" type="button" :disabled="busy" @click="handlePickClick">
+      <p class="upload-title anm-procedure-copy anm-procedure-ui">CSV-Datei auswählen</p>
+      <p class="upload-copy anm-procedure-copy anm-procedure-ui">Datei per Drag & Drop ablegen oder über den Dateidialog auswählen.</p>
+      <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="busy" @click="handlePickClick">
         Datei auswählen
       </button>
-      <p v-if="fileName" class="upload-file">
+      <p v-if="fileName" class="upload-file anm-procedure-copy anm-procedure-ui">
         {{ fileName }}
       </p>
     </div>
 
     <div class="upload-options">
-      <label class="upload-option upload-option-compact">
-        <span>Trennzeichen</span>
-        <select :value="options.delimiter" @change="$emit('update:delimiter', ($event.target as HTMLSelectElement).value as 'auto' | ';' | ',' | '\t')">
+      <label class="upload-option upload-option-compact anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Trennzeichen</span>
+        <select class="anm-input anm-procedure-ui" :value="options.delimiter" @change="$emit('update:delimiter', ($event.target as HTMLSelectElement).value as 'auto' | ';' | ',' | '\t')">
           <option value="auto">Automatisch</option>
           <option value=";">Semikolon</option>
           <option value=",">Komma</option>
           <option :value="'\t'">Tab</option>
         </select>
       </label>
-      <label class="upload-option upload-option-binary">
-        <span>Erste Zeile enthält Spaltennamen</span>
-        <select :value="options.hasHeaders ? 'ja' : 'nein'" @change="$emit('update:hasHeaders', ($event.target as HTMLSelectElement).value === 'ja')">
+      <label class="upload-option upload-option-binary anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Erste Zeile enthält Spaltennamen</span>
+        <select class="anm-input anm-procedure-ui" :value="options.hasHeaders ? 'ja' : 'nein'" @change="$emit('update:hasHeaders', ($event.target as HTMLSelectElement).value === 'ja')">
           <option value="ja">Ja</option>
           <option value="nein">Nein</option>
         </select>
       </label>
-      <label class="upload-option upload-option-compact">
-        <span>Zeichensatz</span>
-        <input type="text" value="UTF-8 (mit Fallback)" disabled />
+      <label class="upload-option upload-option-compact anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Zeichensatz</span>
+        <input class="anm-input anm-procedure-ui" type="text" value="UTF-8 (mit Fallback)" disabled />
       </label>
     </div>
 
@@ -113,7 +113,7 @@ function downloadAnmeldungenExample() {
       <div class="help-heading">
         <button
           type="button"
-          class="help-toggle"
+          class="help-toggle anm-button anm-procedure-ui"
           :aria-expanded="isHelpExpanded ? 'true' : 'false'"
           aria-controls="anmeldungen-import-help-content"
           aria-label="Erklärungen ein- oder ausklappen"
@@ -122,8 +122,8 @@ function downloadAnmeldungenExample() {
           <span class="help-toggle-chevron" :class="{ 'is-collapsed': !isHelpExpanded }" aria-hidden="true"></span>
         </button>
         <div>
-          <p class="help-eyebrow">Importhilfe</p>
-          <h4 id="anmeldungen-import-help-heading">Erklärungen zum Aufbau der Importdatei und zum weiteren Ablauf</h4>
+          <p class="help-eyebrow anm-procedure-copy anm-procedure-ui">Importhilfe</p>
+          <h4 class="anm-procedure-title anm-procedure-ui" id="anmeldungen-import-help-heading">Erklärungen zum Aufbau der Importdatei und zum weiteren Ablauf</h4>
         </div>
       </div>
 
@@ -131,10 +131,10 @@ function downloadAnmeldungenExample() {
         <section class="help-block" aria-labelledby="anmeldungen-file-heading">
           <div class="help-subheading">
             <span class="help-number" aria-hidden="true">1</span>
-            <h5 id="anmeldungen-file-heading">Aufbau der Importdatei</h5>
+            <h5 class="anm-procedure-title anm-procedure-ui" id="anmeldungen-file-heading">Aufbau der Importdatei</h5>
           </div>
 
-          <p class="help-intro">
+          <p class="help-intro anm-procedure-copy anm-procedure-ui">
             Erwartet wird eine CSV-Datei mit einer Kopfzeile. Die Reihenfolge der Spalten ist beliebig,
             da die Felder vor dem Import zugeordnet werden. Das Format der bereitgestellten Musterdatei
             wird automatisch erkannt.
@@ -199,7 +199,7 @@ function downloadAnmeldungenExample() {
             </table>
           </div>
 
-          <p class="help-detail">
+          <p class="help-detail anm-procedure-copy anm-procedure-ui">
             * Enthält die Datei nur Anmeldungen einer Schule, kann die Aufnahmeschule alternativ bei der
             Feldzuordnung global ausgewählt werden. Zusätzlich können <code>empfehlung</code>,
             <code>foerder_id</code>, <code>bemerkung</code>, <code>strasse</code>, <code>plz</code> und
@@ -211,7 +211,7 @@ function downloadAnmeldungenExample() {
               <strong>Beispiel für eine gültige Datei</strong>
               <span>Schulnummern und Beispieldaten müssen vor einem Import ersetzt werden.</span>
             </div>
-            <button class="help-download-button" type="button" @click="downloadAnmeldungenExample">
+            <button class="help-download-button anm-button anm-procedure-ui" type="button" @click="downloadAnmeldungenExample">
               <i class="bi bi-download" aria-hidden="true"></i>
               Musterdatei herunterladen
             </button>
@@ -223,29 +223,29 @@ function downloadAnmeldungenExample() {
         <section class="help-block help-process" aria-labelledby="anmeldungen-process-heading">
           <div class="help-subheading">
             <span class="help-number" aria-hidden="true">2</span>
-            <h5 id="anmeldungen-process-heading">Ablauf der Importroutine</h5>
+            <h5 class="anm-procedure-title anm-procedure-ui" id="anmeldungen-process-heading">Ablauf der Importroutine</h5>
           </div>
 
           <ol class="process-list">
-            <li><span>1</span><div><strong>Datei auswählen</strong><p>CSV-Datei laden und Dateieinstellungen festlegen.</p></div></li>
-            <li><span>2</span><div><strong>Vorschau prüfen</strong><p>Erkannte Zeilen, Spalten und das Trennzeichen kontrollieren.</p></div></li>
-            <li><span>3</span><div><strong>Felder zuordnen</strong><p>Dateispalten den Anmeldefeldern zuweisen. Die Spalten der Musterdatei werden automatisch erkannt.</p></div></li>
-            <li><span>4</span><div><strong>Anmeldungen prüfen</strong><p>Pool-Treffer, neue Anmeldungen, Aktualisierungen und fehlerhafte Zeilen kontrollieren und auswählen.</p></div></li>
-            <li><span>5</span><div><strong>Import starten</strong><p>Nur ausgewählte und gültige Zeilen werden übernommen. Anschließend erscheint die Ergebnisübersicht.</p></div></li>
+            <li><span>1</span><div><strong>Datei auswählen</strong><p class="anm-procedure-copy anm-procedure-ui">CSV-Datei laden und Dateieinstellungen festlegen.</p></div></li>
+            <li><span>2</span><div><strong>Vorschau prüfen</strong><p class="anm-procedure-copy anm-procedure-ui">Erkannte Zeilen, Spalten und das Trennzeichen kontrollieren.</p></div></li>
+            <li><span>3</span><div><strong>Felder zuordnen</strong><p class="anm-procedure-copy anm-procedure-ui">Dateispalten den Anmeldefeldern zuweisen. Die Spalten der Musterdatei werden automatisch erkannt.</p></div></li>
+            <li><span>4</span><div><strong>Anmeldungen prüfen</strong><p class="anm-procedure-copy anm-procedure-ui">Pool-Treffer, neue Anmeldungen, Aktualisierungen und fehlerhafte Zeilen kontrollieren und auswählen.</p></div></li>
+            <li><span>5</span><div><strong>Import starten</strong><p class="anm-procedure-copy anm-procedure-ui">Nur ausgewählte und gültige Zeilen werden übernommen. Anschließend erscheint die Ergebnisübersicht.</p></div></li>
           </ol>
 
           <div class="status-grid" aria-label="Bedeutung der Prüfstatus">
-            <div><span class="status-dot is-new"></span><strong>Neu</strong><p>Die Anmeldung wird neu angelegt.</p></div>
-            <div><span class="status-dot is-update"></span><strong>Update</strong><p>Eine vorhandene Anmeldung wird aktualisiert.</p></div>
-            <div><span class="status-dot is-existing"></span><strong>Vorhanden</strong><p>Es sind keine Änderungen notwendig.</p></div>
-            <div><span class="status-dot is-error"></span><strong>Fehler</strong><p>Die Zeile kann nicht importiert werden.</p></div>
+            <div><span class="status-dot is-new"></span><strong>Neu</strong><p class="anm-procedure-copy anm-procedure-ui">Die Anmeldung wird neu angelegt.</p></div>
+            <div><span class="status-dot is-update"></span><strong>Update</strong><p class="anm-procedure-copy anm-procedure-ui">Eine vorhandene Anmeldung wird aktualisiert.</p></div>
+            <div><span class="status-dot is-existing"></span><strong>Vorhanden</strong><p class="anm-procedure-copy anm-procedure-ui">Es sind keine Änderungen notwendig.</p></div>
+            <div><span class="status-dot is-error"></span><strong>Fehler</strong><p class="anm-procedure-copy anm-procedure-ui">Die Zeile kann nicht importiert werden.</p></div>
           </div>
 
           <div class="help-warning">
             <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
             <div>
               <strong>Abgleich mit dem Schülerpool</strong>
-              <p>
+              <p class="anm-procedure-copy anm-procedure-ui">
                 Die Importspalte <code>externe_schueler_id</code> enthält die externe Schüler-ID. Vorhandene Kinder
                 werden innerhalb des aktuellen Verfahrens über diese ID und die bestehenden Identitätsregeln erkannt. Ein Treffer ergänzt die vorhandenen Pooldaten um die
                 Anmeldung. Ohne Treffer wird ein Datensatz mit dem Abgleichstatus „Nur Anmeldung“ angelegt.
@@ -286,6 +286,9 @@ function downloadAnmeldungenExample() {
 
 .upload-title {
   margin: 0;
+}
+
+.upload-title:where(:not(.anm-procedure-ui)) {
   font-size: 18px;
   font-weight: 700;
   color: #19365b;
@@ -294,6 +297,10 @@ function downloadAnmeldungenExample() {
 .upload-copy,
 .upload-file {
   margin: 0;
+}
+
+.upload-copy:where(:not(.anm-procedure-ui)),
+.upload-file:where(:not(.anm-procedure-ui)) {
   color: #4f6483;
 }
 
@@ -326,14 +333,14 @@ function downloadAnmeldungenExample() {
   min-width: 210px;
 }
 
-.upload-options span {
+.upload-options span:where(:not(.anm-procedure-ui)) {
   font-size: 13px;
   font-weight: 700;
   color: #45617f;
 }
 
-.upload-options select,
-.upload-options input[type="text"] {
+.upload-options select:where(:not(.anm-procedure-ui)),
+.upload-options input[type="text"]:where(:not(.anm-procedure-ui)) {
   min-height: 42px;
   border: 1px solid #c8d6e8;
   border-radius: 14px;
@@ -360,20 +367,23 @@ function downloadAnmeldungenExample() {
 .help-toggle {
   flex: 0 0 auto;
   width: 34px;
-  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.help-toggle:where(:not(.anm-procedure-ui)) {
+  height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #dcfce7;
   color: #166534;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.help-toggle:hover {
+.help-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #bbf7d0;
 }
 
@@ -394,24 +404,31 @@ function downloadAnmeldungenExample() {
 
 .help-eyebrow {
   margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.help-eyebrow:where(:not(.anm-procedure-ui)) {
   color: #4d7c5c;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .help-heading h4,
 .help-subheading h5 {
   margin: 0;
+}
+
+.help-heading h4:where(:not(.anm-procedure-ui)),
+.help-subheading h5:where(:not(.anm-procedure-ui)) {
   color: #14532d;
 }
 
-.help-heading h4 {
+.help-heading h4:where(:not(.anm-procedure-ui)) {
   font-size: 20px;
 }
 
-.help-subheading h5 {
+.help-subheading h5:where(:not(.anm-procedure-ui)) {
   font-size: 18px;
 }
 
@@ -432,6 +449,10 @@ function downloadAnmeldungenExample() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.help-number,
+.process-list > li > span:where(:not(.anm-procedure-ui)) {
   border-radius: 50%;
   background: #166534;
   color: #ffffff;
@@ -446,6 +467,10 @@ function downloadAnmeldungenExample() {
 .help-intro,
 .help-detail {
   margin: 0;
+}
+
+.help-intro:where(:not(.anm-procedure-ui)),
+.help-detail:where(:not(.anm-procedure-ui)) {
   color: #405978;
   line-height: 1.65;
 }
@@ -460,8 +485,8 @@ function downloadAnmeldungenExample() {
   color: #28593a;
 }
 
-.help-callout span,
-.help-example-head span {
+.help-callout span:where(:not(.anm-procedure-ui)),
+.help-example-head span:where(:not(.anm-procedure-ui)) {
   color: #526985;
   font-size: 13px;
 }
@@ -536,21 +561,24 @@ function downloadAnmeldungenExample() {
 }
 
 .help-download-button {
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+}
+
+.help-download-button:where(:not(.anm-procedure-ui)) {
+  min-height: 40px;
   padding: 0 14px;
   border: 1px solid #86bd96;
   border-radius: 999px;
   background: #ffffff;
   color: #166534;
   font-weight: 700;
-  cursor: pointer;
   white-space: nowrap;
 }
 
-.help-download-button:hover {
+.help-download-button:hover:where(:not(.anm-procedure-ui)) {
   border-color: #22a35a;
   background: #e8f8ed;
 }
@@ -587,6 +615,9 @@ function downloadAnmeldungenExample() {
 
 .process-list > li > span {
   width: 28px;
+}
+
+.process-list > li > span:where(:not(.anm-procedure-ui)) {
   height: 28px;
   font-size: 12px;
 }
@@ -601,6 +632,11 @@ function downloadAnmeldungenExample() {
 .status-grid p,
 .help-warning p {
   margin: 3px 0 0;
+}
+
+.process-list p:where(:not(.anm-procedure-ui)),
+.status-grid p:where(:not(.anm-procedure-ui)),
+.help-warning p:where(:not(.anm-procedure-ui)) {
   color: #526985;
   line-height: 1.5;
 }
@@ -623,6 +659,9 @@ function downloadAnmeldungenExample() {
 
 .status-grid p {
   grid-column: 2;
+}
+
+.status-grid p:where(:not(.anm-procedure-ui)) {
   font-size: 12px;
 }
 

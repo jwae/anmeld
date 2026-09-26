@@ -8,7 +8,8 @@
       <button
         v-for="catalog in catalogs"
         :key="catalog.name"
-        :class="catalog.name === selectedCatalogName ? 'btn-primary' : 'btn-secondary'"
+        :class="{ 'anm-button--primary': catalog.name === selectedCatalogName }"
+        :aria-current="catalog.name === selectedCatalogName ? 'true' : undefined"
         type="button"
         :title="catalog.name"
         :disabled="loading || saving"
@@ -16,14 +17,14 @@
       >
         {{ catalog.label }}
       </button>
-      <p v-if="!loading && !catalogs.length" class="catalog-sidebar-empty">Keine Kataloge gefunden.</p>
+      <p v-if="!loading && !catalogs.length" class="catalog-sidebar-empty anm-managed-copy anm-migrated">Keine Kataloge gefunden.</p>
     </aside>
 
     <section class="catalog-table-card">
       <div class="catalog-toolbar">
         <div>
-          <h3>{{ selectedLabel }}</h3>
-          <p v-if="selectedCatalog" :title="selectedCatalog.name">{{ selectedCatalog.name }}</p>
+          <h3 class="anm-managed-title anm-migrated">{{ selectedLabel }}</h3>
+          <p v-if="selectedCatalog" :title="selectedCatalog.name" class="anm-managed-copy anm-migrated">{{ selectedCatalog.name }}</p>
         </div>
         <div class="catalog-toolbar-actions">
           <button
@@ -45,14 +46,14 @@
       </div>
 
       <div v-if="selectedCatalog?.notice" class="catalog-system-notice anm-alert anm-migrated" role="status">
-        <p>{{ selectedCatalog.notice }}</p>
+        <p class="anm-managed-copy anm-migrated">{{ selectedCatalog.notice }}</p>
       </div>
 
       <div v-if="errorMessage" class="anm-alert anm-status--danger anm-migrated" role="alert">
-        <p>{{ errorMessage }}</p>
+        <p class="anm-managed-copy anm-migrated">{{ errorMessage }}</p>
       </div>
       <div v-else-if="noticeMessage" class="anm-alert anm-status--success anm-migrated" role="status">
-        <p>{{ noticeMessage }}</p>
+        <p class="anm-managed-copy anm-migrated">{{ noticeMessage }}</p>
       </div>
 
       <div v-if="loading" class="catalog-empty">Katalog wird geladen...</div>
@@ -132,8 +133,8 @@
 
   <div v-if="leaveDialogOpen" class="catalog-modal-overlay">
     <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Ungespeicherte Änderungen">
-      <h3>Ungespeicherte Änderungen</h3>
-      <p>Im Katalog „{{ selectedLabel }}“ liegen ungespeicherte Änderungen vor.</p>
+      <h3 class="anm-managed-title anm-migrated">Ungespeicherte Änderungen</h3>
+      <p class="anm-managed-copy anm-migrated">Im Katalog „{{ selectedLabel }}“ liegen ungespeicherte Änderungen vor.</p>
       <div class="catalog-modal-actions">
         <button class="anm-button anm-migrated" type="button" :disabled="saving" @click="finishLeaveDialog(false)">Abbrechen</button>
         <button class="anm-button anm-button--danger anm-migrated" type="button" :disabled="saving" @click="discardAndLeave">Verwerfen und wechseln</button>
@@ -146,8 +147,8 @@
 
   <div v-if="deleteDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
     <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Löschungen bestätigen">
-      <h3>Einträge löschen?</h3>
-      <p>
+      <h3 class="anm-managed-title anm-migrated">Einträge löschen?</h3>
+      <p class="anm-managed-copy anm-migrated">
         Im Katalog „{{ selectedLabel }}“ werden {{ deletedRows.length }} Einträge endgültig gelöscht:
       </p>
       <ul>
@@ -164,8 +165,8 @@
 
   <div v-if="deactivateDialogOpen" class="catalog-modal-overlay catalog-delete-overlay">
     <section class="catalog-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Ereignisse deaktivieren">
-      <h3>Protokollereignisse deaktivieren?</h3>
-      <p>
+      <h3 class="anm-managed-title anm-migrated">Protokollereignisse deaktivieren?</h3>
+      <p class="anm-managed-copy anm-migrated">
         Für die folgenden Ereignisse werden nach der Deaktivierung keine neuen Protokolleinträge mehr geschrieben:
       </p>
       <ul>

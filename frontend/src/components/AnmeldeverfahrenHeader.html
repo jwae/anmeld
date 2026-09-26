@@ -3,34 +3,34 @@
     <header class="header header-auth-row anmeldeverfahren-header-top">
       <div class="anmeldeverfahren-header-copy">
         <div>
-          <h1>Anmeldeverfahren für Schulen</h1>
-          <p>Verwaltung von Anmeldeverfahren GS und SEK I und den zugehoerigen Anmelderunden.</p>
+          <h1 class="anm-procedure-title anm-procedure-ui">Anmeldeverfahren für Schulen</h1>
+          <p class="anm-procedure-copy anm-procedure-ui">Verwaltung von Anmeldeverfahren GS und SEK I und den zugehoerigen Anmelderunden.</p>
 
           <div class="anmeldeverfahren-header-context-badges" aria-label="Aktueller Kontext kompakt">
-            <span class="anmeldeverfahren-header-context-badge">
+            <span class="anmeldeverfahren-header-context-badge anm-badge anm-status--neutral">
               <span class="anmeldeverfahren-header-context-badge-label">Verfahren:</span>
               <strong>{{ currentContext.verfahren }}</strong>
             </span>
-            <span class="anmeldeverfahren-header-context-badge">
+            <span class="anmeldeverfahren-header-context-badge anm-badge anm-status--neutral">
             <span class="anmeldeverfahren-header-context-badge-label">Runde:</span>
               <strong>{{ formatCompactRoundLabel(currentContext.runde) }}</strong>
             </span>
             <span
               v-if="verfahrenStatus"
-              class="anmeldeverfahren-header-context-badge"
+              class="anmeldeverfahren-header-context-badge anm-badge anm-status--neutral"
               :data-status="isReviewMode ? 'Review' : verfahrenStatus"
             >
               <span class="anmeldeverfahren-header-context-badge-label">Status:</span>
               <strong>{{ isReviewMode ? "Review" : verfahrenStatus }}</strong>
             </span>
           </div>
-          <p v-if="isReviewMode && verfahrenStatus" class="anmeldeverfahren-review-hint">
+          <p v-if="isReviewMode && verfahrenStatus" class="anmeldeverfahren-review-hint anm-alert anm-status--warning">
             Review-Modus – nur Lesen. Änderungen an den ausgewählten Fachdaten sind nicht möglich.
           </p>
         </div>
       </div>
 
-      <UserSessionCard
+      <UserSessionCard class="anm-procedure-session"
         :user="user"
         :user-label="userLabel"
         :connected-host="connectedHost"
@@ -41,21 +41,21 @@
       />
     </header>
 
-    <nav class="anmeldeverfahren-header-menu" role="tablist" aria-label="Anmeldedaten Bereiche">
+    <nav class="anmeldeverfahren-header-menu anm-nav" aria-label="Anmeldedaten Bereiche">
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'verfahren' }"
-        :aria-selected="activeMenu === 'verfahren' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'verfahren' ? 'page' : undefined"
         @click="emitNavigate('verfahren')"
       >
         Verfahren und Runden
       </button>
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'verfahrensdaten' }"
-        :aria-selected="activeMenu === 'verfahrensdaten' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'verfahrensdaten' ? 'page' : undefined"
         :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
         :disabled="!hasMenuSelectionContext"
         @click="emitNavigate('verfahrensdaten')"
@@ -64,9 +64,9 @@
       </button>
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'abgleich' }"
-        :aria-selected="activeMenu === 'abgleich' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'abgleich' ? 'page' : undefined"
         :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
         :disabled="!hasMenuSelectionContext"
         @click="emitNavigate('abgleich')"
@@ -75,9 +75,9 @@
       </button>
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'koordination' }"
-        :aria-selected="activeMenu === 'koordination' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'koordination' ? 'page' : undefined"
         :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
         :disabled="!hasMenuSelectionContext"
         @click="emitNavigate('koordination')"
@@ -86,9 +86,9 @@
       </button>
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'offene-faelle' }"
-        :aria-selected="activeMenu === 'offene-faelle' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'offene-faelle' ? 'page' : undefined"
         :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
         :disabled="!hasMenuSelectionContext"
         @click="emitNavigate('offene-faelle')"
@@ -97,9 +97,9 @@
       </button>
       <button
         type="button"
-        class="anmeldeverfahren-header-menu-btn"
+        class="anmeldeverfahren-header-menu-btn anm-nav-item anm-procedure-ui"
         :class="{ 'is-active': activeMenu === 'auswertungen' }"
-        :aria-selected="activeMenu === 'auswertungen' ? 'true' : 'false'"
+        :aria-current="activeMenu === 'auswertungen' ? 'page' : undefined"
         :aria-disabled="!hasMenuSelectionContext ? 'true' : 'false'"
         :disabled="!hasMenuSelectionContext"
         @click="emitNavigate('auswertungen')"

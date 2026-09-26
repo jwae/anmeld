@@ -279,9 +279,9 @@ watch(
   <section class="offene-faelle-view">
     <header class="offene-faelle-header">
       <div>
-        <p class="offene-faelle-eyebrow">Offene Faelle</p>
-        <h2>Arbeitsoberflaeche fuer offene Faelle</h2>
-        <p class="offene-faelle-intro">
+        <p class="offene-faelle-eyebrow anm-procedure-copy anm-procedure-ui">Offene Faelle</p>
+        <h2 class="anm-procedure-title anm-procedure-ui">Arbeitsoberflaeche fuer offene Faelle</h2>
+        <p class="offene-faelle-intro anm-procedure-copy anm-procedure-ui">
           Faelle sichten, Status setzen und Bemerkungen pflegen fuer
           <strong>{{ context.verfahren }}</strong>.
         </p>
@@ -292,7 +292,7 @@ watch(
     <div v-if="successMessage" class="status-banner status-banner-success">{{ successMessage }}</div>
 
     <section v-if="!verfahrenId || !rundeId" class="offene-faelle-placeholder">
-      <p>Waehle zuerst ein Verfahren und eine Runde, damit die offenen Faelle geladen werden koennen.</p>
+      <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit die offenen Faelle geladen werden koennen.</p>
     </section>
 
     <section v-else class="offene-faelle-panel">
@@ -454,22 +454,31 @@ watch(
 
 .offene-faelle-eyebrow {
   margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.offene-faelle-eyebrow:where(:not(.anm-procedure-ui)) {
   color: #6882a4;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .offene-faelle-header h2 {
   margin: 0;
+}
+
+.offene-faelle-header h2:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
 .offene-faelle-intro {
   margin: 8px 0 0;
-  color: #4d6280;
   max-width: 72ch;
+}
+
+.offene-faelle-intro:where(:not(.anm-procedure-ui)) {
+  color: #4d6280;
 }
 
 .offene-faelle-placeholder,

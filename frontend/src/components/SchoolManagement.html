@@ -1,14 +1,14 @@
 <section class="school-management-page">
   <div v-if="!isManagementSessionActive" class="user-management-empty school-management-empty">
-    <p>Fuer Daten laden, Aendern, Loeschen und Aktivieren bitte zuerst die Verwaltung laden.</p>
+    <p class="anm-managed-copy anm-migrated">Fuer Daten laden, Aendern, Loeschen und Aktivieren bitte zuerst die Verwaltung laden.</p>
   </div>
 
   <template v-else>
     <section class="user-management-panel school-management-form-card anm-card anm-migrated">
       <div class="user-management-panel-head">
         <div class="school-management-form-title-block">
-          <h3>{{ selectedManagementSchoolSourceId ? "Schule bearbeiten" : "Neue Schule hinzufuegen" }}</h3>
-          <p>Die Verwaltung arbeitet hier direkt auf der Tabelle <code>anm_schulen</code>.</p>
+          <h3 class="anm-managed-title anm-migrated">{{ selectedManagementSchoolSourceId ? "Schule bearbeiten" : "Neue Schule hinzufuegen" }}</h3>
+          <p class="anm-managed-copy anm-migrated">Die Verwaltung arbeitet hier direkt auf der Tabelle <code>anm_schulen</code>.</p>
         </div>
         <div class="school-management-form-actions">
           <button
@@ -99,9 +99,9 @@
         </label>
       </div>
 
-      <label class="user-management-checkbox">
+      <label class="user-management-checkbox anm-check anm-migrated">
         <input v-model="schoolSourceForm.is_active" type="checkbox" :disabled="managementSaving" />
-        <span>is_active</span>
+        <span class="anm-label anm-migrated">is_active</span>
       </label>
 
       <div class="user-management-inline-actions">
@@ -163,13 +163,13 @@
           v-if="localFeedbackError"
           class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
         >
-          <p class="error">{{ localFeedbackError }}</p>
+          <p class="error anm-managed-copy anm-migrated">{{ localFeedbackError }}</p>
         </div>
         <div
           v-else-if="localFeedbackNotice"
           class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
         >
-          <p>{{ localFeedbackNotice }}</p>
+          <p class="anm-managed-copy anm-migrated">{{ localFeedbackNotice }}</p>
         </div>
       </transition>
     </section>
@@ -270,8 +270,8 @@
       <section class="school-management-modal" role="dialog" aria-modal="true" aria-label="Schule auswaehlen">
         <div class="school-management-modal-head">
           <div>
-            <h3>Schule auswaehlen</h3>
-            <p>Filter auf SNR, Schulname und Ort. Auswahl mit Klick auf eine Zeile.</p>
+            <h3 class="anm-managed-title anm-migrated">Schule auswaehlen</h3>
+            <p class="anm-managed-copy anm-migrated">Filter auf SNR, Schulname und Ort. Auswahl mit Klick auf eine Zeile.</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="closeSchoolSelectionModal">
             Schliessen
@@ -317,7 +317,7 @@
               </tr>
             </tbody>
           </table>
-          <p v-else class="school-management-modal-empty">
+          <p v-else class="school-management-modal-empty anm-managed-copy anm-migrated">
             Keine passende Schule gefunden.
           </p>
         </div>
@@ -332,9 +332,9 @@
       <section class="school-management-modal school-management-school-import-preview-modal" role="dialog" aria-modal="true" aria-label="CSV-Vorschau Schulen">
         <div class="school-management-modal-head">
           <div>
-            <h3>CSV-Vorschau (Schulen)</h3>
-            <p>Die Datei <strong>{{ schoolTableImportFileName }}</strong> enthaelt {{ schoolTableImportSummary.total_rows }} gelesene Zeile(n).</p>
-            <p>{{ schoolTableImportSummary.valid_rows }} gueltig, {{ schoolTableImportSummary.invalid_rows }} fehlerhaft, {{ schoolTableImportSummary.selected_rows }} ausgewaehlt.</p>
+            <h3 class="anm-managed-title anm-migrated">CSV-Vorschau (Schulen)</h3>
+            <p class="anm-managed-copy anm-migrated">Die Datei <strong>{{ schoolTableImportFileName }}</strong> enthaelt {{ schoolTableImportSummary.total_rows }} gelesene Zeile(n).</p>
+            <p class="anm-managed-copy anm-migrated">{{ schoolTableImportSummary.valid_rows }} gueltig, {{ schoolTableImportSummary.invalid_rows }} fehlerhaft, {{ schoolTableImportSummary.selected_rows }} ausgewaehlt.</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="closeSchoolTableImportPreview" :disabled="managementSaving">
             Schliessen
@@ -347,13 +347,13 @@
               v-if="localFeedbackError"
               class="school-management-modal-feedback anm-alert anm-status--danger anm-migrated" role="alert"
             >
-              <p class="error">{{ localFeedbackError }}</p>
+              <p class="error anm-managed-copy anm-migrated">{{ localFeedbackError }}</p>
             </div>
             <div
               v-else-if="localFeedbackNotice"
               class="school-management-modal-feedback anm-alert anm-status--success anm-migrated" role="status"
             >
-              <p>{{ localFeedbackNotice }}</p>
+              <p class="anm-managed-copy anm-migrated">{{ localFeedbackNotice }}</p>
             </div>
           </transition>
           <table class="school-management-modal-table">
@@ -446,9 +446,9 @@
       <section class="school-management-modal school-management-import-preview-modal" role="dialog" aria-modal="true" aria-label="CSV-Vorschau">
         <div class="school-management-modal-head">
           <div>
-            <h3>Zugangsdaten für Schulserver importieren.</h3>
-            <p>Es werden nur Zugangsdaten für schon vorhandene Schulen mit SNr. importiert.</p>
-            <p>Die Datei <strong>{{ schoolImportFileName }}</strong> enthaelt {{ schoolImportPreviewData.length }} gueltige Zeile(n).</p>
+            <h3 class="anm-managed-title anm-migrated">Zugangsdaten für Schulserver importieren.</h3>
+            <p class="anm-managed-copy anm-migrated">Es werden nur Zugangsdaten für schon vorhandene Schulen mit SNr. importiert.</p>
+            <p class="anm-managed-copy anm-migrated">Die Datei <strong>{{ schoolImportFileName }}</strong> enthaelt {{ schoolImportPreviewData.length }} gueltige Zeile(n).</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="cancelSchoolImport" :disabled="managementSaving">
             Schliessen
@@ -457,7 +457,7 @@
 
         <div class="school-management-import-preview-options">
           <label
-            class="school-management-import-overwrite-toggle"
+            class="school-management-import-overwrite-toggle anm-check anm-migrated"
             :title="schoolImportOverwriteExisting
               ? 'Ein = Importiere alle Schulen mit Haekchen und ueberschreibe vorhandene'
               : 'Aus = Importiere nur neue Schulen mit Haekchen'"
@@ -468,8 +468,8 @@
               class="school-management-import-overwrite-toggle-input"
               :disabled="managementSaving"
             />
-            <span class="school-management-import-overwrite-toggle-switch" aria-hidden="true"></span>
-            <span class="school-management-import-overwrite-toggle-label">Daten ueberschreiben</span>
+            <span class="school-management-import-overwrite-toggle-switch anm-label anm-migrated" aria-hidden="true"></span>
+            <span class="school-management-import-overwrite-toggle-label anm-label anm-migrated">Daten ueberschreiben</span>
           </label>
         </div>
 
@@ -479,13 +479,13 @@
               v-if="localFeedbackError"
               class="school-management-modal-feedback anm-alert anm-status--danger anm-migrated" role="alert"
             >
-              <p class="error">{{ localFeedbackError }}</p>
+              <p class="error anm-managed-copy anm-migrated">{{ localFeedbackError }}</p>
             </div>
             <div
               v-else-if="localFeedbackNotice"
               class="school-management-modal-feedback anm-alert anm-status--success anm-migrated" role="status"
             >
-              <p>{{ localFeedbackNotice }}</p>
+              <p class="anm-managed-copy anm-migrated">{{ localFeedbackNotice }}</p>
             </div>
           </transition>
           <table class="school-management-modal-table">
@@ -550,6 +550,7 @@
     </div>
 
     <HelpOverlay
+      class="anm-management-help"
       v-if="helpOverlayOpen"
       title="Hilfe zu Schulen"
       subtitle="Kurzer Ueberblick ueber die wichtigsten Funktionen."
@@ -566,8 +567,8 @@
       <section class="school-management-modal school-management-import-info-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Info zum Import">
         <div class="school-management-modal-head">
           <div>
-            <h3>Info zum Import</h3>
-            <p>So muss die CSV-Datei fuer den Import in <code>anm_schulen</code> aufgebaut sein.</p>
+            <h3 class="anm-managed-title anm-migrated">Info zum Import</h3>
+            <p class="anm-managed-copy anm-migrated">So muss die CSV-Datei fuer den Import in <code>anm_schulen</code> aufgebaut sein.</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="closeImportInfoOverlay">
             Schliessen
@@ -576,29 +577,29 @@
 
         <div class="school-management-import-info-grid">
           <section class="school-management-import-info-card">
-            <h4>CSV-Aufbau</h4>
+            <h4 class="anm-managed-title anm-migrated">CSV-Aufbau</h4>
             <div class="school-management-import-info-callout">
               <strong>Pflichtspalten</strong>
               <span>Die Kopfzeile muss genau diese Spalten enthalten:</span>
             </div>
             <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf;db_host;db_name;db_user;db_password_enc;is_active</pre>
-            <div class="school-management-import-info-list">              
-              <p><strong>sf:</strong> Gibt die Schulform an, zum Beispiel <code>GS</code>, <code>GE</code> oder <code>GY</code>.</p>              
-              <p><strong>Pruefung:</strong> Jede Zeile wird vor dem Import als <code>Neu</code>, <code>Aenderung</code>, <code>Unveraendert</code> oder <code>Fehler</code> bewertet.</p>
+            <div class="school-management-import-info-list">
+              <p class="anm-managed-copy anm-migrated"><strong>sf:</strong> Gibt die Schulform an, zum Beispiel <code>GS</code>, <code>GE</code> oder <code>GY</code>.</p>
+              <p class="anm-managed-copy anm-migrated"><strong>Pruefung:</strong> Jede Zeile wird vor dem Import als <code>Neu</code>, <code>Aenderung</code>, <code>Unveraendert</code> oder <code>Fehler</code> bewertet.</p>
             </div>
           </section>
 
           <section class="school-management-import-info-card">
-            <h4>Beispiel</h4>
+            <h4 class="anm-managed-title anm-migrated">Beispiel</h4>
             <pre class="school-management-import-info-code">snr;name;plz;ort;strasse;sf;db_host;db_name;db_user;db_password_enc;is_active
 123456;Goethe-Gymnasium;50667;Koeln;Domkloster 4;GY;https://svws.example.de;svwsdb;svws_user;***;1</pre>
-            
+
           </section>
 
         </div>
 
         <div class="school-management-import-info-note">
-          <p>Als Trennzeichen werden `;` und `,` akzeptiert. Gross- und Kleinschreibung der Ueberschriften wird ignoriert. Leere oder ungueltige `sf`-Werte fuehren in der Vorschau zu einem Fehler.</p>
+          <p class="anm-managed-copy anm-migrated">Als Trennzeichen werden `;` und `,` akzeptiert. Gross- und Kleinschreibung der Ueberschriften wird ignoriert. Leere oder ungueltige `sf`-Werte fuehren in der Vorschau zu einem Fehler.</p>
         </div>
       </section>
     </div>
@@ -611,8 +612,8 @@
       <section class="school-management-modal school-management-import-info-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
         <div class="school-management-modal-head">
           <div>
-            <h3>Info zur Geocodes-Berechnung</h3>
-            <p>So werden fehlende Koordinaten fuer Schulen ermittelt.</p>
+            <h3 class="anm-managed-title anm-migrated">Info zur Geocodes-Berechnung</h3>
+            <p class="anm-managed-copy anm-migrated">So werden fehlende Koordinaten fuer Schulen ermittelt.</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="closeGeocodeInfoOverlay">
             Schliessen
@@ -621,20 +622,20 @@
 
         <div class="school-management-import-info-grid">
           <section class="school-management-import-info-card">
-            <h4>Berechnung</h4>
+            <h4 class="anm-managed-title anm-migrated">Berechnung</h4>
             <div class="school-management-import-info-list">
-              <p>Verwendet werden die Felder <code>strasse</code>, <code>plz</code> und <code>ort</code> aus <code>anm_schulen</code>.</p>
-              <p>Aus diesen Adressdaten wird eine Suchanfrage gebaut und an den Geocoding-Dienst von OpenRouteService gesendet.</p>
-              <p>Wenn ein Treffer gefunden wird, werden die Werte als <code>latitude</code> und <code>longitude</code> gespeichert.</p>
-              <p>Wenn Adresse oder Treffer fehlen, bleiben die Koordinaten leer.</p>
+              <p class="anm-managed-copy anm-migrated">Verwendet werden die Felder <code>strasse</code>, <code>plz</code> und <code>ort</code> aus <code>anm_schulen</code>.</p>
+              <p class="anm-managed-copy anm-migrated">Aus diesen Adressdaten wird eine Suchanfrage gebaut und an den Geocoding-Dienst von OpenRouteService gesendet.</p>
+              <p class="anm-managed-copy anm-migrated">Wenn ein Treffer gefunden wird, werden die Werte als <code>latitude</code> und <code>longitude</code> gespeichert.</p>
+              <p class="anm-managed-copy anm-migrated">Wenn Adresse oder Treffer fehlen, bleiben die Koordinaten leer.</p>
             </div>
           </section>
 
           <section class="school-management-import-info-card">
-            <h4>Dienst</h4>
+            <h4 class="anm-managed-title anm-migrated">Dienst</h4>
             <div class="school-management-import-info-list">
-              <p>Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
-              <p>
+              <p class="anm-managed-copy anm-migrated">Die Anwendung nutzt das Geocoding von OpenRouteService.</p>
+              <p class="anm-managed-copy anm-migrated">
                 Dokumentation:
                 <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
                   OpenRouteService Geocoding
@@ -655,8 +656,8 @@
         <div class="school-management-danger-hero">
           <div class="school-management-danger-badge" aria-hidden="true">!</div>
           <div>
-            <h3>Alle Schulen wirklich loeschen?</h3>
-            <p>Diese Aktion entfernt den kompletten Schulbestand aus der Verwaltung.</p>
+            <h3 class="anm-managed-title anm-migrated">Alle Schulen wirklich loeschen?</h3>
+            <p class="anm-managed-copy anm-migrated">Diese Aktion entfernt den kompletten Schulbestand aus der Verwaltung.</p>
           </div>
         </div>
 
@@ -666,7 +667,7 @@
         </div>
 
         <div class="school-management-danger-list">
-          <p>Folgen dieser Aktion:</p>
+          <p class="anm-managed-copy anm-migrated">Folgen dieser Aktion:</p>
           <ul>
             <li>Alle Eintraege aus `anm_schulen` werden geloescht.</li>
             <li>Die Tabellen `school` und `school_source_db` bleiben unberuehrt.</li>
@@ -675,7 +676,7 @@
         </div>
 
         <div class="school-management-modal-actions">
-          <button class="anm-button anm-button--danger anm-migrated" type="button" @click="closeDeleteAllSchoolsConfirm" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="closeDeleteAllSchoolsConfirm" :disabled="managementSaving">
             Abbrechen
           </button>
           <button class="school-management-danger-button anm-button anm-button--danger anm-migrated" type="button" @click="confirmDeleteAllManagementSchools" :disabled="managementSaving">
@@ -693,8 +694,8 @@
       <section class="school-management-modal school-management-import-result-modal anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" :aria-label="importResultDialogTitle">
         <div class="school-management-modal-head">
           <div>
-            <h3>{{ importResultDialogTitle }}</h3>
-            <p>Ergebnis des CSV-Imports fuer den Bereich Schulen.</p>
+            <h3 class="anm-managed-title anm-migrated">{{ importResultDialogTitle }}</h3>
+            <p class="anm-managed-copy anm-migrated">Ergebnis des CSV-Imports fuer den Bereich Schulen.</p>
           </div>
           <button class="anm-button anm-migrated" type="button" @click="closeImportResultDialog">
             Schliessen
@@ -711,11 +712,11 @@
       aria-live="polite"
       aria-modal="true"
     >
-      <section class="school-management-loading-dialog" aria-label="Verbindungstest laeuft">
+      <section class="school-management-loading-dialog anm-managed-dialog anm-migrated" aria-label="Verbindungstest laeuft">
         <span class="school-management-loading-spinner" aria-hidden="true"></span>
         <strong>Bitte warten...</strong>
-        <p>{{ currentActionLabel || "Vorgang laeuft..." }}</p>
-        <p v-if="currentActionInfo" class="school-management-loading-info">{{ currentActionInfo }}</p>
+        <p class="anm-managed-copy anm-migrated">{{ currentActionLabel || "Vorgang laeuft..." }}</p>
+        <p v-if="currentActionInfo" class="school-management-loading-info anm-managed-copy anm-migrated">{{ currentActionInfo }}</p>
         <a
           v-if="currentActionLink"
           class="school-management-loading-link"

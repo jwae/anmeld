@@ -23,19 +23,20 @@
 }
 
 .catalog-sidebar button {
-  width: 100%;
-  min-height: 38px;
   text-align: left;
 }
 
-.btn-secondary,
-.btn-primary {
+.catalog-sidebar button:where(:not(.anm-migrated)) {
+  width: 100%;
+  min-height: 38px;
+}
+
+.btn-secondary {
   padding: 10px 12px;
   cursor: pointer;
 }
 
-.btn-secondary:where(:not(.anm-migrated)),
-.btn-primary:where(:not(.anm-migrated)) {
+.btn-secondary:where(:not(.anm-migrated)) {
   border-radius: 10px;
   font-size: 14px;
   border: 1px solid #111;
@@ -51,22 +52,6 @@
 .btn-secondary:hover:not(:disabled):where(:not(.anm-migrated)) {
   background: #f4f8fc;
   border-color: #aebed2;
-}
-
-.btn-primary:where(:not(.anm-migrated)) {
-  background: #1d6ef5;
-  border-color: #1d6ef5;
-  color: #fff;
-}
-
-.btn-primary:hover:not(:disabled):where(:not(.anm-migrated)) {
-  background: #1454c8;
-  border-color: #1454c8;
-}
-
-.btn-primary:disabled:where(:not(.anm-migrated)) {
-  background: #9fbef5;
-  border-color: #9fbef5;
 }
 
 button:disabled {
@@ -189,8 +174,8 @@ button:disabled:where(:not(.anm-migrated)) {
   opacity: 0.66;
 }
 
-.catalog-table input:not([type="checkbox"]),
-.catalog-table select {
+.catalog-table input:not([type="checkbox"]):where(:not(.anm-migrated)),
+.catalog-table select:where(:not(.anm-migrated)) {
   width: max(110px, 100%);
   min-height: 30px;
   padding: 5px 7px;
@@ -217,7 +202,7 @@ button:disabled:where(:not(.anm-migrated)) {
   justify-content: center;
 }
 
-.catalog-checkbox input {
+.catalog-checkbox input:where(:not(.anm-migrated)) {
   width: 16px;
   height: 16px;
 }
@@ -274,31 +259,6 @@ button:disabled:where(:not(.anm-migrated)) {
 
 .catalog-sidebar-empty:where(:not(.anm-migrated)) {
   font-size: 13px;
-}
-
-.feedback-panel {
-  margin: 0 12px 12px;
-  padding: 12px 14px;
-}
-
-.feedback-panel:where(:not(.anm-migrated)) {
-  border-radius: 14px;
-}
-
-.feedback-panel p {
-  margin: 0;
-}
-
-.feedback-panel-success:where(:not(.anm-migrated)) {
-  border: 1px solid #bfe5c9;
-  background: #eefaf2;
-  color: #1f5f37;
-}
-
-.feedback-panel-error:where(:not(.anm-migrated)) {
-  border: 1px solid #f0c2c8;
-  background: #fff4f6;
-  color: #8c2935;
 }
 
 .catalog-system-notice:where(:not(.anm-migrated)) {
@@ -391,8 +351,8 @@ button:disabled:where(:not(.anm-migrated)) {
     grid-template-columns: 1fr;
   }
 
-  .catalog-toolbar-actions > button,
-  .catalog-modal-actions > button {
+  .catalog-toolbar-actions > button:where(:not(.anm-migrated)),
+  .catalog-modal-actions > button:where(:not(.anm-migrated)) {
     width: 100%;
   }
 }

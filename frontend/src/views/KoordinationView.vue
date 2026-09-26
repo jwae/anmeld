@@ -306,57 +306,57 @@ watch(
 <template>
   <section class="koordination-view">
     <div v-if="loading && verfahrenId && rundeId" class="loading-overlay" role="status" aria-live="polite">
-      <div class="loading-overlay-card">
-        <p class="loading-overlay-title">Koordination wird geladen</p>
-        <p>Schulen und Schuelerdaten werden geladen.</p>
+      <div class="loading-overlay-card anm-procedure-surface">
+        <p class="loading-overlay-title anm-procedure-copy anm-procedure-ui">Koordination wird geladen</p>
+        <p class="anm-procedure-copy anm-procedure-ui">Schulen und Schuelerdaten werden geladen.</p>
       </div>
     </div>
 
     <div class="koordination-toolbar">
       <div>
-        <p class="koordination-eyebrow">Koordination</p>
-        <h2>Manuelle Verteilung auf freie Schulplaetze</h2>
-        <p class="koordination-intro">
+        <p class="koordination-eyebrow anm-procedure-copy anm-procedure-ui">Koordination</p>
+        <h2 class="anm-procedure-title anm-procedure-ui">Manuelle Verteilung auf freie Schulplaetze</h2>
+        <p class="koordination-intro anm-procedure-copy anm-procedure-ui">
           Waehle eine Schule aus. Die Schueler werden nach Entfernung zur ausgewaehlten Schule sortiert angezeigt.
         </p>
       </div>
       <div class="toolbar-actions">
-        <button class="btn-secondary" type="button" @click="openGeocodeInfoOverlay">
+        <button class="anm-button anm-procedure-ui" type="button" @click="openGeocodeInfoOverlay">
           ? Info Geocodes
         </button>
-        <button class="btn-secondary" type="button" @click="refreshData" :disabled="loading || autoGeocoding">
+        <button class="anm-button anm-procedure-ui" type="button" @click="refreshData" :disabled="loading || autoGeocoding">
           {{ loading ? "Aktualisiere..." : autoGeocoding ? "Geocodiere..." : "Aktualisieren" }}
         </button>
       </div>
     </div>
 
-    <div v-if="autoGeocodingMessage" class="feedback-panel feedback-panel-warning">
-      <p class="feedback-title">Geocodes im Hintergrund</p>
-      <p>{{ autoGeocodingMessage }}</p>
+    <div v-if="autoGeocodingMessage" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Geocodes im Hintergrund</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ autoGeocodingMessage }}</p>
     </div>
 
-    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning">
-      <p class="feedback-title">Kontext unvollstaendig</p>
-      <p>Waehle zuerst ein Verfahren und eine Runde, damit die Koordination geladen werden kann.</p>
+    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kontext unvollstaendig</p>
+      <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit die Koordination geladen werden kann.</p>
     </div>
 
-    <div v-else-if="errorMessage" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
+    <div v-else-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
     </div>
 
     <template v-else>
-      <div v-if="successMessage" class="feedback-panel feedback-panel-success">
-        <p class="feedback-title">Gespeichert</p>
-        <p>{{ successMessage }}</p>
+      <div v-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Gespeichert</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
 
       <section class="koordination-board">
         <article class="panel-card school-panel">
           <div class="section-head">
             <div>
-              <p class="section-eyebrow">1</p>
-              <h4>Schulen aus dem Verfahren mit freien Kapazitaeten</h4>
+              <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">1</p>
+              <h4 class="anm-procedure-title anm-procedure-ui">Schulen aus dem Verfahren mit freien Kapazitaeten</h4>
             </div>
             <span class="section-meta">{{ schools.length }} Schulen</span>
           </div>
@@ -404,8 +404,8 @@ watch(
         <article class="panel-card student-panel">
           <div class="section-head">
             <div>
-              <p class="section-eyebrow">2</p>
-              <h4>Schueler ohne Anmeldung oder Aufnahme</h4>
+              <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">2</p>
+              <h4 class="anm-procedure-title anm-procedure-ui">Schueler ohne Anmeldung oder Aufnahme</h4>
             </div>
             <span class="section-meta">
               {{ students.length }} Eintraege
@@ -430,7 +430,7 @@ watch(
               }}
             </div>
             <button
-              class="btn-primary"
+              class="anm-button anm-button--primary anm-procedure-ui"
               type="button"
               :disabled="isReadonly || assigning || !isActiveRound || !selectedSchool || !selectedStudentCount"
               @click="handleAssign"
@@ -513,30 +513,30 @@ watch(
       class="koordination-modal-overlay"
       @click.self="closeGeocodeInfoOverlay"
     >
-      <section class="koordination-modal" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
+      <section class="koordination-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
         <div class="section-head">
           <div>
-            <p class="section-eyebrow">Info</p>
-            <h4>Info zur Geocodes-Berechnung</h4>
+            <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Info</p>
+            <h4 class="anm-procedure-title anm-procedure-ui">Info zur Geocodes-Berechnung</h4>
           </div>
-          <button class="btn-secondary" type="button" @click="closeGeocodeInfoOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" @click="closeGeocodeInfoOverlay">
             Schliessen
           </button>
         </div>
         <div class="koordination-info-grid">
           <section class="koordination-info-card">
-            <h5>Berechnung</h5>
-            <p>Fehlende Adressen werden ueber <code>strasse</code>, <code>plz</code> und <code>ort</code> geocodiert.</p>
-            <p>Aus dem Treffer werden <code>Latitude</code> und <code>Longitude</code> fuer die Distanzberechnung zur gewaehlten Schule gespeichert.</p>
-            <p>Wenn moeglich, berechnet die Anwendung anschliessend zuerst den Fussweg ueber OpenRouteService. Falls dafuer keine Route geliefert werden kann, wird auf die Strassenroute umgestellt; nur danach wird auf Luftlinie zurueckgefallen.</p>
-            <p>Wenn eine Adresse unvollstaendig ist oder kein Treffer gefunden wird, bleibt die Entfernung fuer diesen Datensatz leer.</p>
+            <h5 class="anm-procedure-title anm-procedure-ui">Berechnung</h5>
+            <p class="anm-procedure-copy anm-procedure-ui">Fehlende Adressen werden ueber <code>strasse</code>, <code>plz</code> und <code>ort</code> geocodiert.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Aus dem Treffer werden <code>Latitude</code> und <code>Longitude</code> fuer die Distanzberechnung zur gewaehlten Schule gespeichert.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Wenn moeglich, berechnet die Anwendung anschliessend zuerst den Fussweg ueber OpenRouteService. Falls dafuer keine Route geliefert werden kann, wird auf die Strassenroute umgestellt; nur danach wird auf Luftlinie zurueckgefallen.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Wenn eine Adresse unvollstaendig ist oder kein Treffer gefunden wird, bleibt die Entfernung fuer diesen Datensatz leer.</p>
           </section>
           <section class="koordination-info-card">
-            <h5>Dienst</h5>
-            <p>Die Anwendung nutzt das Geocoding und Routing von OpenRouteService.</p>
-            <p>Openrouteservice (ORS) ist ein frei zugaenglicher, webbasierter Kartendienst, der komplexe Geodaten und Routenberechnungen anbietet. Er basiert auf den frei zugaenglichen Geodaten von OpenStreetMap (OSM) und wird vom HeiGIT (Heidelberg Institute for Geoinformation Technology) entwickelt.</p>
-            <p>Fuer die Nutzung ist ein kostenloser API-Key erforderlich. Die kostenfreie Nutzung ist auf ein taegliches Limit von 2.500 Routing-Anfragen pro Tag beschraenkt. Der API-Key wird im Backend der Anwendung eingetragen. In der Koordination werden zuerst <code>foot-walking</code> und danach bei Bedarf <code>driving-car</code> verwendet.</p>
-            <p>
+            <h5 class="anm-procedure-title anm-procedure-ui">Dienst</h5>
+            <p class="anm-procedure-copy anm-procedure-ui">Die Anwendung nutzt das Geocoding und Routing von OpenRouteService.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Openrouteservice (ORS) ist ein frei zugaenglicher, webbasierter Kartendienst, der komplexe Geodaten und Routenberechnungen anbietet. Er basiert auf den frei zugaenglichen Geodaten von OpenStreetMap (OSM) und wird vom HeiGIT (Heidelberg Institute for Geoinformation Technology) entwickelt.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Fuer die Nutzung ist ein kostenloser API-Key erforderlich. Die kostenfreie Nutzung ist auf ein taegliches Limit von 2.500 Routing-Anfragen pro Tag beschraenkt. Der API-Key wird im Backend der Anwendung eingetragen. In der Koordination werden zuerst <code>foot-walking</code> und danach bei Bedarf <code>driving-car</code> verwendet.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">
               <a href="https://openrouteservice.org/dev/#/api-docs/geocode/search/get" target="_blank" rel="noopener noreferrer">
                 OpenRouteService Geocoding
               </a>
@@ -581,6 +581,9 @@ watch(
 
 .loading-overlay-title {
   margin: 0 0 6px;
+}
+
+.loading-overlay-title:where(:not(.anm-procedure-ui)) {
   font-size: 14px;
   font-weight: 800;
   color: #17385f;
@@ -588,6 +591,9 @@ watch(
 
 .loading-overlay-card p:last-child {
   margin: 0;
+}
+
+.loading-overlay-card p:last-child:where(:not(.anm-procedure-ui)) {
   line-height: 1.45;
   color: #4a607e;
 }
@@ -625,9 +631,13 @@ watch(
 .koordination-eyebrow,
 .section-eyebrow {
   margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.koordination-eyebrow:where(:not(.anm-procedure-ui)),
+.section-eyebrow:where(:not(.anm-procedure-ui)) {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #6680a3;
 }
@@ -635,13 +645,20 @@ watch(
 .koordination-toolbar h2,
 .section-head h3 {
   margin: 0;
+}
+
+.koordination-toolbar h2:where(:not(.anm-procedure-ui)),
+.section-head h3 {
   color: #17385f;
 }
 
 .koordination-intro {
   margin: 8px 0 0;
-  color: #4a607e;
   max-width: 72ch;
+}
+
+.koordination-intro:where(:not(.anm-procedure-ui)) {
+  color: #4a607e;
   line-height: 1.55;
 }
 
@@ -771,20 +788,20 @@ watch(
   line-height: 1.4;
 }
 
-.btn-secondary,
-.btn-primary {
+.btn-secondary:where(:not(.anm-procedure-ui)),
+.btn-primary:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
   border: 0;
 }
 
-.btn-secondary {
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   background: #eef4fd;
   color: #17385f;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-procedure-ui)) {
   background: #1f5fbf;
   color: #fff;
   box-shadow: 0 10px 24px rgba(31, 95, 191, 0.2);
@@ -794,6 +811,10 @@ watch(
 .btn-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-primary:disabled:where(:not(.anm-procedure-ui)),
+.btn-secondary:disabled:where(:not(.anm-procedure-ui)) {
   box-shadow: none;
 }
 
@@ -869,30 +890,30 @@ watch(
   color: #7c3aed;
 }
 
-.feedback-panel {
+.feedback-panel:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 14px;
   font-size: 14px;
 }
 
-.feedback-panel-warning {
+.feedback-panel-warning:where(:not(.anm-procedure-ui)) {
   border: 1px solid #d9d9c8;
   background: #fffdf3;
 }
 
-.feedback-panel-error {
+.feedback-panel-error:where(:not(.anm-procedure-ui)) {
   border: 1px solid #fca5a5;
   background: #fff5f5;
   color: #991b1b;
 }
 
-.feedback-panel-success {
+.feedback-panel-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #a7f3d0;
   background: #f0fdf4;
   color: #065f46;
 }
 
-.feedback-title,
+.feedback-title:where(:not(.anm-procedure-ui)),
 .table-empty {
   font-weight: 700;
 }
@@ -933,12 +954,18 @@ watch(
 
 .koordination-info-card h5 {
   margin: 0 0 8px;
+}
+
+.koordination-info-card h5:where(:not(.anm-procedure-ui)) {
   color: #17385f;
   font-size: 15px;
 }
 
 .koordination-info-card p {
   margin: 0 0 8px;
+}
+
+.koordination-info-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.5;
 }

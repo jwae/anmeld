@@ -112,40 +112,40 @@ function save() {
 
 <template>
   <div class="modal-overlay" @click.self="$emit('cancel')">
-    <div class="modal-content">
+    <div class="modal-content anm-procedure-surface">
       <div class="modal-header">
         <div class="modal-header-copy">
-          <p class="modal-eyebrow">Kapazitätsformular</p>
-          <h2>{{ isEditMode ? 'Kapazität bearbeiten' : 'Neue Kapazität anlegen' }}</h2>
-          <p class="modal-subtitle">
+          <p class="modal-eyebrow anm-procedure-copy anm-procedure-ui">Kapazitätsformular</p>
+          <h2 class="anm-procedure-title anm-procedure-ui">{{ isEditMode ? 'Kapazität bearbeiten' : 'Neue Kapazität anlegen' }}</h2>
+          <p class="modal-subtitle anm-procedure-copy anm-procedure-ui">
             Pflege hier Jahrgang, Kapazität und reservierte Plätze für die ausgewählte Schule.
           </p>
         </div>
-        <button type="button" class="btn-secondary modal-close-button" @click="$emit('cancel')">
+        <button type="button" class="modal-close-button anm-button anm-procedure-ui" @click="$emit('cancel')">
           Schliessen
         </button>
       </div>
 
       <div
         v-if="errorMessage || errors.length"
-        class="feedback-panel feedback-panel-error kapazitaet-form-error"
+        class="feedback-panel feedback-panel-error kapazitaet-form-error anm-alert anm-status--danger anm-procedure-ui"
         role="alert"
         aria-live="assertive"
       >
         <div class="kapazitaet-form-error-heading">
           <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
-          <p class="feedback-title">Eingaben konnten nicht gespeichert werden</p>
+          <p class="feedback-title anm-procedure-copy anm-procedure-ui">Eingaben konnten nicht gespeichert werden</p>
         </div>
-        <p v-if="errorMessage" class="kapazitaet-form-error-message">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="kapazitaet-form-error-message anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
         <ul v-if="errors.length" class="validation-list">
           <li v-for="error in errors" :key="error">{{ error }}</li>
         </ul>
       </div>
 
       <form class="kapazitaet-form-grid" @submit.prevent="save">
-        <label class="field-block">
-          <span class="field-label">Schule *</span>
-          <select v-model="formData.snr" :disabled="isEditMode" required>
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Schule *</span>
+          <select class="anm-input anm-procedure-ui" v-model="formData.snr" :disabled="isEditMode" required>
             <option value="" disabled>Bitte wählen</option>
             <option v-for="school in schulen" :key="school.snr" :value="school.snr">
               {{ school.name }}
@@ -153,29 +153,29 @@ function save() {
           </select>
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Jahrgang *</span>
-          <input v-model="formData.jahrgang" :disabled="isEditMode" type="text" placeholder="z. B. 5" required />
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Jahrgang *</span>
+          <input class="anm-input anm-procedure-ui" v-model="formData.jahrgang" :disabled="isEditMode" type="text" placeholder="z. B. 5" required />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Maximale Klassen</span>
-          <input v-model.number="formData.maximale_klassen" type="number" min="0" />
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Maximale Klassen</span>
+          <input class="anm-input anm-procedure-ui" v-model.number="formData.maximale_klassen" type="number" min="0" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Schüler pro Klasse</span>
-          <input v-model.number="formData.maximale_schueler_pro_klasse" type="number" min="0" />
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Schüler pro Klasse</span>
+          <input class="anm-input anm-procedure-ui" v-model.number="formData.maximale_schueler_pro_klasse" type="number" min="0" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Reservierte Plätze</span>
-          <input v-model.number="formData.reservierte_plaetze" type="number" min="0" />
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Reservierte Plätze</span>
+          <input class="anm-input anm-procedure-ui" v-model.number="formData.reservierte_plaetze" type="number" min="0" />
         </label>
 
-        <label class="field-block">
-          <span class="field-label">Gesamtkapazität</span>
-          <input
+        <label class="field-block anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Gesamtkapazität</span>
+          <input class="anm-input anm-procedure-ui"
             :value="gesamtkapazitaet"
             type="text"
             readonly
@@ -186,15 +186,15 @@ function save() {
 
 
 
-        <label class="field-block kapazitaet-form-full-width">
-          <span class="field-label">Bemerkung</span>
-          <textarea v-model="formData.bemerkung" rows="4" placeholder="Hinweise, Sonderfälle, interne Notizen"></textarea>
+        <label class="field-block kapazitaet-form-full-width anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Bemerkung</span>
+          <textarea class="anm-input anm-procedure-ui" v-model="formData.bemerkung" rows="4" placeholder="Hinweise, Sonderfälle, interne Notizen"></textarea>
         </label>
       </form>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" @click="$emit('cancel')">Abbrechen</button>
-        <button type="submit" class="btn-primary" @click="save">Speichern</button>
+        <button type="button" class="anm-button anm-procedure-ui" @click="$emit('cancel')">Abbrechen</button>
+        <button type="submit" class="anm-button anm-button--primary anm-procedure-ui" @click="save">Speichern</button>
       </div>
     </div>
   </div>
@@ -251,15 +251,21 @@ function save() {
 
 .modal-eyebrow {
   margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.modal-eyebrow:where(:not(.anm-procedure-ui)) {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #6680a3;
 }
 
 .modal-header h2 {
   margin: 0;
+}
+
+.modal-header h2:where(:not(.anm-procedure-ui)) {
   color: #17385f;
   font-size: clamp(24px, 3vw, 30px);
   line-height: 1.15;
@@ -267,9 +273,12 @@ function save() {
 
 .modal-subtitle {
   margin: 0;
+  max-width: 56ch;
+}
+
+.modal-subtitle:where(:not(.anm-procedure-ui)) {
   color: #597190;
   line-height: 1.5;
-  max-width: 56ch;
 }
 
 .kapazitaet-form-grid {
@@ -287,7 +296,7 @@ function save() {
   gap: 8px;
 }
 
-.field-label {
+.field-label:where(:not(.anm-procedure-ui)) {
   font-size: 13px;
   font-weight: 700;
   color: #26476f;
@@ -297,6 +306,11 @@ select,
 input,
 textarea {
   width: 100%;
+}
+
+select:where(:not(.anm-procedure-ui)),
+input:where(:not(.anm-procedure-ui)),
+textarea:where(:not(.anm-procedure-ui)) {
   border: 1px solid #cddaea;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.96);
@@ -307,32 +321,48 @@ textarea {
 }
 
 textarea {
-  min-height: 118px;
   resize: vertical;
+}
+
+textarea:where(:not(.anm-procedure-ui)) {
+  min-height: 118px;
 }
 
 select:focus,
 input:focus,
 textarea:focus {
   outline: none;
+}
+
+select:focus:where(:not(.anm-procedure-ui)),
+input:focus:where(:not(.anm-procedure-ui)),
+textarea:focus:where(:not(.anm-procedure-ui)) {
   border-color: #5a97e5;
   box-shadow: 0 0 0 4px rgba(90, 151, 229, 0.18);
   background: #ffffff;
 }
 
 input[readonly] {
+  cursor: default;
+}
+
+input[readonly]:where(:not(.anm-procedure-ui)) {
   background: #f2f6fb;
   color: #6c7f98;
   border-color: #dce5ef;
-  cursor: default;
 }
 
 select:disabled,
 input:disabled,
 textarea:disabled {
+  cursor: not-allowed;
+}
+
+select:disabled:where(:not(.anm-procedure-ui)),
+input:disabled:where(:not(.anm-procedure-ui)),
+textarea:disabled:where(:not(.anm-procedure-ui)) {
   background: #f2f6fb;
   color: #6c7f98;
-  cursor: not-allowed;
 }
 
 .validation-list {
@@ -342,6 +372,9 @@ textarea:disabled {
 
 .kapazitaet-form-error {
   margin-bottom: 20px;
+}
+
+.kapazitaet-form-error:where(:not(.anm-procedure-ui)) {
   padding: 16px 18px;
   border: 2px solid #dc2626;
   border-left-width: 6px;
@@ -368,7 +401,7 @@ textarea:disabled {
   margin: 0;
 }
 
-.kapazitaet-form-error-heading .feedback-title {
+.kapazitaet-form-error-heading .feedback-title:where(:not(.anm-procedure-ui)) {
   color: #991b1b;
   font-size: 16px;
   font-weight: 800;
@@ -377,6 +410,10 @@ textarea:disabled {
 .kapazitaet-form-error-message,
 .kapazitaet-form-error .validation-list {
   margin-top: 10px;
+}
+
+.kapazitaet-form-error-message:where(:not(.anm-procedure-ui)),
+.kapazitaet-form-error .validation-list {
   font-weight: 650;
   line-height: 1.45;
 }
@@ -390,7 +427,7 @@ textarea:disabled {
   border-top: 1px solid #e4edf7;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-procedure-ui)) {
   border: 0;
   border-radius: 999px;
   padding: 11px 18px;
@@ -401,7 +438,7 @@ textarea:disabled {
   transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
 
-.btn-secondary {
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   border: 1px solid #cbd8e7;
   border-radius: 999px;
   padding: 11px 18px;
@@ -411,17 +448,20 @@ textarea:disabled {
   transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 }
 
-.btn-primary:hover,
-.btn-secondary:hover {
+.btn-primary:hover:where(:not(.anm-procedure-ui)),
+.btn-secondary:hover:where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
 }
 
 .btn-primary:hover {
   filter: brightness(1.03);
+}
+
+.btn-primary:hover:where(:not(.anm-procedure-ui)) {
   box-shadow: 0 14px 32px rgba(20, 89, 168, 0.24);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:where(:not(.anm-procedure-ui)) {
   border-color: #b4c7de;
   background: #ffffff;
 }

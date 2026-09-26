@@ -40,11 +40,11 @@ function formatTimestamp(value: string) {
 </script>
 
 <template>
-  <section class="anm-card">
+  <section class="anm-card anm-procedure-surface">
     <div class="anm-card-head">
       <div>
-        <h3>Anmeldeverfahren</h3>
-        <p>Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
+        <h3 class="anm-procedure-title anm-procedure-ui">Anmeldeverfahren</h3>
+        <p class="anm-procedure-copy anm-procedure-ui">Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
       </div>
       <div class="anm-card-head-actions">
         <label class="anm-toggle-row">
@@ -56,13 +56,13 @@ function formatTimestamp(value: string) {
           <span>{{ showHidden ? "Ausgeblendete Verfahren ausblenden" : "Ausgeblendete Verfahren anzeigen" }}</span>
         </label>
         <template v-if="!isReadonly">
-          <button class="btn-secondary anm-head-btn anm-head-btn-primary" type="button" :disabled="canCreate === false" @click="emit('create')">
+          <button class="anm-head-btn anm-head-btn-primary anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="canCreate === false" @click="emit('create')">
             Neues Verfahren
           </button>
-          <button class="btn-secondary anm-head-btn anm-head-btn-success" type="button" :disabled="canStart === false" @click="emit('start')">
+          <button class="anm-head-btn anm-head-btn-success anm-button anm-procedure-ui" type="button" :disabled="canStart === false" @click="emit('start')">
             Verfahren starten
           </button>
-          <button class="btn-secondary anm-head-btn anm-head-btn-danger" type="button" :disabled="canFinish === false" @click="emit('finish')">
+          <button class="anm-head-btn anm-head-btn-danger anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="canFinish === false" @click="emit('finish')">
             Verfahren beenden
           </button>
         </template>
@@ -70,7 +70,7 @@ function formatTimestamp(value: string) {
       </div>
     </div>
 
-    <div v-if="loading" class="anm-loading-state">Verfahren werden geladen...</div>
+    <div v-if="loading" class="anm-loading-state anm-alert anm-procedure-ui">Verfahren werden geladen...</div>
 
     <div v-else class="anm-table-wrap">
       <table class="anm-table">
@@ -167,6 +167,9 @@ function formatTimestamp(value: string) {
 
 .anm-card-head h3 {
   margin: 0;
+}
+
+.anm-card-head h3:where(:not(.anm-procedure-ui)) {
   color: #19385e;
   font-size: 1.12rem;
   line-height: 1.25;
@@ -174,6 +177,9 @@ function formatTimestamp(value: string) {
 
 .anm-card-head p {
   margin: 4px 0 0;
+}
+
+.anm-card-head p:where(:not(.anm-procedure-ui)) {
   color: #607794;
   font-size: 12px;
 }
@@ -199,7 +205,7 @@ function formatTimestamp(value: string) {
   font-size: 12px;
 }
 
-.anm-head-btn {
+.anm-head-btn:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid transparent;
@@ -218,40 +224,43 @@ function formatTimestamp(value: string) {
     color 0.18s ease;
 }
 
-.anm-head-btn:hover:not(:disabled) {
+.anm-head-btn:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
 }
 
 .anm-head-btn:disabled {
-  background: #f3f6fa;
-  color: #8ba0b8;
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-.anm-head-btn-primary {
+.anm-head-btn:disabled:where(:not(.anm-procedure-ui)) {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+}
+
+.anm-head-btn-primary:where(:not(.anm-procedure-ui)) {
   border-color: #c8dbef;
   background: #ffffff;
 }
 
-.anm-head-btn-success {
+.anm-head-btn-success:where(:not(.anm-procedure-ui)) {
   border-color: #cde7d4;
   background: #f4fbf6;
   color: #2d6a39;
 }
 
-.anm-head-btn-danger {
+.anm-head-btn-danger:where(:not(.anm-procedure-ui)) {
   border-color: #f0d0d0;
   background: #fff7f7;
   color: #9a3a3a;
 }
 
-.anm-head-btn-danger:hover:not(:disabled) {
+.anm-head-btn-danger:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   background: #faeeee;
 }
 
-.anm-loading-state,
+.anm-loading-state:where(:not(.anm-procedure-ui)),
 .anm-empty-cell {
   padding: 14px;
   border: 1px dashed #cfdbeb;

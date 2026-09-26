@@ -65,7 +65,7 @@ function formatCellValue(field: { key: string; label: string }, value: string | 
 <template>
   <section class="wizard-step">
     <div class="validation-toolbar">
-      <button class="validation-toggle-button" type="button" :disabled="busy" @click="$emit('toggle-all')">
+      <button class="validation-toggle-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('toggle-all')">
         Auswahl umschalten
       </button>
     </div>
@@ -129,6 +129,10 @@ function formatCellValue(field: { key: string; label: string }, value: string | 
 }
 
 .validation-toggle-button {
+  cursor: pointer;
+}
+
+.validation-toggle-button:where(:not(.anm-procedure-ui)) {
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid #cdd8e6;
@@ -137,11 +141,10 @@ function formatCellValue(field: { key: string; label: string }, value: string | 
   color: #355172;
   font-size: 12px;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.validation-toggle-button:hover:not(:disabled) {
+.validation-toggle-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: linear-gradient(180deg, #fdfefe 0%, #edf4fb 100%);
 }

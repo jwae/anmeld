@@ -1,14 +1,14 @@
 <section class="school-group-page">
   <div v-if="!isManagementSessionActive" class="anm-alert anm-status--danger anm-migrated" role="alert">
-    <p class="error">Bitte zuerst die Verwaltung laden, damit die Schulen fuer Schulgruppen verfuegbar sind.</p>
+    <p class="error anm-managed-copy anm-migrated">Bitte zuerst die Verwaltung laden, damit die Schulen fuer Schulgruppen verfuegbar sind.</p>
   </div>
 
   <template v-else>
     <section class="user-management-panel school-group-form-card anm-card anm-migrated">
       <div class="user-management-panel-head">
         <div>
-          <h3>Gruppe anlegen</h3>
-          <p>Lege hier eine neue Schulgruppe an. Nach dem Speichern steht sie sofort in der Auswahl bereit.</p>
+          <h3 class="anm-managed-title anm-migrated">Gruppe anlegen</h3>
+          <p class="anm-managed-copy anm-migrated">Lege hier eine neue Schulgruppe an. Nach dem Speichern steht sie sofort in der Auswahl bereit.</p>
         </div>
       </div>
 
@@ -25,9 +25,9 @@
 
         <div class="user-management-checkbox-field school-group-field-active anm-field anm-migrated">
           <span class="anm-label anm-migrated">Aktiv</span>
-          <label class="user-management-checkbox user-management-checkbox-card">
+          <label class="user-management-checkbox user-management-checkbox-card anm-check anm-migrated">
             <input v-model="groupForm.aktiv" type="checkbox" :disabled="managementSaving" />
-            <span>Gruppe aktiv</span>
+            <span class="anm-label anm-migrated">Gruppe aktiv</span>
           </label>
         </div>
       </div>
@@ -43,13 +43,13 @@
           v-if="localFeedbackError"
           class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
         >
-          <p class="error">{{ localFeedbackError }}</p>
+          <p class="error anm-managed-copy anm-migrated">{{ localFeedbackError }}</p>
         </div>
         <div
           v-else-if="localFeedbackNotice"
           class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
         >
-          <p>{{ localFeedbackNotice }}</p>
+          <p class="anm-managed-copy anm-migrated">{{ localFeedbackNotice }}</p>
         </div>
       </transition>
     </section>
@@ -57,8 +57,8 @@
     <section class="user-management-panel school-group-select-card">
       <div class="user-management-panel-head">
         <div>
-          <h3>Gruppen verwalten</h3>
-          <p>Waehle eine vorhandene Schulgruppe aus und pflege ihre Schulen direkt per Checkbox.</p>
+          <h3 class="anm-managed-title anm-migrated">Gruppen verwalten</h3>
+          <p class="anm-managed-copy anm-migrated">Waehle eine vorhandene Schulgruppe aus und pflege ihre Schulen direkt per Checkbox.</p>
         </div>
       </div>
 
@@ -186,8 +186,8 @@
         <div class="school-group-danger-hero">
           <div class="school-group-danger-badge" aria-hidden="true">!</div>
           <div>
-            <h3>Schulgruppe wirklich loeschen?</h3>
-            <p>Diese Aktion entfernt die Gruppe und loest ihre Zuordnung zu allen Schulen auf.</p>
+            <h3 class="anm-managed-title anm-migrated">Schulgruppe wirklich loeschen?</h3>
+            <p class="anm-managed-copy anm-migrated">Diese Aktion entfernt die Gruppe und loest ihre Zuordnung zu allen Schulen auf.</p>
           </div>
         </div>
 
@@ -199,7 +199,7 @@
         </div>
 
         <div class="school-group-danger-list">
-          <p>Folgen dieser Aktion:</p>
+          <p class="anm-managed-copy anm-migrated">Folgen dieser Aktion:</p>
           <ul>
             <li>Die Schulgruppe wird dauerhaft geloescht.</li>
             <li>Alle markierten Schul-Zuordnungen dieser Gruppe werden entfernt.</li>
@@ -208,7 +208,7 @@
         </div>
 
         <div class="school-group-modal-actions">
-          <button class="anm-button anm-button--danger anm-migrated" type="button" @click="closeDeleteGroupConfirm" :disabled="managementSaving">
+          <button class="anm-button anm-migrated" type="button" @click="closeDeleteGroupConfirm" :disabled="managementSaving">
             Abbrechen
           </button>
           <button class="school-group-danger-button-strong anm-button anm-button--danger anm-migrated" type="button" @click="confirmDeleteSelectedGroup" :disabled="managementSaving">

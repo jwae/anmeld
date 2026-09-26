@@ -1,0 +1,90 @@
+/* Procedure-only additions to the shared SVWS-inspired design system.
+ * See public/licenses/svws-ui.txt. No table selectors or inherited theme on
+ * table ancestors. Opt-in classes also work in existing Teleport dialogs.
+ */
+.anm-procedure-ui.anm-procedure-title {
+  color: var(--anm-text);
+  font-size: var(--anm-text-lg);
+  font-weight: var(--anm-weight-bold);
+  line-height: var(--anm-leading-heading);
+  overflow-wrap: anywhere;
+}
+.anm-procedure-ui.anm-procedure-copy {
+  color: var(--anm-text-muted);
+  font-size: var(--anm-text-button);
+  line-height: var(--anm-leading);
+  overflow-wrap: anywhere;
+}
+.anm-procedure-ui.anm-button { white-space: normal; }
+.anm-procedure-ui.anm-button--icon { width: var(--anm-control-height); }
+.anm-procedure-ui.anm-input { font-size: var(--anm-text-button); }
+.anm-procedure-ui.anm-check { color: var(--anm-text); font-size: var(--anm-text-button); }
+.anm-procedure-ui.anm-procedure-check-input {
+  width: 1.125rem;
+  height: 1.125rem;
+  min-height: 0;
+  accent-color: var(--anm-brand);
+  flex: 0 0 auto;
+}
+.anm-procedure-ui.anm-procedure-check-input:focus-visible {
+  outline: var(--anm-focus-width) solid var(--anm-focus);
+  outline-offset: var(--anm-focus-offset);
+}
+.anm-procedure-ui.anm-alert .anm-procedure-copy { color: inherit; }
+
+/* Preserve padding, borders' widths, dimensions and inherited type of surfaces
+ * containing legacy tables. Only the enclosing surface decoration changes. */
+.anm-procedure-surface.anm-procedure-surface.anm-procedure-surface {
+  border-color: var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  background: var(--anm-surface);
+  box-shadow: var(--anm-shadow-none);
+}
+.anm-procedure-surface:is([role="dialog"], .anm-overlay-card, .modal-content) {
+  box-shadow: var(--anm-shadow-dialog);
+}
+
+/* Shared session implementation and all its bindings remain unchanged. */
+.anm-procedure-session.user-session-card {
+  padding: var(--anm-space-3) var(--anm-space-4);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  background: var(--anm-surface);
+  box-shadow: var(--anm-shadow-none);
+  min-width: 0;
+  max-width: 100%;
+}
+.anm-procedure-session.user-session-card .user-session-card-user {
+  color: var(--anm-text);
+  font-size: var(--anm-text-button);
+  line-height: var(--anm-leading);
+  overflow-wrap: anywhere;
+}
+.anm-procedure-session.user-session-card .user-session-card-badge {
+  background: var(--anm-surface-muted);
+  color: var(--anm-text-muted);
+  border-radius: var(--anm-radius-control);
+  line-height: var(--anm-leading);
+  overflow-wrap: anywhere;
+}
+.anm-procedure-session.user-session-card .user-session-card-action {
+  min-height: var(--anm-control-height);
+  padding: var(--anm-space-2) var(--anm-space-3);
+  border: var(--anm-border-width) solid var(--anm-border-control);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface);
+  color: var(--anm-text);
+  font-size: var(--anm-text-button);
+  font-weight: var(--anm-weight-bold);
+}
+.anm-procedure-session.user-session-card .user-session-card-action:hover {
+  background: var(--anm-brand-soft);
+  color: var(--anm-brand-hover);
+}
+.anm-procedure-session.user-session-card .user-session-card-action:focus-visible {
+  outline: var(--anm-focus-width) solid var(--anm-focus);
+  outline-offset: var(--anm-focus-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anm-procedure-ui { transition: none; animation: none; }
+}

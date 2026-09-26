@@ -34,27 +34,27 @@ function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
       <article
         v-for="field in fields"
         :key="field.key"
-        class="mapping-card"
+        class="mapping-card anm-procedure-surface"
         :class="{
           'is-required-unmapped': isMissingRequiredMapping(field, mapping),
           'is-mapped': hasImportMapping(field, mapping),
         }"
       >
         <div class="mapping-copy">
-          <p class="mapping-title">
+          <p class="mapping-title anm-procedure-copy anm-procedure-ui">
             {{ field.label }}
             <span v-if="field.required" class="mapping-badge is-required">Pflicht</span>
             <span v-else-if="field.warning" class="mapping-badge is-warning">Warnfeld</span>
             <span v-else-if="field.readOnly" class="mapping-badge">Automatisch</span>
           </p>
-          <p>{{ field.description }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui">{{ field.description }}</p>
         </div>
 
         <template v-if="field.readOnly">
           <div class="mapping-readonly">{{ field.systemValue || "Automatisch gesetzt" }}</div>
         </template>
         <template v-else>
-          <select :value="mapping[field.key] || ''" @change="$emit('change', { key: field.key, value: ($event.target as HTMLSelectElement).value })">
+          <select class="anm-input anm-procedure-ui" :value="mapping[field.key] || ''" @change="$emit('change', { key: field.key, value: ($event.target as HTMLSelectElement).value })">
             <option value="">Nicht zuordnen</option>
             <option v-for="column in columns" :key="column" :value="column">{{ column }}</option>
           </select>
@@ -91,7 +91,7 @@ function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
   background: #fff8f8;
 }
 
-.mapping-card.is-required-unmapped select {
+.mapping-card.is-required-unmapped select:where(:not(.anm-procedure-ui)) {
   border-color: #dca7ad;
   background: #fffafa;
 }
@@ -101,13 +101,16 @@ function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
   background: #dcfce7;
 }
 
-.mapping-card.is-mapped select {
+.mapping-card.is-mapped select:where(:not(.anm-procedure-ui)) {
   border-color: #4fa36d;
   background: #f0fdf4;
 }
 
 .mapping-title {
   margin: 0 0 4px;
+}
+
+.mapping-title:where(:not(.anm-procedure-ui)) {
   font-weight: 700;
   color: #19365b;
   font-size: 14px;
@@ -115,6 +118,9 @@ function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
 
 .mapping-copy p:last-child {
   margin: 0;
+}
+
+.mapping-copy p:last-child:where(:not(.anm-procedure-ui)) {
   color: #526985;
   font-size: 12px;
   line-height: 1.35;
@@ -140,7 +146,7 @@ function hasImportMapping(field: ImportField, mapping: Record<string, string>) {
   color: #92400e;
 }
 
-select,
+select:where(:not(.anm-procedure-ui)),
 .mapping-readonly {
   min-height: 38px;
   border: 1px solid #c8d6e8;

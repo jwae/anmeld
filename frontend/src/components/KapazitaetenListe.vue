@@ -29,22 +29,22 @@ function formatAvailableSeats(row: any) {
 </script>
 
 <template>
-  <section class="anm-card kapazitaeten-list-card">
+  <section class="anm-card kapazitaeten-list-card anm-procedure-surface">
     <div class="anm-card-head-row">
-      <p class="anm-roadmap-eyebrow">Uebersicht</p>
+      <p class="anm-roadmap-eyebrow anm-procedure-copy anm-procedure-ui">Uebersicht</p>
       <div class="kapazitaeten-list-actions">
-        <button type="button" class="btn-secondary kapazitaeten-head-action" :disabled="loading" @click="emit('refresh')">Aktualisieren</button>
-        <button type="button" class="btn-secondary kapazitaeten-head-action" :disabled="!verfahrenId || isReadonly" @click="emit('import')">Kapazitaeten importieren</button>
+        <button type="button" class="kapazitaeten-head-action anm-button anm-procedure-ui" :disabled="loading" @click="emit('refresh')">Aktualisieren</button>
+        <button type="button" class="kapazitaeten-head-action anm-button anm-procedure-ui" :disabled="!verfahrenId || isReadonly" @click="emit('import')">Kapazitaeten importieren</button>
       </div>
     </div>
     <div class="anm-card-head">
       <div>
-        <h3>Schulkapazitaeten</h3>
+        <h3 class="anm-procedure-title anm-procedure-ui">Schulkapazitaeten</h3>
       </div>
 
     </div>
 
-    <div v-if="loading" class="anm-loading-state">Lade Daten...</div>
+    <div v-if="loading" class="anm-loading-state anm-alert anm-procedure-ui">Lade Daten...</div>
 
     <div v-else class="anm-table-wrap">
       <table class="anm-table kapazitaeten-table">
@@ -153,6 +153,9 @@ function formatAvailableSeats(row: any) {
 .anm-roadmap-eyebrow {
   margin: 0;
   text-transform: uppercase;
+}
+
+.anm-roadmap-eyebrow:where(:not(.anm-procedure-ui)) {
   letter-spacing: 0.14em;
   font-size: 12px;
   font-weight: 700;
@@ -161,6 +164,9 @@ function formatAvailableSeats(row: any) {
 
 .kapazitaeten-list-card h3 {
   margin: 0;
+}
+
+.kapazitaeten-list-card h3:where(:not(.anm-procedure-ui)) {
   color: #19365b;
 }
 
@@ -174,7 +180,7 @@ function formatAvailableSeats(row: any) {
   overflow-x: auto;
 }
 
-.anm-loading-state,
+.anm-loading-state:where(:not(.anm-procedure-ui)),
 .anm-empty-cell {
   padding: 16px;
   border: 1px dashed #ccd9ea;
@@ -247,7 +253,7 @@ function formatAvailableSeats(row: any) {
 }
 
 .btn-primary,
-.btn-secondary,
+.btn-secondary:where(:not(.anm-procedure-ui)),
 .btn-danger {
   border-radius: 999px;
   padding: 8px 12px;
@@ -260,7 +266,7 @@ function formatAvailableSeats(row: any) {
   color: #ffffff;
 }
 
-.btn-secondary {
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   background: #eef4fd;
   color: #17385f;
 }
@@ -275,6 +281,9 @@ function formatAvailableSeats(row: any) {
   align-items: center;
   justify-content: center;
   min-width: 36px;
+}
+
+.anm-actions-icons .btn-secondary:where(:not(.anm-procedure-ui)) {
   height: 36px;
   padding: 8px 10px;
 }
@@ -303,6 +312,10 @@ function formatAvailableSeats(row: any) {
 }
 
 .kapazitaeten-list-actions .kapazitaeten-head-action {
+  cursor: pointer;
+}
+
+.kapazitaeten-list-actions .kapazitaeten-head-action:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid #c8dbef;
@@ -311,7 +324,6 @@ function formatAvailableSeats(row: any) {
   line-height: 1;
   white-space: nowrap;
   box-shadow: 0 6px 14px rgba(30, 68, 107, 0.08);
-  cursor: pointer;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -319,15 +331,18 @@ function formatAvailableSeats(row: any) {
     color 0.18s ease;
 }
 
-.kapazitaeten-list-actions .kapazitaeten-head-action:hover:not(:disabled) {
+.kapazitaeten-list-actions .kapazitaeten-head-action:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
 }
 
 .kapazitaeten-list-actions .kapazitaeten-head-action:disabled {
+  cursor: not-allowed;
+}
+
+.kapazitaeten-list-actions .kapazitaeten-head-action:disabled:where(:not(.anm-procedure-ui)) {
   background: #f3f6fa;
   color: #8ba0b8;
   box-shadow: none;
-  cursor: not-allowed;
 }
 </style>

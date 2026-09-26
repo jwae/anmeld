@@ -187,10 +187,10 @@ onMounted(() => {
   <section class="import-card">
     <div class="import-card-head">
       <div>
-        <h3>
+        <h3 class="anm-procedure-title anm-procedure-ui">
           <button
             type="button"
-            class="section-toggle"
+            class="section-toggle anm-button anm-procedure-ui"
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="toggleExpanded"
           >
@@ -198,34 +198,34 @@ onMounted(() => {
           </button>
           Schulanmeldungen importieren (CSV, Schild3)
         </h3>
-        <p>CSV-Datei fuer die aktuelle Runde pruefen, Statuswerte zuordnen und gueltige Anmeldungen in anm_schueler uebernehmen.</p>
+        <p class="anm-procedure-copy anm-procedure-ui">CSV-Datei fuer die aktuelle Runde pruefen, Statuswerte zuordnen und gueltige Anmeldungen in anm_schueler uebernehmen.</p>
       </div>
       <div class="import-head-actions">
-        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
+        <button class="anm-button anm-procedure-ui" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openCsvImportOverlay">
           Import (CSV)
         </button>
-        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
+        <button class="anm-button anm-procedure-ui" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="importiereAnmeldungenAusSchild3">
           Import aus Schild3
         </button>
-        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openRueckmeldungenMgOverlay">
+        <button class="anm-button anm-procedure-ui" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || importing" @click="openRueckmeldungenMgOverlay">
           Rückmeldungen MG
         </button>
       </div>
     </div>
 
     <div v-show="isExpanded" class="section-panel">
-      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Fehler</p>
-        <p>{{ errorMessage }}</p>
+      <div v-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
       </div>
 
-      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-        <p class="feedback-title">Erfolg</p>
-        <p>{{ successMessage }}</p>
+      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Erfolg</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
 
       <div class="school-strip">
-        <div v-if="loadingSchools" class="anm-loading-state">Schulen werden geladen...</div>
+        <div v-if="loadingSchools" class="anm-loading-state anm-alert anm-procedure-ui">Schulen werden geladen...</div>
         <div v-else-if="!schools.length" class="anm-empty-state">Keine Schulen fuer das aktuelle Verfahren vorhanden.</div>
         <div v-else class="table-wrap school-table-wrap">
           <table class="import-table school-table">
@@ -260,7 +260,7 @@ onMounted(() => {
       </div>
 
       <div v-if="schildDiagnostics.length" class="diagnostic-actions">
-        <button class="btn-secondary" type="button" @click="showSchildDiagnosticsOverlay = true">
+        <button class="anm-button anm-procedure-ui" type="button" @click="showSchildDiagnosticsOverlay = true">
           Diagnose anzeigen
         </button>
       </div>
@@ -293,12 +293,12 @@ onMounted(() => {
       aria-labelledby="schild3-diagnostics-title"
       @click.self="closeSchildDiagnosticsOverlay"
     >
-      <section class="diagnostic-overlay-card">
+      <section class="diagnostic-overlay-card anm-procedure-surface">
         <div class="diagnostic-overlay-head">
-          <h3 id="schild3-diagnostics-title">Backend-Diagnose Schild3-Import</h3>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="schild3-diagnostics-title">Backend-Diagnose Schild3-Import</h3>
         </div>
         <div class="diagnostic-overlay-copy">
-          <p>Diese Werte kommen direkt aus dem Backend pro Schule und zeigen, was der Schild3-Import wirklich gesehen hat.</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Diese Werte kommen direkt aus dem Backend pro Schule und zeigen, was der Schild3-Import wirklich gesehen hat.</p>
           <div class="diagnostic-list">
             <article
               v-for="entry in schildDiagnostics"
@@ -326,8 +326,8 @@ onMounted(() => {
                 <div><strong>Uebersprungen:</strong> {{ entry.skipped_rows ?? "-" }}</div>
                 <div><strong>Fehler:</strong> {{ entry.error_rows ?? "-" }}</div>
               </div>
-              <p v-if="entry.message" class="diagnostic-message">{{ entry.message }}</p>
-              <p v-if="entry.status_summary" class="diagnostic-message">
+              <p v-if="entry.message" class="diagnostic-message anm-procedure-copy anm-procedure-ui">{{ entry.message }}</p>
+              <p v-if="entry.status_summary" class="diagnostic-message anm-procedure-copy anm-procedure-ui">
                 {{ entry.status_summary.UPDATE }} UPDATE · {{ entry.status_summary.NEU }} NEU · {{ entry.status_summary.FEHLER }} FEHLER
               </p>
               <div v-if="entry.row_results?.length" class="table-wrap">
@@ -344,7 +344,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="diagnostic-overlay-actions">
-          <button class="btn-secondary" type="button" @click="closeSchildDiagnosticsOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
             Schliessen
           </button>
         </div>
@@ -375,10 +375,13 @@ onMounted(() => {
 
 .import-card h3 {
   margin: 0;
-  color: #19365b;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.import-card h3:where(:not(.anm-procedure-ui)) {
+  color: #19365b;
   font-size: 1.3em;
 }
 
@@ -392,17 +395,20 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   width: 34px;
+  cursor: pointer;
+}
+
+.section-toggle:where(:not(.anm-procedure-ui)) {
   height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.section-toggle:hover {
+.section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
 }
 
@@ -423,6 +429,9 @@ onMounted(() => {
 
 .import-card p {
   margin: 8px 0 0;
+}
+
+.import-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;
 }
@@ -433,7 +442,7 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.import-head-actions .btn-secondary {
+.import-head-actions .btn-secondary:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid #c8dbef;
@@ -449,19 +458,22 @@ onMounted(() => {
     color 0.18s ease;
 }
 
-.import-head-actions .btn-secondary:hover:not(:disabled) {
+.import-head-actions .btn-secondary:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
 }
 
 .import-head-actions .btn-secondary:disabled {
-  background: #f3f6fa;
-  color: #8ba0b8;
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-.btn-secondary {
+.import-head-actions .btn-secondary:disabled:where(:not(.anm-procedure-ui)) {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+}
+
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
@@ -476,7 +488,7 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.import-summary div {
+.import-summary div:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
@@ -527,6 +539,9 @@ onMounted(() => {
 
 .diagnostic-overlay-head h3 {
   margin: 0;
+}
+
+.diagnostic-overlay-head h3:where(:not(.anm-procedure-ui)) {
   color: #19365b;
 }
 
@@ -537,6 +552,9 @@ onMounted(() => {
 
 .diagnostic-overlay-copy p {
   margin: 0;
+}
+
+.diagnostic-overlay-copy p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.6;
 }
@@ -579,7 +597,7 @@ onMounted(() => {
   color: #334e68;
 }
 
-.diagnostic-message {
+.diagnostic-message:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 12px;
   background: #eef4fd;
@@ -640,27 +658,30 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.feedback-panel {
+.feedback-panel:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 14px;
   font-size: 14px;
 }
 
-.feedback-panel-error {
+.feedback-panel-error:where(:not(.anm-procedure-ui)) {
   border: 1px solid #fca5a5;
   background: #fff5f5;
   color: #991b1b;
 }
 
-.feedback-panel-success {
+.feedback-panel-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #a7f3d0;
   background: #f0fdf4;
   color: #065f46;
 }
 
 .feedback-title {
-  font-weight: 700;
   margin: 0 0 4px;
+}
+
+.feedback-title:where(:not(.anm-procedure-ui)) {
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {

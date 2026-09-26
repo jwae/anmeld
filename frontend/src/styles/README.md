@@ -4,8 +4,9 @@
 
 `main.ts` importiert `styles/index.css` einmal nach Bootstrap. `tokens.css`
 enthaelt die Designwerte; `components.css` die wiederverwendbaren UI-Regeln.
-Der Login verwendet diese Regeln bereits. App-Verwaltung und Fachansichten
-werden separat migriert. Keine globalen Regeln fuer `button`, `input` oder
+Der Login und die nicht tabellarischen Bereiche der App-Verwaltung verwenden
+diese Regeln. Bestehende Verwaltungstabellen und ihre Filter/Bedienelemente
+behalten ihre Formatierung; die weiteren Fachansichten werden separat migriert. Keine globalen Regeln fuer `button`, `input` oder
 Bootstrap-Klassen hinzufuegen; neue Oberflaechen verwenden `anm-*`.
 
 Das System ist bewusst ein helles Theme. Farben, Schriftgroessen, Gewichte,
@@ -106,3 +107,19 @@ Build/Typecheck; Tastaturfokus; 320px Breite und 200% Zoom; lange Texte;
 Laden/Fehler/Readonly/Disabled; reduzierte Bewegung und hohe Kontraste;
 Dialogfokus und Escape. CSS und erfolgreiche Builds ersetzen keine
 Browserpruefung der jeweiligen Komponente.
+
+## App-Verwaltung: geschützte Tabellen
+
+`management.css` wird durch `APPManagement.vue` geladen. Es enthält ausschließlich
+Verwaltungsvarianten und explizit markierte Elemente (`anm-migrated`). Es setzt
+keine globale Schrift oder Farbe auf Eltern der bestehenden Tabellen. Die
+Sitzungskarte verwendet einen eigenen Wrapper; die gemeinsame Komponente bleibt
+für andere Ansichten unverändert. Hilfefenster erhalten nur in der Verwaltung
+die Klasse `anm-management-help`.
+
+Lokale Layoutregeln bleiben bestehen. Gemeinsam von Formularen und Tabellen
+benutzte Altregeln schließen migrierte Elemente mit
+`:where(:not(.anm-migrated))` aus. `:where` verändert die Spezifität der alten
+Tabellenregeln nicht. Diese Regeln nicht pauschal löschen. Vor weiteren Änderungen
+`node scripts/check-management-migration.mjs` ausführen; Details und Grenzen der
+Prüfung stehen in `TODO_CODEX.md` im Projektverzeichnis.

@@ -2,9 +2,9 @@
     <div v-if="!embedded" class="user-management-card-header">
       <div class="user-management-card-title">
         <div>
-          <p class="eyebrow">Verwaltung</p>
-          <h2>Benutzer verwalten</h2>
-          <p class="user-management-intro">
+          <p class="eyebrow anm-managed-copy anm-migrated">Verwaltung</p>
+          <h2 class="anm-managed-title anm-migrated">Benutzer verwalten</h2>
+          <p class="user-management-intro anm-managed-copy anm-migrated">
             Pflege Benutzerkonten, Gruppen und deren Berechtigungen direkt in der App-Datenbank.
           </p>
         </div>
@@ -32,13 +32,13 @@
         v-if="managementError && (!isManagementSessionActive || activeManagementTab === 'schools')"
         class="anm-alert anm-status--danger anm-migrated" role="alert"
       >
-        <p class="error">{{ managementError }}</p>
+        <p class="error anm-managed-copy anm-migrated">{{ managementError }}</p>
       </div>
       <div
         v-else-if="managementNotice && (!isManagementSessionActive || activeManagementTab === 'schools')"
         class="anm-alert anm-status--success anm-migrated" role="status"
       >
-        <p>{{ managementNotice }}</p>
+        <p class="anm-managed-copy anm-migrated">{{ managementNotice }}</p>
       </div>
     </transition>
 
@@ -55,7 +55,7 @@
     </div>
 
     <div v-if="!isManagementSessionActive" class="user-management-empty">
-      <p>
+      <p class="anm-managed-copy anm-migrated">
         <template v-if="hasExternalManagementSession">
           Die Verwaltung ist nur mit einer berechtigten Sitzung verfuegbar.
         </template>
@@ -69,7 +69,7 @@
     <template v-if="isManagementSessionActive">
       <div class="user-management-summary">
           <article class="user-management-stat anm-card anm-migrated">
-            <span class="user-management-stat-label">Benutzer</span>
+            <span class="user-management-stat-label anm-label anm-migrated">Benutzer</span>
             <strong>
               {{ managementStats.total_users }}
               <small>
@@ -80,7 +80,7 @@
             </strong>
           </article>
           <article class="user-management-stat anm-card anm-migrated">
-            <span class="user-management-stat-label">Gruppen</span>
+            <span class="user-management-stat-label anm-label anm-migrated">Gruppen</span>
             <strong>
               {{ managementStats.total_groups }}
               <small>
@@ -91,7 +91,7 @@
             </strong>
           </article>
           <article class="user-management-stat anm-card anm-migrated">
-            <span class="user-management-stat-label">Schulserver</span>
+            <span class="user-management-stat-label anm-label anm-migrated">Schulserver</span>
             <strong>
               {{ managementStats.total_school_sources }}
               <small>
@@ -102,7 +102,7 @@
             </strong>
           </article>
           <article class="user-management-stat anm-card anm-migrated">
-            <span class="user-management-stat-label">Snapshots</span>
+            <span class="user-management-stat-label anm-label anm-migrated">Snapshots</span>
             <strong>
               {{ managementStats.total_snapshots }}
               <small>{{ managementStats.total_snapshot_schools }} Schule{{ managementStats.total_snapshot_schools === 1 ? "" : "n" }}</small>
@@ -119,6 +119,8 @@
           role="tab"
           title="Benutzerkonten anlegen, bearbeiten, aktivieren und loeschen."
           :aria-selected="activeManagementTab === 'users' ? 'true' : 'false'"
+          id="management-tab-users"
+          aria-controls="management-panel-users"
           @click="requestManagementTab('users')"
         >
           <i class="bi bi-people" aria-hidden="true"></i>
@@ -132,6 +134,8 @@
           role="tab"
           title="Gruppen und deren Berechtigungen verwalten."
           :aria-selected="activeManagementTab === 'groups' ? 'true' : 'false'"
+          id="management-tab-groups"
+          aria-controls="management-panel-groups"
           @click="requestManagementTab('groups')"
         >
           <i class="bi bi-collection" aria-hidden="true"></i>
@@ -145,6 +149,8 @@
           role="tab"
           title="Schulserver-Quellen fuer die angebundenen Schulen pflegen."
           :aria-selected="activeManagementTab === 'schools' ? 'true' : 'false'"
+          id="management-tab-schools"
+          aria-controls="management-panel-schools"
           @click="requestManagementTab('schools')"
         >
           <i class="bi bi-building" aria-hidden="true"></i>
@@ -158,6 +164,8 @@
           role="tab"
           title="Schulgruppen fuer Quell- und Zielschulen verwalten."
           :aria-selected="activeManagementTab === 'school-groups' ? 'true' : 'false'"
+          id="management-tab-school-groups"
+          aria-controls="management-panel-school-groups"
           @click="requestManagementTab('school-groups')"
         >
           <i class="bi bi-diagram-3" aria-hidden="true"></i>
@@ -171,6 +179,8 @@
           role="tab"
           title="Katalogtabellen bearbeiten."
           :aria-selected="activeManagementTab === 'catalogs' ? 'true' : 'false'"
+          id="management-tab-catalogs"
+          aria-controls="management-panel-catalogs"
           @click="requestManagementTab('catalogs')"
         >
           <i class="bi bi-journal-text" aria-hidden="true"></i>
@@ -184,6 +194,8 @@
           role="tab"
           title="Unveränderliches Anwendungsprotokoll anzeigen."
           :aria-selected="activeManagementTab === 'protocol' ? 'true' : 'false'"
+          id="management-tab-protocol"
+          aria-controls="management-panel-protocol"
           @click="requestManagementTab('protocol')"
         >
           <i class="bi bi-clock-history" aria-hidden="true"></i>
@@ -191,12 +203,12 @@
         </button>
       </div>
 
-      <div v-if="activeManagementTab === 'users' && canManageUsers" class="user-management-tab-panel" role="tabpanel">
+      <div v-if="activeManagementTab === 'users' && canManageUsers" class="user-management-tab-panel" id="management-panel-users" aria-labelledby="management-tab-users" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
           <section class="user-management-panel anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
-                <h3>Benutzerverwaltung</h3>
+                <h3 class="anm-managed-title anm-migrated">Benutzerverwaltung</h3>
               </div>
               <button class="anm-button anm-migrated" type="button" @click="resetUserForm" :disabled="managementSaving">
                 Neuer Benutzer
@@ -242,13 +254,13 @@
 
               <div class="user-management-checkbox-field anm-field anm-migrated">
                 <span class="anm-label anm-migrated">Aktiv</span>
-                <label class="user-management-checkbox user-management-checkbox-card">
+                <label class="user-management-checkbox user-management-checkbox-card anm-check anm-migrated">
                   <input
                     v-model="userForm.is_active"
                     type="checkbox"
                     :disabled="managementSaving || isSelectedCurrentManagedUser"
                   />
-                  <span>Benutzer aktiv</span>
+                  <span class="anm-label anm-migrated">Benutzer aktiv</span>
                 </label>
               </div>
             </div>
@@ -264,13 +276,13 @@
                 v-if="managementError"
                 class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
               >
-                <p class="error">{{ managementError }}</p>
+                <p class="error anm-managed-copy anm-migrated">{{ managementError }}</p>
               </div>
               <div
                 v-else-if="managementNotice"
                 class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
               >
-                <p>{{ managementNotice }}</p>
+                <p class="anm-managed-copy anm-migrated">{{ managementNotice }}</p>
               </div>
             </transition>
           </section>
@@ -280,7 +292,7 @@
           <section class="user-management-list-card anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
-                <h3>Benutzerübersicht</h3>
+                <h3 class="anm-managed-title anm-migrated">Benutzerübersicht</h3>
               </div>
             </div>
             <div class="user-management-list user-management-user-list">
@@ -296,7 +308,7 @@
                     {{ user.is_active ? "Aktiv" : "Inaktiv" }}
                   </span>
                 </div>
-                <p>{{ user.user_fullname || "Ohne Vollname" }}</p>
+                <p class="anm-managed-copy anm-migrated">{{ user.user_fullname || "Ohne Vollname" }}</p>
                 <small>{{ user.group_name }}{{ user.email ? ` - ${user.email}` : "" }}</small>
                 <div class="user-management-list-actions">
                   <button class="anm-button anm-migrated" type="button" @click="editManagementUser(user.user_id)" :disabled="managementSaving" aria-label="Bearbeiten">
@@ -327,13 +339,13 @@
         </div>
       </div>
 
-      <div v-else-if="activeManagementTab === 'groups' && canManageGroups" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'groups' && canManageGroups" class="user-management-tab-panel" id="management-panel-groups" aria-labelledby="management-tab-groups" role="tabpanel">
         <div class="user-management-grid user-management-grid-single">
           <section class="user-management-panel anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
-                <h3>Gruppenverwaltung</h3>
-                <p>Gruppen steuern die Berechtigungen ihrer Benutzer.</p>
+                <h3 class="anm-managed-title anm-migrated">Gruppenverwaltung</h3>
+                <p class="anm-managed-copy anm-migrated">Gruppen steuern die Berechtigungen ihrer Benutzer.</p>
               </div>
               <button class="anm-button anm-migrated" type="button" @click="resetGroupForm" :disabled="managementSaving">
                 Neue Gruppe
@@ -353,19 +365,19 @@
 
               <div class="user-management-checkbox-field anm-field anm-migrated">
                 <span class="anm-label anm-migrated">Aktiv</span>
-                <label class="user-management-checkbox user-management-checkbox-card">
+                <label class="user-management-checkbox user-management-checkbox-card anm-check anm-migrated">
                   <input v-model="groupForm.is_active" type="checkbox" :disabled="managementSaving" />
-                  <span>Gruppe aktiv</span>
+                  <span class="anm-label anm-migrated">Gruppe aktiv</span>
                 </label>
               </div>
             </div>
 
             <div class="user-management-checklist">
-              <p class="anm-label anm-migrated">Berechtigungen</p>
+              <p class="anm-label anm-migrated anm-managed-copy">Berechtigungen</p>
               <label
                 v-for="permission in managementPermissions"
                 :key="permission.permission_id"
-                class="user-management-checkitem"
+                class="user-management-checkitem anm-check anm-migrated"
               >
                 <input
                   v-model="groupForm.permission_ids"
@@ -373,7 +385,7 @@
                   :value="permission.permission_id"
                   :disabled="managementSaving || !permission.is_active"
                 />
-                <span>{{ permission.permission_name }} ({{ permission.permission_key }})</span>
+                <span class="anm-label anm-migrated">{{ permission.permission_name }} ({{ permission.permission_key }})</span>
               </label>
             </div>
 
@@ -386,13 +398,13 @@
                 v-if="managementError"
                 class="user-management-inline-feedback anm-alert anm-status--danger anm-migrated" role="alert"
               >
-                <p class="error">{{ managementError }}</p>
+                <p class="error anm-managed-copy anm-migrated">{{ managementError }}</p>
               </div>
               <div
                 v-else-if="managementNotice"
                 class="user-management-inline-feedback anm-alert anm-status--success anm-migrated" role="status"
               >
-                <p>{{ managementNotice }}</p>
+                <p class="anm-managed-copy anm-migrated">{{ managementNotice }}</p>
               </div>
             </transition>
           </section>
@@ -402,7 +414,7 @@
           <section class="user-management-list-card anm-card anm-migrated">
             <div class="user-management-panel-head">
               <div>
-                <h3>Gruppenübersicht</h3>
+                <h3 class="anm-managed-title anm-migrated">Gruppenübersicht</h3>
               </div>
             </div>
             <div class="user-management-list user-management-group-card-list">
@@ -413,7 +425,7 @@
                     {{ group.is_active ? "Aktiv" : "Inaktiv" }}
                   </span>
                 </div>
-                <p>{{ group.group_description || "Keine Beschreibung" }}</p>
+                <p class="anm-managed-copy anm-migrated">{{ group.group_description || "Keine Beschreibung" }}</p>
                 <small>
                   {{ Array.isArray(group.permissions) && group.permissions.length ? group.permissions.map((entry) => entry.permission_name).join(", ") : "Keine Berechtigungen" }}
                 </small>
@@ -434,7 +446,7 @@
         </div>
       </div>
 
-      <div v-else-if="activeManagementTab === 'schools'" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'schools'" class="user-management-tab-panel" id="management-panel-schools" aria-labelledby="management-tab-schools" role="tabpanel">
         <SchoolManagement
           :management-token="effectiveManagementToken"
           :is-management-session-active="isManagementSessionActive"
@@ -444,7 +456,7 @@
           @feedback="handleSchoolManagementFeedback"
         />
       </div>
-      <div v-else-if="activeManagementTab === 'school-groups'" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'school-groups'" class="user-management-tab-panel" id="management-panel-school-groups" aria-labelledby="management-tab-school-groups" role="tabpanel">
         <SchoolGroupManagement
           :management-token="effectiveManagementToken"
           :is-management-session-active="isManagementSessionActive"
@@ -454,7 +466,7 @@
           @feedback="handleSchoolManagementFeedback"
         />
       </div>
-      <div v-else-if="activeManagementTab === 'catalogs'" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'catalogs'" class="user-management-tab-panel" id="management-panel-catalogs" aria-labelledby="management-tab-catalogs" role="tabpanel">
         <CatalogManagement
           ref="catalogManagementRef"
           :management-token="effectiveManagementToken"
@@ -462,7 +474,7 @@
           :can-edit-catalogs="canEditCatalogs"
         />
       </div>
-      <div v-else-if="activeManagementTab === 'protocol'" class="user-management-tab-panel" role="tabpanel">
+      <div v-else-if="activeManagementTab === 'protocol'" class="user-management-tab-panel" id="management-panel-protocol" aria-labelledby="management-tab-protocol" role="tabpanel">
         <AppProtocol
           :management-token="effectiveManagementToken"
           :is-management-session-active="isManagementSessionActive"

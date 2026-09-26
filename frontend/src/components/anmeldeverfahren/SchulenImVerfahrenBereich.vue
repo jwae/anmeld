@@ -283,24 +283,24 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 <template>
   <section class="anm-view">
     <transition name="feedback-fade" mode="out-in">
-      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Fehler</p>
-        <p class="error">{{ errorMessage }}</p>
+      <div v-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+        <p class="error anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
       </div>
-      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-        <p class="feedback-title">Aktion erfolgreich</p>
-        <p>{{ successMessage }}</p>
+      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Aktion erfolgreich</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
     </transition>
 
-    <section v-if="verfahrenstyp === 'SEK1'" class="anm-card anm-schools-card">
+    <section v-if="verfahrenstyp === 'SEK1'" class="anm-card anm-schools-card anm-procedure-surface">
       <div class="anm-card-head">
         <div>
           
-          <h3 class="anm-section-heading">
+          <h3 class="anm-section-heading anm-procedure-title anm-procedure-ui">
             <button
               type="button"
-              class="anm-section-toggle"
+              class="anm-section-toggle anm-button anm-procedure-ui"
               :aria-expanded="showAbgebendeSchulenSection ? 'true' : 'false'"
               @click="showAbgebendeSchulenSection = !showAbgebendeSchulenSection"
             >
@@ -312,7 +312,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Abgebende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe mit abgebenden Schulen im Verfahren aus.</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Waehle eine Schulgruppe mit abgebenden Schulen im Verfahren aus.</p>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
           Bitte zuerst ein Verfahren auswaehlen, damit die abgebenden Schulen gepflegt werden koennen.
         </div>
 
-        <div v-else-if="loadingBeteiligteSchulen || loadingSchulgruppen" class="anm-loading-state">
+        <div v-else-if="loadingBeteiligteSchulen || loadingSchulgruppen" class="anm-loading-state anm-alert anm-procedure-ui">
           Schulgruppen und Schulen werden geladen...
         </div>
 
@@ -331,9 +331,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
         <div v-else>
           <div class="anm-form-row anm-form-row-with-action">
-            <label class="anm-field">
-              <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
-              <select v-model="selectedAbgebendeSchulgruppeId" class="anm-select" :disabled="isReadonly || savingBeteiligteSchulen">
+            <label class="anm-field anm-field anm-procedure-ui">
+              <span class="anm-field-label anm-label anm-procedure-ui">Auswahl einer Schulgruppe fuer das Verfahren</span>
+              <select v-model="selectedAbgebendeSchulgruppeId" class="anm-select anm-input anm-procedure-ui" :disabled="isReadonly || savingBeteiligteSchulen">
                 <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
@@ -345,7 +345,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               </select>
             </label>
             <button
-              class="btn-primary anm-inline-submit-btn"
+              class="anm-inline-submit-btn anm-button anm-button--primary anm-procedure-ui"
               type="button"
               :disabled="isReadonly || savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedAbgebendeSchulgruppe"
               @click="submitAbgebendeSchulgruppeFuerVerfahren"
@@ -354,10 +354,10 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
           </div>
 
-          <p v-if="selectedAbgebendeSchulgruppe?.beschreibung" class="anm-inline-hint">
+          <p v-if="selectedAbgebendeSchulgruppe?.beschreibung" class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
             {{ selectedAbgebendeSchulgruppe.beschreibung }}
           </p>
-          <p v-else class="anm-inline-hint">
+          <p v-else class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
             Fuer dieses Verfahren ist aktuell keine abgebende Schulgruppe definiert.
           </p>
 
@@ -412,14 +412,14 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
       </div>
     </section>
 
-    <section class="anm-card anm-schools-card">
+    <section class="anm-card anm-schools-card anm-procedure-surface">
       <div class="anm-card-head">
         <div>
           
-          <h3 class="anm-section-heading">
+          <h3 class="anm-section-heading anm-procedure-title anm-procedure-ui">
             <button
               type="button"
-              class="anm-section-toggle"
+              class="anm-section-toggle anm-button anm-procedure-ui"
               :aria-expanded="showBeteiligteSchulenSection ? 'true' : 'false'"
               @click="showBeteiligteSchulenSection = !showBeteiligteSchulenSection"
             >
@@ -431,7 +431,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
             <span>Aufnehmende Schulen im Verfahren</span>
           </h3>
-          <p>Waehle eine Schulgruppe mit aufnehmenden Schulen im Verfahren aus.</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Waehle eine Schulgruppe mit aufnehmenden Schulen im Verfahren aus.</p>
         </div>
       </div>
 
@@ -440,7 +440,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
           Bitte zuerst ein Verfahren auswaehlen, damit die aufnehmenden Schulen gepflegt werden koennen.
         </div>
 
-        <div v-else-if="loadingBeteiligteSchulen || loadingSchulgruppen" class="anm-loading-state">
+        <div v-else-if="loadingBeteiligteSchulen || loadingSchulgruppen" class="anm-loading-state anm-alert anm-procedure-ui">
           Schulgruppen und Schulen werden geladen...
         </div>
 
@@ -450,9 +450,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
         <div v-else>
           <div class="anm-form-row anm-form-row-with-action">
-            <label class="anm-field">
-              <span class="anm-field-label">Auswahl einer Schulgruppe fuer das Verfahren</span>
-              <select v-model="selectedSchulgruppeId" class="anm-select" :disabled="isReadonly || savingBeteiligteSchulen">
+            <label class="anm-field anm-field anm-procedure-ui">
+              <span class="anm-field-label anm-label anm-procedure-ui">Auswahl einer Schulgruppe fuer das Verfahren</span>
+              <select v-model="selectedSchulgruppeId" class="anm-select anm-input anm-procedure-ui" :disabled="isReadonly || savingBeteiligteSchulen">
                 <option value="">Noch keine Schulgruppe definiert</option>
                 <option
                   v-for="gruppe in sortedSchulgruppen"
@@ -464,7 +464,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               </select>
             </label>
             <button
-              class="btn-primary anm-inline-submit-btn"
+              class="anm-inline-submit-btn anm-button anm-button--primary anm-procedure-ui"
               type="button"
               :disabled="isReadonly || savingBeteiligteSchulen || loadingBeteiligteSchulen || loadingSchulgruppen || !verfahrenId || !selectedSchulgruppe"
               @click="submitSchulgruppeFuerVerfahren"
@@ -473,10 +473,10 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
             </button>
           </div>
 
-          <p v-if="selectedSchulgruppe?.beschreibung" class="anm-inline-hint">
+          <p v-if="selectedSchulgruppe?.beschreibung" class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
             {{ selectedSchulgruppe.beschreibung }}
           </p>
-          <p v-else class="anm-inline-hint">
+          <p v-else class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
             Fuer dieses Verfahren ist aktuell keine aufnehmende Schulgruppe definiert.
           </p>
 
@@ -566,11 +566,17 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
 .anm-card h3 {
   margin: 0;
+}
+
+.anm-card h3:where(:not(.anm-procedure-ui)) {
   color: #19385e;
 }
 
 .anm-card p {
   margin: 8px 0 0;
+}
+
+.anm-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;
 }
@@ -587,6 +593,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.anm-section-heading:where(:not(.anm-procedure-ui)) {
   font-size: 1.3em;
 }
 
@@ -595,17 +604,20 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
   align-items: center;
   justify-content: center;
   width: 34px;
+  cursor: pointer;
+}
+
+.anm-section-toggle:where(:not(.anm-procedure-ui)) {
   height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.anm-section-toggle:hover {
+.anm-section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
 }
 
@@ -676,6 +688,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
 .anm-sort-btn span {
   min-width: 10px;
+}
+
+.anm-sort-btn span:where(:not(.anm-procedure-ui)) {
   color: #7d93ae;
   font-size: 11px;
 }
@@ -713,15 +728,22 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 }
 
 .anm-field-label {
+  text-transform: uppercase;
+}
+
+.anm-field-label:where(:not(.anm-procedure-ui)) {
   color: #5a7393;
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .anm-select {
   width: 100%;
+  box-sizing: border-box;
+}
+
+.anm-select:where(:not(.anm-procedure-ui)) {
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid #cfdceb;
@@ -729,16 +751,18 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
   background: #fff;
   color: #19385e;
   font: inherit;
-  box-sizing: border-box;
 }
 
 .anm-inline-submit-btn {
-  min-height: 38px;
-  height: 38px;
-  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.anm-inline-submit-btn:where(:not(.anm-procedure-ui)) {
+  min-height: 38px;
+  height: 38px;
+  padding: 0 16px;
   white-space: nowrap;
   border-radius: 12px;
   background: #f7e6e8;
@@ -746,12 +770,12 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
   color: #8a3d48;
 }
 
-.anm-inline-submit-btn:hover:not(:disabled) {
+.anm-inline-submit-btn:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   background: #f2d9dd;
   border-color: #c88f98;
 }
 
-.anm-inline-submit-btn:disabled {
+.anm-inline-submit-btn:disabled:where(:not(.anm-procedure-ui)) {
   background: #f8eef0;
   border-color: #e2c7cb;
   color: #b48a91;
@@ -759,6 +783,9 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
 .anm-inline-hint {
   margin: 0 0 14px;
+}
+
+.anm-inline-hint:where(:not(.anm-procedure-ui)) {
   padding: 10px 12px;
   border-radius: 12px;
   background: #f6f9fd;
@@ -768,7 +795,7 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
 
 .anm-empty-cell,
 .anm-empty-state,
-.anm-loading-state {
+.anm-loading-state:where(:not(.anm-procedure-ui)) {
   padding: 16px;
   border: 1px dashed #ccd9ea;
   border-radius: 16px;

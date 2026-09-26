@@ -1,0 +1,92 @@
+/* Administration-only additions to the shared design system.
+ * No table selectors: table markup, controls, formats and inherited typography
+ * remain owned by their original components. Also works on teleported dialogs.
+ */
+.anm-migrated.anm-managed-dialog {
+  color-scheme: light;
+  background: var(--anm-surface);
+  color: var(--anm-text);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  box-shadow: var(--anm-shadow-dialog);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+.anm-migrated.anm-badge.is-inactive {
+  --anm-status-text: var(--anm-text-muted);
+  --anm-status-bg: var(--anm-surface-muted);
+}
+.anm-migrated.anm-badge::before { content: none; }
+.anm-migrated.anm-card.has-administration-permissions {
+  border-color: var(--anm-danger);
+  background: var(--anm-danger-soft);
+}
+.anm-migrated.anm-button { white-space: normal; }
+.anm-migrated.anm-nav-item { border-bottom-width: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .anm-migrated, .anm-migrated .is-spinning { transition: none; animation: none; }
+}
+
+/* Only elements explicitly opted into the migration get these rules. */
+.anm-migrated.anm-managed-title {
+  color: var(--anm-text);
+  font-size: var(--anm-text-lg);
+  font-weight: var(--anm-weight-bold);
+  line-height: var(--anm-leading-heading);
+}
+.anm-migrated.anm-managed-copy {
+  color: inherit;
+  font-size: var(--anm-text-button);
+  line-height: var(--anm-leading);
+  overflow-wrap: anywhere;
+}
+.anm-migrated.anm-check {
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  min-height: var(--anm-control-height);
+  height: auto;
+  padding: var(--anm-space-2);
+  color: var(--anm-text);
+  background: var(--anm-surface-muted);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-control);
+  font-size: var(--anm-text-xs);
+}
+.anm-migrated.anm-check > span { white-space: normal; overflow-wrap: anywhere; }
+.anm-migrated.user-management-tabs { margin-top: var(--anm-space-4); flex-wrap: nowrap; }
+.anm-migrated.user-management-tab { min-width: 7.5rem; }
+.anm-migrated.app-protocol-confirm { padding-top: var(--anm-space-12); }
+.anm-migrated.app-protocol-confirm-x {
+  width: var(--anm-control-height);
+  height: var(--anm-control-height);
+  padding: 0;
+  font-size: var(--anm-text-heading);
+}
+/* The help component is shared; this opt-in class affects only its admin instance. */
+.anm-management-help.help-overlay { background: var(--anm-overlay); }
+.anm-management-help .help-overlay-dialog {
+  background: var(--anm-surface);
+  color: var(--anm-text);
+  border-color: var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  box-shadow: var(--anm-shadow-dialog);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+}
+.anm-management-help .help-overlay-head { background: var(--anm-surface-muted); border-color: var(--anm-border); }
+.anm-management-help .help-overlay-copy h3 { color: var(--anm-text); font-size: var(--anm-text-lg); }
+.anm-management-help .help-overlay-copy p,
+.anm-management-help .help-overlay-content { color: var(--anm-text-muted); }
+.anm-management-help .help-overlay-close {
+  min-height: var(--anm-control-height);
+  border-color: var(--anm-border-control);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface);
+  color: var(--anm-text);
+}
+.anm-management-help .help-overlay-close:hover { background: var(--anm-brand-soft); color: var(--anm-brand-hover); }
+.anm-management-help .help-overlay-close:focus-visible {
+  outline: var(--anm-focus-width) solid var(--anm-focus);
+  outline-offset: var(--anm-focus-offset);
+}

@@ -766,13 +766,13 @@ onBeforeUnmount(() => {
 <template>
   <section class="verfahren-und-runden-bereich">
     <transition name="feedback-fade" mode="out-in">
-      <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Fehler</p>
-        <p class="error">{{ errorMessage }}</p>
+      <div v-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+        <p class="error anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
       </div>
-      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-        <p class="feedback-title">Aktion erfolgreich</p>
-        <p>{{ successMessage }}</p>
+      <div v-else-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Aktion erfolgreich</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
     </transition>
 
@@ -824,17 +824,17 @@ onBeforeUnmount(() => {
       aria-labelledby="anm-procedure-overlay-title"
       @click.self="showProcedureOverlay = false"
     >
-      <section class="anm-overlay-card">
+      <section class="anm-overlay-card anm-procedure-surface">
         <div class="anm-overlay-head">
-          <h3 id="anm-procedure-overlay-title">
+          <h3 class="anm-procedure-title anm-procedure-ui" id="anm-procedure-overlay-title">
             {{ verfahrenForm.id ? "Verfahren bearbeiten" : "Verfahren anlegen" }}
           </h3>
-          <button class="anm-overlay-close" type="button" @click="showProcedureOverlay = false">Schliessen</button>
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showProcedureOverlay = false">Schliessen</button>
         </div>
-        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
+        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error anm-alert anm-status--danger anm-procedure-ui">
           {{ errorMessage }}
         </div>
-        <div v-else-if="procedureOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+        <div v-else-if="procedureOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success anm-alert anm-status--success anm-procedure-ui">
           {{ procedureOverlaySuccessMessage }}
         </div>
         <AnmeldeverfahrenForm
@@ -857,17 +857,17 @@ onBeforeUnmount(() => {
       aria-labelledby="anm-round-overlay-title"
       @click.self="showRoundOverlay = false"
     >
-      <section class="anm-overlay-card">
+      <section class="anm-overlay-card anm-procedure-surface">
         <div class="anm-overlay-head">
-          <h3 id="anm-round-overlay-title">
+          <h3 class="anm-procedure-title anm-procedure-ui" id="anm-round-overlay-title">
             {{ rundenForm.id ? "Runde bearbeiten" : "Weitere Runde anlegen" }}
           </h3>
-          <button class="anm-overlay-close" type="button" @click="showRoundOverlay = false">Schliessen</button>
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showRoundOverlay = false">Schliessen</button>
         </div>
-        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error">
+        <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error anm-alert anm-status--danger anm-procedure-ui">
           {{ errorMessage }}
         </div>
-        <div v-else-if="roundOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success">
+        <div v-else-if="roundOverlaySuccessMessage" class="anm-overlay-feedback anm-overlay-feedback-success anm-alert anm-status--success anm-procedure-ui">
           {{ roundOverlaySuccessMessage }}
         </div>
         <AnmelderundenForm
@@ -890,12 +890,12 @@ onBeforeUnmount(() => {
       aria-labelledby="anm-start-round-overlay-title"
       @click.self="closeStartRoundOverlay"
     >
-      <section class="anm-overlay-card anm-start-round-card">
+      <section class="anm-overlay-card anm-start-round-card anm-procedure-surface">
         <div class="anm-overlay-head">
-          <h3 id="anm-start-round-overlay-title">
+          <h3 class="anm-procedure-title anm-procedure-ui" id="anm-start-round-overlay-title">
             Runde starten
           </h3>
-          <button class="anm-overlay-close" type="button" @click="closeStartRoundOverlay">Schliessen</button>
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="closeStartRoundOverlay">Schliessen</button>
         </div>
 
         <div class="anm-start-round-intro">
@@ -903,12 +903,12 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="anm-start-round-summary">
-          <p><strong>Aktuelle Runde:</strong> {{ startRoundCurrentLabel }}</p>
-          <p><strong>Naechste Runde:</strong> {{ startRoundTargetLabel }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Aktuelle Runde:</strong> {{ startRoundCurrentLabel }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Naechste Runde:</strong> {{ startRoundTargetLabel }}</p>
         </div>
 
         <div class="anm-start-round-info">
-          <p>Beim Start dieser Runde passiert Folgendes:</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Beim Start dieser Runde passiert Folgendes:</p>
           <ul>
             <li>{{ startRoundCurrentLabel }} wird beendet.</li>
             <li>{{ startRoundTargetLabel }} wechselt in den Status <strong>In Bearbeitung</strong>.</li>
@@ -919,10 +919,10 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="anm-actions">
-          <button class="btn-secondary anm-form-secondary-btn" type="button" @click="closeStartRoundOverlay">
+          <button class="anm-form-secondary-btn anm-button anm-procedure-ui" type="button" @click="closeStartRoundOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary anm-form-primary-btn" type="button" @click="startRound">
+          <button class="anm-form-primary-btn anm-button anm-button--primary anm-procedure-ui" type="button" @click="startRound">
             Runde jetzt starten
           </button>
         </div>
@@ -937,31 +937,31 @@ onBeforeUnmount(() => {
       aria-labelledby="anm-delete-round-overlay-title"
       @click.self="closeDeleteRoundOverlay"
     >
-      <section class="anm-overlay-card anm-delete-procedure-card">
+      <section class="anm-overlay-card anm-delete-procedure-card anm-procedure-surface">
         <div class="anm-overlay-head">
-          <h3 id="anm-delete-round-overlay-title">Runde endgueltig loeschen?</h3>
-          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
+          <h3 class="anm-procedure-title anm-procedure-ui" id="anm-delete-round-overlay-title">Runde endgueltig loeschen?</h3>
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
             Schliessen
           </button>
         </div>
 
         <div class="anm-delete-procedure-summary">
-          <p><strong>Rundennummer:</strong> {{ pendingDeleteRound.runden_nummer }}</p>
-          <p><strong>Bezeichnung:</strong> {{ pendingDeleteRound.bezeichnung }}</p>
-          <p><strong>Status:</strong> {{ pendingDeleteRound.status }}</p>
-          <p><strong>Zeitraum:</strong> {{ pendingDeleteRound.startdatum || "-" }} bis {{ pendingDeleteRound.enddatum || "-" }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Rundennummer:</strong> {{ pendingDeleteRound.runden_nummer }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Bezeichnung:</strong> {{ pendingDeleteRound.bezeichnung }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Status:</strong> {{ pendingDeleteRound.status }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Zeitraum:</strong> {{ pendingDeleteRound.startdatum || "-" }} bis {{ pendingDeleteRound.enddatum || "-" }}</p>
         </div>
 
         <div class="anm-delete-procedure-warning">
-          <p>Die Runde und ihre zugehoerigen Daten werden endgueltig geloescht.</p>
-          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
+          <p class="anm-procedure-copy anm-procedure-ui">Die Runde und ihre zugehoerigen Daten werden endgueltig geloescht.</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
         </div>
 
         <div class="anm-actions">
-          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
             Abbrechen
           </button>
-          <button class="anm-overlay-close" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="confirmDeleteRunde">
+          <button class="anm-overlay-close anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="confirmDeleteRunde">
             {{ deletingRundenId === pendingDeleteRound.id ? "Loesche..." : "Runde endgueltig loeschen" }}
           </button>
         </div>
@@ -976,10 +976,10 @@ onBeforeUnmount(() => {
       aria-labelledby="anm-delete-procedure-overlay-title"
       @click.self="closeDeleteProcedureOverlay"
     >
-      <section class="anm-overlay-card anm-delete-procedure-card">
+      <section class="anm-overlay-card anm-delete-procedure-card anm-procedure-surface">
         <div class="anm-overlay-head">
-          <h3 id="anm-delete-procedure-overlay-title">Verfahren endgueltig loeschen?</h3>
-          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+          <h3 class="anm-procedure-title anm-procedure-ui" id="anm-delete-procedure-overlay-title">Verfahren endgueltig loeschen?</h3>
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
             Schliessen
           </button>
         </div>
@@ -987,14 +987,14 @@ onBeforeUnmount(() => {
 
 
         <div class="anm-delete-procedure-summary">
-          <p><strong>Bezeichnung:</strong> {{ pendingDeleteProcedure.bezeichnung }}</p>
-          <p><strong>Schuljahr:</strong> {{ pendingDeleteProcedure.schuljahr }}</p>
-          <p><strong>Verfahrenstyp:</strong> {{ pendingDeleteProcedure.verfahrenstyp }}</p>
-          <p><strong>Status:</strong> {{ pendingDeleteProcedure.status }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Bezeichnung:</strong> {{ pendingDeleteProcedure.bezeichnung }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Schuljahr:</strong> {{ pendingDeleteProcedure.schuljahr }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Verfahrenstyp:</strong> {{ pendingDeleteProcedure.verfahrenstyp }}</p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Status:</strong> {{ pendingDeleteProcedure.status }}</p>
         </div>
 
         <div class="anm-delete-procedure-warning">
-          <p>Dabei werden auch alle zugehoerigen Daten entfernt, unter anderem:</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Dabei werden auch alle zugehoerigen Daten entfernt, unter anderem:</p>
           <ul>
             <li>Runden</li>
             <li>Schuelerdaten</li>
@@ -1004,14 +1004,14 @@ onBeforeUnmount(() => {
             <li>Zuweisungen</li>
             <li>Importdaten</li>
           </ul>
-          <p><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
+          <p class="anm-procedure-copy anm-procedure-ui"><strong>Dieser Vorgang kann nicht rueckgaengig gemacht werden!</strong></p>
         </div>
 
         <div class="anm-actions">
-          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
             Abbrechen
           </button>
-          <button class="anm-overlay-close" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="confirmDeleteVerfahren">
+          <button class="anm-overlay-close anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="confirmDeleteVerfahren">
             {{ deletingVerfahrenId === pendingDeleteProcedure.id ? "Loesche..." : "Verfahren endgueltig loeschen" }}
           </button>
         </div>
@@ -1026,12 +1026,12 @@ onBeforeUnmount(() => {
   gap: 0;
 }
 
-.feedback-panel {
+.feedback-panel:where(:not(.anm-procedure-ui)) {
   border-radius: 14px;
   padding: 12px 14px;
 }
 
-.feedback-panel-success {
+.feedback-panel-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #bfe5c9;
   background: #eefaf2;
   color: #1f5f37;
@@ -1039,6 +1039,9 @@ onBeforeUnmount(() => {
 
 .feedback-title {
   margin: 0 0 6px;
+}
+
+.feedback-title:where(:not(.anm-procedure-ui)) {
   font-weight: 700;
 }
 
@@ -1100,10 +1103,17 @@ onBeforeUnmount(() => {
 
 .anm-overlay-head h3 {
   margin: 0;
+}
+
+.anm-overlay-head h3:where(:not(.anm-procedure-ui)) {
   color: #19385e;
 }
 
 .anm-overlay-close {
+  cursor: pointer;
+}
+
+.anm-overlay-close:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 8px 14px;
   border: 1px solid #cfdceb;
@@ -1111,23 +1121,22 @@ onBeforeUnmount(() => {
   background: #f8fbff;
   color: #19385e;
   font-weight: 700;
-  cursor: pointer;
 }
 
-.anm-overlay-feedback {
+.anm-overlay-feedback:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 14px;
   font-size: 13px;
   line-height: 1.45;
 }
 
-.anm-overlay-feedback-error {
+.anm-overlay-feedback-error:where(:not(.anm-procedure-ui)) {
   border: 1px solid #f3b4b4;
   background: #fff1f1;
   color: #8f2525;
 }
 
-.anm-overlay-feedback-success {
+.anm-overlay-feedback-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #b9e2c0;
   background: #f2fbf4;
   color: #266b35;

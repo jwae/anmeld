@@ -626,10 +626,10 @@ onUnmounted(() => {
   <section class="import-card">
     <div class="import-card-head">
       <div>
-        <h3>
+        <h3 class="anm-procedure-title anm-procedure-ui">
           <button
             type="button"
-            class="section-toggle"
+            class="section-toggle anm-button anm-procedure-ui"
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="isExpanded = !isExpanded"
           >
@@ -637,31 +637,31 @@ onUnmounted(() => {
           </button>
           {{ title || "Schuelerpool importieren (CSV, EWO-Datei)" }}
         </h3>
-        <p>CSV-Datei laden, Vorschau pruefen und gueltige Zeilen in den Schuelerpool uebernehmen.</p>
-        <p v-show="isExpanded" class="pool-info-line">
+        <p class="anm-procedure-copy anm-procedure-ui">CSV-Datei laden, Vorschau pruefen und gueltige Zeilen in den Schuelerpool uebernehmen.</p>
+        <p v-show="isExpanded" class="pool-info-line anm-procedure-copy anm-procedure-ui">
           {{ poolCountLabel }}
           <strong>{{ poolCount === null ? "-" : poolCount }}</strong>
         </p>
       </div>
       <div class="import-head-actions">
-        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
+        <button class="anm-button anm-procedure-ui" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openCsvImportOverlay">
           Import Pooldaten (CSV, EWO)
         </button>
-        <button class="btn-secondary" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
+        <button class="anm-button anm-procedure-ui" type="button" :disabled="isReadonly || !verfahrenId || !rundeId || loading" @click="openSchildImportOverlay">
           Import Pooldaten aus Schild3
         </button>
       </div>
     </div>
 
     <div v-show="isExpanded" class="section-panel">
-    <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
+    <div v-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
     </div>
 
-    <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-      <p class="feedback-title">Erfolg</p>
-      <p>{{ successMessage }}</p>
+    <div v-else-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Erfolg</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
     </div>
 
     <div v-if="summary" class="import-summary">
@@ -677,7 +677,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="schildDiagnostics.length" class="pool-diagnostic-actions">
-      <button class="btn-secondary" type="button" @click="showSchildDiagnosticsOverlay = true">
+      <button class="anm-button anm-procedure-ui" type="button" @click="showSchildDiagnosticsOverlay = true">
         Diagnose anzeigen
       </button>
     </div>
@@ -844,28 +844,28 @@ onUnmounted(() => {
       aria-labelledby="pool-import-overlay-title"
       @click.self="closeSchildImportOverlay"
     >
-      <section class="pool-import-overlay-card">
+      <section class="pool-import-overlay-card anm-procedure-surface">
         <div class="pool-import-overlay-head">
-          <h3 id="pool-import-overlay-title">Import Pooldaten aus Schild</h3>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="pool-import-overlay-title">Import Pooldaten aus Schild</h3>
         </div>
         <div class="pool-import-overlay-copy">
-          <p>
+          <p class="anm-procedure-copy anm-procedure-ui">
             Es werden fuer alle abgebenden Schulen dieses Verfahrens die Daten der Schuelerinnen und Schueler aus Jahrgang 4
             abgerufen und in den Schuelerpool uebernommen oder aktualisiert.
           </p>
-          <p>
+          <p class="anm-procedure-copy anm-procedure-ui">
             Grundlage sind die in den Schulstammdaten hinterlegten SVWS-Zugangsdaten. Vorhandene Eintraege
             im Pool werden aktualisiert.
           </p>
-          <p>
+          <p class="anm-procedure-copy anm-procedure-ui">
             Der Abruf erfolgt fuer das aktuelle Schuljahr {{ currentSchoolYearLabel }} Abschnitt {{ currentSectionNo }}.
           </p>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="btn-secondary" type="button" :disabled="loading" @click="closeSchildImportOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" :disabled="loading" @click="closeSchildImportOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary" type="button" :disabled="loading || isReadonly" @click="confirmSchildImport">
+          <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="loading || isReadonly" @click="confirmSchildImport">
             Weiter
           </button>
         </div>
@@ -880,13 +880,13 @@ onUnmounted(() => {
       aria-labelledby="pool-edit-overlay-title"
       @click.self="closeEditPoolOverlay"
     >
-      <section class="pool-import-overlay-card pool-edit-overlay-card">
+      <section class="pool-import-overlay-card pool-edit-overlay-card anm-procedure-surface">
         <div class="pool-import-overlay-head">
-          <h3 id="pool-edit-overlay-title">Pool-Datensatz bearbeiten</h3>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="pool-edit-overlay-title">Pool-Datensatz bearbeiten</h3>
           <div class="pool-overlay-nav" aria-label="Datensatznavigation">
             <button
               type="button"
-              class="head-icon-button"
+              class="head-icon-button anm-button anm-button--icon anm-procedure-ui"
               :disabled="savingEditPool || !canEditPreviousPoolRow"
               aria-label="Vorherigen Datensatz bearbeiten"
               title="Vorheriger Datensatz"
@@ -896,7 +896,7 @@ onUnmounted(() => {
             </button>
             <button
               type="button"
-              class="head-icon-button"
+              class="head-icon-button anm-button anm-button--icon anm-procedure-ui"
               :disabled="savingEditPool || !canEditNextPoolRow"
               aria-label="Naechsten Datensatz bearbeiten"
               title="Naechster Datensatz"
@@ -906,7 +906,7 @@ onUnmounted(() => {
             </button>
             <button
               type="button"
-              class="head-icon-button pool-edit-close-button"
+              class="head-icon-button pool-edit-close-button anm-button anm-button--icon anm-procedure-ui"
               :disabled="savingEditPool || deletingPoolRow"
               aria-label="Dialog schliessen"
               title="Dialog schliessen"
@@ -921,7 +921,7 @@ onUnmounted(() => {
           <div class="pool-edit-delete-field">
             <button
               type="button"
-              class="pool-edit-inline-delete-button"
+              class="pool-edit-inline-delete-button anm-button anm-button--danger anm-procedure-ui"
               :disabled="savingEditPool || deletingPoolRow || isReadonly || !currentEditPoolRow"
               aria-label="Datensatz loeschen"
               title="Datensatz loeschen"
@@ -930,102 +930,102 @@ onUnmounted(() => {
               <i class="bi bi-trash" aria-hidden="true"></i>
             </button>
           </div>
-          <label>
-            <span>Vorname</span>
-            <input v-model="editPoolForm.vorname" class="pool-edit-input-soft" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Vorname</span>
+            <input v-model="editPoolForm.vorname" class="pool-edit-input-soft anm-input anm-procedure-ui" type="text" />
           </label>
-          <label>
-            <span>Nachname</span>
-            <input v-model="editPoolForm.nachname" class="pool-edit-input-soft" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Nachname</span>
+            <input v-model="editPoolForm.nachname" class="pool-edit-input-soft anm-input anm-procedure-ui" type="text" />
           </label>
-          <label>
-            <span>Geburtsdatum</span>
-            <input v-model="editPoolForm.geburtsdatum" type="date" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Geburtsdatum</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.geburtsdatum" type="date" />
           </label>
-          <label>
-            <span>Quell-SNR</span>
-            <input v-model="editPoolForm.herkunftsschule_snr" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Quell-SNR</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.herkunftsschule_snr" type="text" />
           </label>
-          <label>
-            <span>Schul-Nr</span>
-            <input v-model="editPoolForm.anmeldeschule_snr" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Schul-Nr</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.anmeldeschule_snr" type="text" />
           </label>
-          <label>
-            <span>Schulname</span>
-            <input v-model="editPoolForm.schule" type="text" disabled />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Schulname</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.schule" type="text" disabled />
           </label>
-          <label>
-            <span>Strasse</span>
-            <input v-model="editPoolForm.strasse" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Strasse</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.strasse" type="text" />
           </label>
-          <label>
-            <span>PLZ</span>
-            <input v-model="editPoolForm.plz" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">PLZ</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.plz" type="text" />
           </label>
-          <label>
-            <span>Ort</span>
-            <input v-model="editPoolForm.ort" type="text" />
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Ort</span>
+            <input class="anm-input anm-procedure-ui" v-model="editPoolForm.ort" type="text" />
           </label>
           <section class="pool-edit-status-section pool-edit-form-full" aria-label="Herkunft und Status">
             <div class="pool-edit-status-grid">
-              <label :title="poolFieldComment('herkunft') || undefined">
-                <span>Herkunft <i v-if="poolFieldComment('herkunft')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
-                <select v-model="editPoolForm.herkunft">
+              <label class="anm-field anm-procedure-ui" :title="poolFieldComment('herkunft') || undefined">
+                <span class="anm-label anm-procedure-ui">Herkunft <i v-if="poolFieldComment('herkunft')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select class="anm-input anm-procedure-ui" v-model="editPoolForm.herkunft">
                   <option v-for="option in herkunftOptions" :key="option" :value="option">{{ option }}</option>
                 </select>
               </label>
-              <label :title="poolFieldComment('abgleich_status') || undefined">
-                <span>Abgleichstatus <i v-if="poolFieldComment('abgleich_status')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
-                <select v-model="editPoolForm.abgleich_status">
+              <label class="anm-field anm-procedure-ui" :title="poolFieldComment('abgleich_status') || undefined">
+                <span class="anm-label anm-procedure-ui">Abgleichstatus <i v-if="poolFieldComment('abgleich_status')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select class="anm-input anm-procedure-ui" v-model="editPoolForm.abgleich_status">
                   <option v-for="option in abgleichStatusOptions" :key="option" :value="option">{{ option }}</option>
                 </select>
               </label>
-              <label :title="poolFieldComment('anmeldestatus') || undefined">
-                <span>Anmeldestatus <i v-if="poolFieldComment('anmeldestatus')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
-                <select v-model="editPoolForm.anmeldestatus">
+              <label class="anm-field anm-procedure-ui" :title="poolFieldComment('anmeldestatus') || undefined">
+                <span class="anm-label anm-procedure-ui">Anmeldestatus <i v-if="poolFieldComment('anmeldestatus')" class="bi bi-info-circle pool-edit-field-info" aria-hidden="true"></i></span>
+                <select class="anm-input anm-procedure-ui" v-model="editPoolForm.anmeldestatus">
                   <option v-for="option in anmeldestatusEditOptions" :key="option" :value="option">{{ option }}</option>
                 </select>
               </label>
             </div>
           </section>
-          <label>
-            <span>Teilnahmestatus</span>
-            <select v-model="editPoolForm.teilnahmestatus">
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Teilnahmestatus</span>
+            <select class="anm-input anm-procedure-ui" v-model="editPoolForm.teilnahmestatus">
               <option v-for="option in teilnahmestatusOptions" :key="option" :value="option">{{ option }}</option>
             </select>
           </label>
-          <label>
-            <span>LE</span>
-            <select v-model="editPoolForm.foerderbedarf">
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">LE</span>
+            <select class="anm-input anm-procedure-ui" v-model="editPoolForm.foerderbedarf">
               <option value="0">Nein</option>
               <option value="1">Ja</option>
             </select>
           </label>
-          <label>
-            <span>ZD</span>
-            <select v-model="editPoolForm.zieldifferent">
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">ZD</span>
+            <select class="anm-input anm-procedure-ui" v-model="editPoolForm.zieldifferent">
               <option value="0">Nein</option>
               <option value="1">Ja</option>
             </select>
           </label>
-          <label>
-            <span>EF</span>
-            <select v-model="editPoolForm.ef">
+          <label class="anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">EF</span>
+            <select class="anm-input anm-procedure-ui" v-model="editPoolForm.ef">
               <option value="0">Nein</option>
               <option value="1">Ja</option>
             </select>
           </label>
-          <label class="pool-edit-form-full">
-            <span>Bemerkung</span>
-            <textarea v-model="editPoolForm.bemerkung" rows="4"></textarea>
+          <label class="pool-edit-form-full anm-field anm-procedure-ui">
+            <span class="anm-label anm-procedure-ui">Bemerkung</span>
+            <textarea class="anm-input anm-procedure-ui" v-model="editPoolForm.bemerkung" rows="4"></textarea>
           </label>
           </div>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="btn-secondary" type="button" :disabled="savingEditPool" @click="closeEditPoolOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" :disabled="savingEditPool" @click="closeEditPoolOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary" type="button" :disabled="savingEditPool || isReadonly" @click="saveEditPoolRow">
+          <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="savingEditPool || isReadonly" @click="saveEditPoolRow">
             {{ savingEditPool ? "Speichere..." : "Speichern" }}
           </button>
         </div>
@@ -1040,12 +1040,12 @@ onUnmounted(() => {
       aria-labelledby="pool-delete-overlay-title"
       @click.self="closeDeletePoolOverlay"
     >
-      <section class="pool-import-overlay-card pool-delete-overlay-card">
+      <section class="pool-import-overlay-card pool-delete-overlay-card anm-procedure-surface">
         <div class="pool-delete-hero">
           <div class="pool-delete-badge" aria-hidden="true">!</div>
           <div>
-            <h3 id="pool-delete-overlay-title">Datensatz wirklich loeschen?</h3>
-            <p>Diese Aktion entfernt das Kind aus dem Schuelerpool der aktuellen Runde.</p>
+            <h3 class="anm-procedure-title anm-procedure-ui" id="pool-delete-overlay-title">Datensatz wirklich loeschen?</h3>
+            <p class="anm-procedure-copy anm-procedure-ui">Diese Aktion entfernt das Kind aus dem Schuelerpool der aktuellen Runde.</p>
           </div>
         </div>
 
@@ -1058,10 +1058,10 @@ onUnmounted(() => {
         </div>
 
         <div class="pool-import-overlay-actions">
-          <button class="btn-secondary" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
             Abbrechen
           </button>
-          <button class="btn-primary pool-delete-confirm-button" type="button" :disabled="deletingPoolRow || isReadonly" @click="confirmDeletePoolRow">
+          <button class="pool-delete-confirm-button anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="deletingPoolRow || isReadonly" @click="confirmDeletePoolRow">
             {{ deletingPoolRow ? "Loesche..." : "Loeschen" }}
           </button>
         </div>
@@ -1076,12 +1076,12 @@ onUnmounted(() => {
       aria-labelledby="pool-import-duplicate-conflicts-title"
       @click.self="closeDuplicateConflictsOverlay"
     >
-      <section class="pool-import-overlay-card pool-import-updates-card">
+      <section class="pool-import-overlay-card pool-import-updates-card anm-procedure-surface">
         <div class="pool-import-overlay-head">
-          <h3 id="pool-import-duplicate-conflicts-title"><span class="warning-icon" aria-hidden="true">!</span>Doppelte Schueler-IDs</h3>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="pool-import-duplicate-conflicts-title"><span class="warning-icon" aria-hidden="true">!</span>Doppelte Schueler-IDs</h3>
         </div>
         <div class="pool-import-overlay-copy">
-          <p>Diese Datensaetze wurden wegen eines mehrdeutigen Identitaetskonflikts nicht importiert.</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Diese Datensaetze wurden wegen eines mehrdeutigen Identitaetskonflikts nicht importiert.</p>
           <div class="pool-import-updates-list">
             <div
               v-for="(entry, index) in duplicateConflicts"
@@ -1093,7 +1093,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="btn-primary" type="button" @click="closeDuplicateConflictsOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" @click="closeDuplicateConflictsOverlay">
             Schliessen
           </button>
         </div>
@@ -1108,12 +1108,12 @@ onUnmounted(() => {
       aria-labelledby="pool-import-diagnostics-title"
       @click.self="closeSchildDiagnosticsOverlay"
     >
-      <section class="pool-import-overlay-card pool-import-diagnostics-card">
+      <section class="pool-import-overlay-card pool-import-diagnostics-card anm-procedure-surface">
         <div class="pool-import-overlay-head">
-          <h3 id="pool-import-diagnostics-title">Backend-Diagnose Schild-Import</h3>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="pool-import-diagnostics-title">Backend-Diagnose Schild-Import</h3>
         </div>
         <div class="pool-import-overlay-copy">
-          <p>Diese Werte kommen direkt aus dem Backend pro Schule und helfen beim Eingrenzen des Imports.</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Diese Werte kommen direkt aus dem Backend pro Schule und helfen beim Eingrenzen des Imports.</p>
           <div class="pool-diagnostic-list">
             <article
               v-for="entry in schildDiagnostics"
@@ -1140,12 +1140,12 @@ onUnmounted(() => {
                 <div><strong>Uebersprungen:</strong> {{ entry.skipped_rows ?? "-" }}</div>
                 <div><strong>Fehler:</strong> {{ entry.error_rows ?? "-" }}</div>
               </div>
-              <p v-if="entry.message" class="pool-diagnostic-message">{{ entry.message }}</p>
+              <p v-if="entry.message" class="pool-diagnostic-message anm-procedure-copy anm-procedure-ui">{{ entry.message }}</p>
             </article>
           </div>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="btn-primary" type="button" @click="closeSchildDiagnosticsOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
             Schliessen
           </button>
         </div>
@@ -1177,10 +1177,13 @@ onUnmounted(() => {
 
 .import-card h3 {
   margin: 0;
-  color: #19365b;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.import-card h3:where(:not(.anm-procedure-ui)) {
+  color: #19365b;
   font-size: 1.3em;
 }
 
@@ -1194,17 +1197,20 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: 34px;
+  cursor: pointer;
+}
+
+.section-toggle:where(:not(.anm-procedure-ui)) {
   height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.section-toggle:hover {
+.section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
 }
 
@@ -1225,12 +1231,18 @@ onUnmounted(() => {
 
 .import-card p {
   margin: 8px 0 0;
+}
+
+.import-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;
 }
 
 .pool-info-line {
   margin-top: 10px;
+}
+
+.pool-info-line:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
@@ -1252,19 +1264,22 @@ onUnmounted(() => {
 
 .head-icon-button {
   width: 40px;
-  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.head-icon-button:where(:not(.anm-procedure-ui)) {
+  height: 40px;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-.head-icon-button:hover {
+.head-icon-button:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
   transform: translateY(-1px);
 }
@@ -1272,6 +1287,9 @@ onUnmounted(() => {
 .head-icon-button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.head-icon-button:disabled:where(:not(.anm-procedure-ui)) {
   transform: none;
 }
 
@@ -1285,7 +1303,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.import-head-actions .btn-secondary {
+.import-head-actions .btn-secondary:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid #c8dbef;
@@ -1301,32 +1319,35 @@ onUnmounted(() => {
     color 0.18s ease;
 }
 
-.import-head-actions .btn-secondary:hover:not(:disabled) {
+.import-head-actions .btn-secondary:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
 }
 
 .import-head-actions .btn-secondary:disabled {
-  background: #f3f6fa;
-  color: #8ba0b8;
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-.btn-primary,
-.btn-secondary {
+.import-head-actions .btn-secondary:disabled:where(:not(.anm-procedure-ui)) {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+}
+
+.btn-primary:where(:not(.anm-procedure-ui)),
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 16px;
   font-weight: 700;
   border: 0;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-procedure-ui)) {
   background: linear-gradient(180deg, #1f72d8 0%, #1459a8 100%);
   color: #ffffff;
 }
 
-.btn-secondary {
+.btn-secondary:where(:not(.anm-procedure-ui)) {
   background: #eef4fd;
   color: #17385f;
 }
@@ -1337,7 +1358,7 @@ onUnmounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.import-summary div {
+.import-summary div:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border: 1px solid #dbe4f0;
   border-radius: 14px;
@@ -1362,6 +1383,9 @@ onUnmounted(() => {
 
 .import-preview-head span {
   margin-top: 4px;
+}
+
+.import-preview-head span:where(:not(.anm-procedure-ui)) {
   color: #5d7390;
 }
 
@@ -1392,10 +1416,13 @@ onUnmounted(() => {
 }
 
 .pool-metric-card span {
+  text-transform: uppercase;
+}
+
+.pool-metric-card span:where(:not(.anm-procedure-ui)) {
   color: #5a7393;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
@@ -1417,6 +1444,9 @@ onUnmounted(() => {
 
 .pool-search-input-wrap input {
   width: 100%;
+}
+
+.pool-search-input-wrap input:where(:not(.anm-procedure-ui)) {
   padding-right: 40px;
 }
 
@@ -1447,15 +1477,18 @@ onUnmounted(() => {
 }
 
 .pool-table-toolbar span {
+  text-transform: uppercase;
+}
+
+.pool-table-toolbar span:where(:not(.anm-procedure-ui)) {
   color: #5a7393;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.pool-table-toolbar input,
-.pool-table-toolbar select {
+.pool-table-toolbar input:where(:not(.anm-procedure-ui)),
+.pool-table-toolbar select:where(:not(.anm-procedure-ui)) {
   min-height: 32px;
   border: 1px solid #d7e2ef;
   border-radius: 8px;
@@ -1706,10 +1739,13 @@ onUnmounted(() => {
 
 .pool-import-overlay-head h3 {
   margin: 0;
-  color: #19365b;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.pool-import-overlay-head h3:where(:not(.anm-procedure-ui)) {
+  color: #19365b;
 }
 
 .pool-overlay-nav {
@@ -1739,6 +1775,9 @@ onUnmounted(() => {
 
 .pool-import-overlay-copy p {
   margin: 0;
+}
+
+.pool-import-overlay-copy p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.6;
 }
@@ -1772,7 +1811,7 @@ onUnmounted(() => {
   color: #19365b;
 }
 
-.pool-diagnostic-item-head span {
+.pool-diagnostic-item-head span:where(:not(.anm-procedure-ui)) {
   color: #5f7593;
   font-size: 0.92rem;
 }
@@ -1785,7 +1824,7 @@ onUnmounted(() => {
   color: #334e68;
 }
 
-.pool-diagnostic-message {
+.pool-diagnostic-message:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 12px;
   background: #eef4fd;
@@ -1815,11 +1854,17 @@ onUnmounted(() => {
 
 .pool-delete-hero h3 {
   margin: 0 0 4px;
+}
+
+.pool-delete-hero h3:where(:not(.anm-procedure-ui)) {
   color: #7f1d1d;
 }
 
 .pool-delete-hero p {
   margin: 0;
+}
+
+.pool-delete-hero p:where(:not(.anm-procedure-ui)) {
   color: #7b4150;
   line-height: 1.55;
 }
@@ -1840,7 +1885,7 @@ onUnmounted(() => {
   font-size: 16px;
 }
 
-.pool-delete-summary span {
+.pool-delete-summary span:where(:not(.anm-procedure-ui)) {
   color: #9a3412;
   font-size: 13px;
 }
@@ -1854,16 +1899,19 @@ onUnmounted(() => {
 
 .pool-delete-note p {
   margin: 0;
+}
+
+.pool-delete-note p:where(:not(.anm-procedure-ui)) {
   color: #475569;
 }
 
-.pool-delete-confirm-button {
+.pool-delete-confirm-button:where(:not(.anm-procedure-ui)) {
   background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
   border-color: #dc2626;
   box-shadow: 0 12px 24px rgba(220, 38, 38, 0.2);
 }
 
-.pool-delete-confirm-button:hover:not(:disabled) {
+.pool-delete-confirm-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
   border-color: #b91c1c;
 }
@@ -1895,20 +1943,23 @@ onUnmounted(() => {
 
 .pool-edit-inline-delete-button {
   width: 42px;
-  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.pool-edit-inline-delete-button:where(:not(.anm-procedure-ui)) {
+  height: 34px;
   border: 1px solid #f0a8a8;
   border-radius: 10px;
   background: #fff1f1;
   color: #b42318;
   font-size: 17px;
-  cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.pool-edit-inline-delete-button:hover:not(:disabled) {
+.pool-edit-inline-delete-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   border-color: #d92d20;
   background: #d92d20;
@@ -1946,10 +1997,13 @@ onUnmounted(() => {
 }
 
 .pool-edit-form-grid span {
+  text-transform: uppercase;
+}
+
+.pool-edit-form-grid span:where(:not(.anm-procedure-ui)) {
   color: #5a7393;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
@@ -1957,6 +2011,11 @@ onUnmounted(() => {
 .pool-edit-form-grid select,
 .pool-edit-form-grid textarea {
   width: 100%;
+}
+
+.pool-edit-form-grid input:where(:not(.anm-procedure-ui)),
+.pool-edit-form-grid select:where(:not(.anm-procedure-ui)),
+.pool-edit-form-grid textarea:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   border: 1px solid #d7e2ef;
   border-radius: 10px;
@@ -1967,16 +2026,19 @@ onUnmounted(() => {
 }
 
 .pool-edit-form-grid textarea {
-  min-height: 72px;
   resize: vertical;
 }
 
-.pool-edit-form-grid input:disabled {
+.pool-edit-form-grid textarea:where(:not(.anm-procedure-ui)) {
+  min-height: 72px;
+}
+
+.pool-edit-form-grid input:disabled:where(:not(.anm-procedure-ui)) {
   background: #f3f7fb;
   color: #6b7f99;
 }
 
-.pool-edit-input-soft {
+.pool-edit-input-soft:where(:not(.anm-procedure-ui)) {
   background: #f7fbff;
   font-weight: 700;
 }

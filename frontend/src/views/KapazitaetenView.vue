@@ -345,11 +345,11 @@ watch(() => props.verfahrenId, () => {
   <section class="kapazitaeten-view">
     <div class="kapazitaeten-toolbar">
       <div>
-        <p class="kapazitaeten-eyebrow">Schulkapazitäten</p>
-        <h2>
+        <p class="kapazitaeten-eyebrow anm-procedure-copy anm-procedure-ui">Schulkapazitäten</p>
+        <h2 class="anm-procedure-title anm-procedure-ui">
           <button
             type="button"
-            class="section-toggle"
+            class="section-toggle anm-button anm-procedure-ui"
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="isExpanded = !isExpanded"
           >
@@ -358,7 +358,7 @@ watch(() => props.verfahrenId, () => {
           
           Kapazitäten der aufnehmenden Schulen verwalten
         </h2>
-        <p class="kapazitaeten-intro">
+        <p class="kapazitaeten-intro anm-procedure-copy anm-procedure-ui">
           Erfasse die Kapazitäten der aufnehmenden Schulen.
         </p>
       </div>
@@ -371,23 +371,23 @@ watch(() => props.verfahrenId, () => {
       ref="kapazitaetenImportInput"
       type="file"
       accept=".csv,text/csv"
-      class="kapazitaeten-import-input"
+      class="kapazitaeten-import-input anm-input anm-procedure-ui"
       @change="handleKapazitaetenImportFileSelected"
     />
 
-    <div v-if="errorMessage && !activeForm" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
+    <div v-if="errorMessage && !activeForm" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
     </div>
 
-    <div v-else-if="successMessage" class="feedback-panel feedback-panel-success">
-      <p class="feedback-title">Erfolg</p>
-      <p>{{ successMessage }}</p>
+    <div v-else-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Erfolg</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
     </div>
 
-    <div v-if="!verfahrenId" class="feedback-panel feedback-panel-warning">
-      <p class="feedback-title">Kein Verfahren ausgewählt</p>
-      <p>Wähle zuerst ein Anmeldeverfahren in „Verfahren und Runden“, damit die Kapazitäten geladen werden können.</p>
+    <div v-if="!verfahrenId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kein Verfahren ausgewählt</p>
+      <p class="anm-procedure-copy anm-procedure-ui">Wähle zuerst ein Anmeldeverfahren in „Verfahren und Runden“, damit die Kapazitäten geladen werden können.</p>
     </div>
 
     <template v-else>
@@ -420,25 +420,25 @@ watch(() => props.verfahrenId, () => {
       class="kapazitaeten-modal-overlay"
       @click.self="closeKapazitaetenImportPreview"
     >
-      <section class="kapazitaeten-modal" role="dialog" aria-modal="true" aria-labelledby="kapazitaeten-import-title">
+      <section class="kapazitaeten-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="kapazitaeten-import-title">
         <div class="kapazitaeten-modal-head">
           <div>
-            <p class="kapazitaeten-import-eyebrow">CSV-Import</p>
-            <h3 id="kapazitaeten-import-title">Kapazitaeten importieren</h3>
-            <p>
+            <p class="kapazitaeten-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import</p>
+            <h3 class="anm-procedure-title anm-procedure-ui" id="kapazitaeten-import-title">Kapazitaeten importieren</h3>
+            <p class="anm-procedure-copy anm-procedure-ui">
               Schritt {{ kapazitaetenImportStep }} von 3 |
               {{ kapazitaetenImportStep === 1 ? "Datei auswaehlen" : kapazitaetenImportStep === 2 ? "Vorschau pruefen" : "Ergebnis" }}
             </p>
           </div>
-          <button class="kapazitaeten-wizard-header-close" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
+          <button class="kapazitaeten-wizard-header-close anm-button anm-procedure-ui" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
             Schliessen
           </button>
         </div>
 
         <div class="kapazitaeten-import-body">
-          <div v-if="errorMessage" class="feedback-panel feedback-panel-error kapazitaeten-import-error">
-            <p class="feedback-title">Fehler</p>
-            <p>{{ errorMessage }}</p>
+          <div v-if="errorMessage" class="feedback-panel feedback-panel-error kapazitaeten-import-error anm-alert anm-status--danger anm-procedure-ui">
+            <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+            <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
           </div>
 
           <div v-if="kapazitaetenImportStep === 1" class="kapazitaeten-import-upload-step">
@@ -448,9 +448,9 @@ watch(() => props.verfahrenId, () => {
             @drop.prevent="handleKapazitaetenImportFileDrop"
           >
             <strong>Importdatei auswaehlen</strong>
-            <p>CSV-Datei hier ablegen oder ueber den Dateidialog auswaehlen.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">CSV-Datei hier ablegen oder ueber den Dateidialog auswaehlen.</p>
             <div class="kapazitaeten-import-file-selection">
-              <button class="btn-primary" type="button" :disabled="importSaving" @click="openKapazitaetenImportFilePicker">
+              <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="importSaving" @click="openKapazitaetenImportFilePicker">
                 Datei auswaehlen
               </button>
               <strong v-if="kapazitaetenImportFileName">{{ kapazitaetenImportFileName }}</strong>
@@ -458,8 +458,8 @@ watch(() => props.verfahrenId, () => {
           </div>
 
           <section class="kapazitaeten-import-guide">
-            <h4>Hinweise zur Importdatei</h4>
-            <p>
+            <h4 class="anm-procedure-title anm-procedure-ui">Hinweise zur Importdatei</h4>
+            <p class="anm-procedure-copy anm-procedure-ui">
               Der Import legt Kapazitaeten anhand von Schulnummer und Jahrgang neu an oder aktualisiert
               bereits vorhandene Eintraege. Vor der Uebernahme werden alle Zeilen geprueft und als
               neu, geaendert, unveraendert oder fehlerhaft gekennzeichnet.
@@ -468,15 +468,15 @@ watch(() => props.verfahrenId, () => {
               <strong>Dateiformat</strong>
               <span>CSV mit Semikolon als Trennzeichen, Kopfzeile und Zeichensatz UTF-8.</span>
             </div>
-            <p class="kapazitaeten-import-columns-label">Erforderliche Spalten:</p>
+            <p class="kapazitaeten-import-columns-label anm-procedure-copy anm-procedure-ui">Erforderliche Spalten:</p>
             <code class="kapazitaeten-import-columns">snr;jahrgang;maximale_klassen;maximale_schueler_pro_klasse;gesamtkapazitaet;reservierte_plaetze</code>
           </section>
           </div>
 
           <div v-else-if="kapazitaetenImportStep === 2" class="kapazitaeten-import-preview-step">
           <div class="kapazitaeten-import-preview-summary">
-            <p>Die Datei <strong>{{ kapazitaetenImportFileName }}</strong> enthaelt {{ kapazitaetenImportSummary.total_rows }} gelesene Zeile(n).</p>
-            <p>{{ kapazitaetenImportSummary.valid_rows }} gueltig, {{ kapazitaetenImportSummary.invalid_rows }} fehlerhaft, {{ kapazitaetenImportSummary.selected_rows }} ausgewaehlt.</p>
+            <p class="anm-procedure-copy anm-procedure-ui">Die Datei <strong>{{ kapazitaetenImportFileName }}</strong> enthaelt {{ kapazitaetenImportSummary.total_rows }} gelesene Zeile(n).</p>
+            <p class="anm-procedure-copy anm-procedure-ui">{{ kapazitaetenImportSummary.valid_rows }} gueltig, {{ kapazitaetenImportSummary.invalid_rows }} fehlerhaft, {{ kapazitaetenImportSummary.selected_rows }} ausgewaehlt.</p>
             <div class="kapazitaeten-import-status-summary">
               <span class="is-new">Neu: {{ kapazitaetenImportStatusSummary.neu }}</span>
               <span class="is-change">Aenderung: {{ kapazitaetenImportStatusSummary.aenderung }}</span>
@@ -538,8 +538,8 @@ watch(() => props.verfahrenId, () => {
           <div v-else class="kapazitaeten-import-result" role="status" aria-live="polite">
             <div class="kapazitaeten-import-result-icon" aria-hidden="true">✓</div>
             <div>
-              <h4>Import erfolgreich abgeschlossen</h4>
-              <p>{{ kapazitaetenImportResult?.imported_count || 0 }} Kapazitaet(en) wurden verarbeitet.</p>
+              <h4 class="anm-procedure-title anm-procedure-ui">Import erfolgreich abgeschlossen</h4>
+              <p class="anm-procedure-copy anm-procedure-ui">{{ kapazitaetenImportResult?.imported_count || 0 }} Kapazitaet(en) wurden verarbeitet.</p>
             </div>
             <div class="kapazitaeten-import-result-summary">
               <div><strong>{{ kapazitaetenImportResult?.created_count || 0 }}</strong><span>Neu</span></div>
@@ -550,12 +550,12 @@ watch(() => props.verfahrenId, () => {
         </div>
 
         <div class="kapazitaeten-modal-actions">
-          <button class="kapazitaeten-wizard-close" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
+          <button class="kapazitaeten-wizard-close anm-button anm-procedure-ui" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
             {{ kapazitaetenImportStep === 3 ? "Schliessen" : "Abbrechen" }}
           </button>
           <div v-if="kapazitaetenImportStep < 3" class="kapazitaeten-import-navigation">
             <button
-              class="kapazitaeten-import-nav-button"
+              class="kapazitaeten-import-nav-button anm-button anm-button--icon anm-procedure-ui"
               type="button"
               title="Zurueck"
               aria-label="Zurueck"
@@ -566,7 +566,7 @@ watch(() => props.verfahrenId, () => {
             </button>
             <button
               v-if="kapazitaetenImportStep === 1"
-              class="kapazitaeten-import-nav-button is-primary"
+              class="kapazitaeten-import-nav-button is-primary anm-button anm-button--primary anm-button--icon anm-procedure-ui"
               type="button"
               title="Weiter zur Vorschau"
               aria-label="Weiter zur Vorschau"
@@ -577,7 +577,7 @@ watch(() => props.verfahrenId, () => {
             </button>
             <button
               v-else
-              class="kapazitaeten-wizard-submit"
+              class="kapazitaeten-wizard-submit anm-button anm-button--primary anm-procedure-ui"
               type="button"
               @click="confirmKapazitaetenImport"
               :disabled="importSaving || !kapazitaetenImportPreviewData.some((row) => row?.selected && row?.status !== 'Fehler')"
@@ -614,10 +614,13 @@ watch(() => props.verfahrenId, () => {
 
 .kapazitaeten-toolbar h2 {
   margin: 0;
-  color: #17385f;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.kapazitaeten-toolbar h2:where(:not(.anm-procedure-ui)) {
+  color: #17385f;
   font-size: 1.3em;
 }
 
@@ -631,17 +634,20 @@ watch(() => props.verfahrenId, () => {
   align-items: center;
   justify-content: center;
   width: 34px;
+  cursor: pointer;
+}
+
+.section-toggle:where(:not(.anm-procedure-ui)) {
   height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.section-toggle:hover {
+.section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
 }
 
@@ -662,17 +668,23 @@ watch(() => props.verfahrenId, () => {
 
 .kapazitaeten-eyebrow {
   margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.kapazitaeten-eyebrow:where(:not(.anm-procedure-ui)) {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #6680a3;
 }
 
 .kapazitaeten-intro {
   margin: 8px 0 0;
-  color: #4a607e;
   max-width: 64ch;
+}
+
+.kapazitaeten-intro:where(:not(.anm-procedure-ui)) {
+  color: #4a607e;
   line-height: 1.5;
 }
 
@@ -682,7 +694,7 @@ watch(() => props.verfahrenId, () => {
   flex-wrap: wrap;
 }
 
-.btn-primary,
+.btn-primary:where(:not(.anm-procedure-ui)),
 .btn-secondary {
   border-radius: 999px;
   padding: 10px 16px;
@@ -690,7 +702,7 @@ watch(() => props.verfahrenId, () => {
   border: 0;
 }
 
-.btn-primary {
+.btn-primary:where(:not(.anm-procedure-ui)) {
   background: linear-gradient(180deg, #1f72d8 0%, #1459a8 100%);
   color: #ffffff;
 }
@@ -704,7 +716,7 @@ watch(() => props.verfahrenId, () => {
   display: none;
 }
 
-.feedback-panel-warning {
+.feedback-panel-warning:where(:not(.anm-procedure-ui)) {
   border: 1px solid #d9d9c8;
   background: #fffdf3;
 }
@@ -743,24 +755,37 @@ watch(() => props.verfahrenId, () => {
 
 .kapazitaeten-modal-head h3 {
   margin: 0;
+}
+
+.kapazitaeten-modal-head h3:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
 .kapazitaeten-import-eyebrow {
   margin: 0 0 6px !important;
+  text-transform: uppercase;
+}
+
+.kapazitaeten-import-eyebrow:where(:not(.anm-procedure-ui)) {
   color: #6680a3 !important;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 
 .kapazitaeten-modal-head p {
   margin: 8px 0 0;
+}
+
+.kapazitaeten-modal-head p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
 }
 
 .kapazitaeten-wizard-header-close {
+  cursor: pointer;
+}
+
+.kapazitaeten-wizard-header-close:where(:not(.anm-procedure-ui)) {
   min-height: 42px;
   padding: 0 16px;
   border: 1px solid #cdd8e6;
@@ -768,16 +793,19 @@ watch(() => props.verfahrenId, () => {
   background: linear-gradient(180deg, #ffffff 0%, #f4f8fc 100%);
   color: #355172;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.kapazitaeten-wizard-header-close:hover:not(:disabled) {
+.kapazitaeten-wizard-header-close:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: linear-gradient(180deg, #fdfefe 0%, #edf4fb 100%);
 }
 
 .kapazitaeten-wizard-close {
+  cursor: pointer;
+}
+
+.kapazitaeten-wizard-close:where(:not(.anm-procedure-ui)) {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid #cdd8e6;
@@ -785,16 +813,19 @@ watch(() => props.verfahrenId, () => {
   background: #ffffff;
   color: #355172;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.kapazitaeten-wizard-close:hover:not(:disabled) {
+.kapazitaeten-wizard-close:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: #f8fbff;
 }
 
 .kapazitaeten-wizard-submit {
+  cursor: pointer;
+}
+
+.kapazitaeten-wizard-submit:where(:not(.anm-procedure-ui)) {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid #163b67;
@@ -802,12 +833,11 @@ watch(() => props.verfahrenId, () => {
   background: linear-gradient(180deg, #214f86 0%, #163b67 100%);
   color: #ffffff;
   font-weight: 700;
-  cursor: pointer;
   box-shadow: 0 10px 24px rgba(22, 59, 103, 0.22);
   transition: all 0.2s ease;
 }
 
-.kapazitaeten-wizard-submit:hover:not(:disabled) {
+.kapazitaeten-wizard-submit:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #102a49;
   background: linear-gradient(180deg, #1d4677 0%, #102a49 100%);
 }
@@ -817,6 +847,11 @@ watch(() => props.verfahrenId, () => {
 .kapazitaeten-wizard-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.kapazitaeten-wizard-header-close:disabled:where(:not(.anm-procedure-ui)),
+.kapazitaeten-wizard-close:disabled:where(:not(.anm-procedure-ui)),
+.kapazitaeten-wizard-submit:disabled:where(:not(.anm-procedure-ui)) {
   box-shadow: none;
 }
 
@@ -862,12 +897,12 @@ watch(() => props.verfahrenId, () => {
   margin: 0;
 }
 
-.kapazitaeten-import-guide h4 {
+.kapazitaeten-import-guide h4:where(:not(.anm-procedure-ui)) {
   color: #14532d;
   font-size: 17px;
 }
 
-.kapazitaeten-import-guide p {
+.kapazitaeten-import-guide p:where(:not(.anm-procedure-ui)) {
   line-height: 1.55;
 }
 
@@ -885,7 +920,7 @@ watch(() => props.verfahrenId, () => {
   font-size: 13px;
 }
 
-.kapazitaeten-import-columns-label {
+.kapazitaeten-import-columns-label:where(:not(.anm-procedure-ui)) {
   font-size: 13px;
   font-weight: 700;
 }
@@ -920,6 +955,10 @@ watch(() => props.verfahrenId, () => {
 .kapazitaeten-import-dropzone p,
 .kapazitaeten-import-dropzone span {
   margin: 0;
+}
+
+.kapazitaeten-import-dropzone p:where(:not(.anm-procedure-ui)),
+.kapazitaeten-import-dropzone span {
   color: #4f6483;
 }
 
@@ -947,6 +986,9 @@ watch(() => props.verfahrenId, () => {
 
 .kapazitaeten-import-preview-summary p {
   margin: 0;
+}
+
+.kapazitaeten-import-preview-summary p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
 }
 
@@ -1015,6 +1057,9 @@ watch(() => props.verfahrenId, () => {
 
 .kapazitaeten-import-result h4 {
   margin-bottom: 5px;
+}
+
+.kapazitaeten-import-result h4:where(:not(.anm-procedure-ui)) {
   color: #14532d;
   font-size: 18px;
 }
@@ -1029,6 +1074,9 @@ watch(() => props.verfahrenId, () => {
 .kapazitaeten-import-result-summary div {
   display: grid;
   gap: 3px;
+}
+
+.kapazitaeten-import-result-summary div:where(:not(.anm-procedure-ui)) {
   padding: 14px;
   border: 1px solid #cde8d4;
   border-radius: 14px;
@@ -1054,16 +1102,19 @@ watch(() => props.verfahrenId, () => {
   align-items: center;
   justify-content: center;
   width: 44px;
+  cursor: pointer;
+}
+
+.kapazitaeten-import-nav-button:where(:not(.anm-procedure-ui)) {
   height: 44px;
   padding: 0;
   border: 1px solid #cdd8e6;
   border-radius: 14px;
   background: #ffffff;
   color: #355172;
-  cursor: pointer;
 }
 
-.kapazitaeten-import-nav-button.is-primary {
+.kapazitaeten-import-nav-button.is-primary:where(:not(.anm-procedure-ui)) {
   border-color: #163b67;
   background: linear-gradient(180deg, #214f86 0%, #163b67 100%);
   color: #ffffff;
@@ -1073,6 +1124,9 @@ watch(() => props.verfahrenId, () => {
 .kapazitaeten-import-nav-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.kapazitaeten-import-nav-button:disabled:where(:not(.anm-procedure-ui)) {
   box-shadow: none;
 }
 

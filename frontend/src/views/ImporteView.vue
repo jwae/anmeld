@@ -98,16 +98,16 @@ async function handleDeleteAll() {
 
     <section v-if="canDeleteStudentData" class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
-        <p class="importe-eyebrow">Gefahrenbereich</p>
-        <h3>
+        <p class="importe-eyebrow anm-procedure-copy anm-procedure-ui">Gefahrenbereich</p>
+        <h3 class="anm-procedure-title anm-procedure-ui">
           <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
           <span>Schülerdaten löschen</span>
         </h3>
-        <p>Diese Aktion löscht aus dem aktivierten Verfahren alle Schülerdaten aus den Import-, Abgleich- und Falltabellen.</p>
+        <p class="anm-procedure-copy anm-procedure-ui">Diese Aktion löscht aus dem aktivierten Verfahren alle Schülerdaten aus den Import-, Abgleich- und Falltabellen.</p>
       </div>
 
       <button
-        class="btn-danger"
+        class="anm-button anm-button--danger anm-procedure-ui"
         type="button"
         :disabled="loading || isReadonly || !verfahrenId"
         @click="openDeleteAllConfirm"
@@ -118,16 +118,16 @@ async function handleDeleteAll() {
 
     <Teleport to="body">
       <div v-if="deleteAllConfirmOpen" class="delete-all-backdrop" @click.self="closeDeleteAllConfirm">
-        <section class="delete-all-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
-          <button class="delete-all-close" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
+        <section class="delete-all-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
+          <button class="delete-all-close anm-button anm-procedure-ui" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
           <div class="delete-all-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
           <div class="delete-all-copy">
-            <h3 id="delete-all-title">Alle Schülerdaten löschen?</h3>
-            <p>Alle Schülerdaten des Verfahrens <strong>{{ context?.verfahren || "Aktuelles Verfahren" }}</strong> werden aus den Import-, Abgleich- und Falltabellen gelöscht.</p>
-            <p class="delete-all-warning">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <h3 class="anm-procedure-title anm-procedure-ui" id="delete-all-title">Alle Schülerdaten löschen?</h3>
+            <p class="anm-procedure-copy anm-procedure-ui">Alle Schülerdaten des Verfahrens <strong>{{ context?.verfahren || "Aktuelles Verfahren" }}</strong> werden aus den Import-, Abgleich- und Falltabellen gelöscht.</p>
+            <p class="delete-all-warning anm-procedure-copy anm-procedure-ui">Diese Aktion kann nicht rückgängig gemacht werden.</p>
           </div>
           <footer>
-            <button class="delete-all-submit" type="button" :disabled="loading" @click="handleDeleteAll">
+            <button class="delete-all-submit anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="loading" @click="handleDeleteAll">
               <i class="bi bi-trash3" aria-hidden="true"></i>
               {{ loading ? "Lösche..." : "Endgültig löschen" }}
             </button>
@@ -147,6 +147,9 @@ async function handleDeleteAll() {
 .importe-eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
+}
+
+.importe-eyebrow:where(:not(.anm-procedure-ui)) {
   letter-spacing: 0.14em;
   font-size: 12px;
   font-weight: 700;
@@ -174,31 +177,40 @@ async function handleDeleteAll() {
 
 .importe-danger-zone-copy h3 {
   margin: 0;
-  color: #7f1d1d;
-  font-size: 1.3em;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+.importe-danger-zone-copy h3:where(:not(.anm-procedure-ui)) {
+  color: #7f1d1d;
+  font-size: 1.3em;
+}
+
 .importe-danger-zone-copy p:not(.importe-eyebrow) {
   margin: 0;
+}
+
+.importe-danger-zone-copy p:not(.importe-eyebrow):where(:not(.anm-procedure-ui)) {
   color: #7f1d1d;
   line-height: 1.55;
 }
 
 .btn-danger {
+  cursor: pointer;
+}
+
+.btn-danger:where(:not(.anm-procedure-ui)) {
   border-radius: 999px;
   padding: 10px 18px;
   font-weight: 700;
   border: 1px solid #fca5a5;
   background: #fee2e2;
   color: #991b1b;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.btn-danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   background: #fecaca;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
 }
@@ -259,6 +271,9 @@ async function handleDeleteAll() {
   top: 9px;
   right: 11px;
   width: 30px;
+}
+
+.delete-all-close:where(:not(.anm-procedure-ui)) {
   height: 30px;
   border: 0;
   border-radius: 50%;
@@ -268,15 +283,17 @@ async function handleDeleteAll() {
   line-height: 1;
 }
 
-.delete-all-close:hover:not(:disabled) { background: #fff1f2; color: #991b1b; }
+.delete-all-close:hover:not(:disabled):where(:not(.anm-procedure-ui)) { background: #fff1f2; color: #991b1b; }
 .delete-all-close:disabled { cursor: wait; opacity: 0.55; }
 .delete-all-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fee2e2; color: #b91c1c; font-size: 18px; }
-.delete-all-copy h3 { margin: 0; color: #7f1d1d; font-size: 19px; }
-.delete-all-copy p { margin: 8px 0 0; color: #65434a; line-height: 1.5; }
-.delete-all-copy .delete-all-warning { color: #991b1b; font-weight: 700; }
+.delete-all-copy h3 { margin: 0; }
+.delete-all-copy h3:where(:not(.anm-procedure-ui)) { color: #7f1d1d; font-size: 19px; }
+.delete-all-copy p { margin: 8px 0 0; }
+.delete-all-copy p:where(:not(.anm-procedure-ui)) { color: #65434a; line-height: 1.5; }
+.delete-all-copy .delete-all-warning:where(:not(.anm-procedure-ui)) { color: #991b1b; font-weight: 700; }
 .delete-all-dialog footer { grid-column: 1 / -1; display: flex; justify-content: center; margin-top: 5px; }
-.delete-all-submit { min-height: 38px; padding: 8px 16px; border: 1px solid #b91c1c; border-radius: 9px; background: #b91c1c; color: #fff; font-weight: 700; }
-.delete-all-submit:hover:not(:disabled) { background: #991b1b; }
+.delete-all-submit:where(:not(.anm-procedure-ui)) { min-height: 38px; padding: 8px 16px; border: 1px solid #b91c1c; border-radius: 9px; background: #b91c1c; color: #fff; font-weight: 700; }
+.delete-all-submit:hover:not(:disabled):where(:not(.anm-procedure-ui)) { background: #991b1b; }
 .delete-all-submit:disabled { cursor: wait; opacity: 0.65; }
 
 @media (max-width: 760px) {

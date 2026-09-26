@@ -115,3 +115,5 @@ watch(activeCredentialsMenu, (menu) => {
 
 <template src="./LoginCredentialsPage.html"></template>
 <style scoped src="./LoginCredentialsPage.css"></style>
+
+<style src="../styles/procedure.css"></style>

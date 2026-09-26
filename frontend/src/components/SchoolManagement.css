@@ -4,48 +4,12 @@
   border: 1px solid #ccc;
 }
 
-.feedback-panel {
-  padding: 12px 14px;
-}
-
-.feedback-panel:where(:not(.anm-migrated)) {
-  border-radius: 14px;
-}
-
-.feedback-panel-success:where(:not(.anm-migrated)) {
-  border: 1px solid #bfe5c9;
-  background: #eefaf2;
-  color: #1f5f37;
-}
-
-.feedback-panel-error:where(:not(.anm-migrated)) {
-  border: 1px solid #f0c2c8;
-  background: #fff4f6;
-}
-
-.feedback-panel .error {
-  margin: 0;
-}
-
-.btn-primary:where(:not(.anm-migrated)) {
-  background: #1d6ef5;
-  border-color: #1d6ef5;
-  color: #fff;
-}
-
-.btn-primary:hover:where(:not(.anm-migrated)) {
-  background: #1454c8;
-  border-color: #1454c8;
-}
-
-.btn-primary:disabled:where(:not(.anm-migrated)) {
-  background: #9fbef5;
-  border-color: #9fbef5;
-}
-
 button {
-  padding: 10px 12px;
   cursor: pointer;
+}
+
+button:where(:not(.anm-migrated)) {
+  padding: 10px 12px;
 }
 
 button:where(:not(.anm-migrated)) {
@@ -72,33 +36,6 @@ button:disabled:where(:not(.anm-migrated)) {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #2457a6;
-}
-
-.field-label:where(:not(.anm-migrated)) {
-  font-size: 12px;
-  font-weight: 600;
-  color: #314561;
-}
-
-.field-block {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.field-block input,
-.field-block select {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 6px 8px;
-}
-
-.field-block input:where(:not(.anm-migrated)),
-.field-block select:where(:not(.anm-migrated)) {
-  border: 1px solid #d6d6d6;
-  border-radius: 10px;
-  font-size: 12px;
 }
 
 .user-management-empty {
@@ -138,7 +75,6 @@ button:disabled:where(:not(.anm-migrated)) {
   gap: 10px;
 }
 
-.user-management-panel .btn-primary,
 .user-management-panel .btn-secondary {
   height: 38px;
   min-height: 38px;
@@ -146,10 +82,6 @@ button:disabled:where(:not(.anm-migrated)) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.user-management-panel .btn-primary {
-  max-width: 200px;
 }
 
 .user-management-panel-head {
@@ -274,7 +206,7 @@ button:disabled:where(:not(.anm-migrated)) {
   gap: 4px;
 }
 
-.school-management-table-head-action {
+.school-management-table-head-action:where(:not(.anm-migrated)) {
   min-height: 32px;
   padding: 6px 10px;
 }
@@ -705,7 +637,6 @@ button:disabled:where(:not(.anm-migrated)) {
   border-top: 1px solid #dbe4f0;
 }
 
-.school-management-modal-actions .btn-primary,
 .school-management-modal-actions .btn-secondary {
   min-height: 34px;
   padding: 8px 14px;
@@ -717,7 +648,6 @@ button:disabled:where(:not(.anm-migrated)) {
   white-space: nowrap;
 }
 
-.school-management-modal-actions .btn-primary:where(:not(.anm-migrated)),
 .school-management-modal-actions .btn-secondary:where(:not(.anm-migrated)) {
   line-height: 1.2;
 }
@@ -726,8 +656,11 @@ button:disabled:where(:not(.anm-migrated)) {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
   cursor: pointer;
+}
+
+.school-management-import-overwrite-toggle:where(:not(.anm-migrated)) {
+  padding: 10px 12px;
 }
 
 .school-management-import-overwrite-toggle:where(:not(.anm-migrated)) {

@@ -46,16 +46,16 @@ const selectedRound = computed<Anmelderunde | null>(
 </script>
 
 <template>
-  <section class="anm-card">
+  <section class="anm-card anm-procedure-surface">
     <div class="anm-card-head">
       <div>
-        <h3>Anmelderunden</h3>
-        <p v-if="verfahren">Runden fuer {{ verfahren.bezeichnung }}.</p>
-        <p v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
+        <h3 class="anm-procedure-title anm-procedure-ui">Anmelderunden</h3>
+        <p class="anm-procedure-copy anm-procedure-ui" v-if="verfahren">Runden fuer {{ verfahren.bezeichnung }}.</p>
+        <p class="anm-procedure-copy anm-procedure-ui" v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
       </div>
       <div class="anm-card-head-actions">
         <button
-          class="btn-secondary anm-head-btn anm-head-btn-primary"
+          class="anm-head-btn anm-head-btn-primary anm-button anm-button--primary anm-procedure-ui"
           type="button"
           :disabled="isReadonly || canCreateRound === false"
           title="Legt eine weitere Anmelderunde für das ausgewählte Verfahren an"
@@ -68,19 +68,19 @@ const selectedRound = computed<Anmelderunde | null>(
     </div>
 
     <div v-if="verfahren" class="anm-round-guidance">
-      <p v-if="verfahren.status === 'Beendet'">
+      <p class="anm-procedure-copy anm-procedure-ui" v-if="verfahren.status === 'Beendet'">
         Das Verfahren ist beendet. Die Runden stehen ausschliesslich im Review-Modus zur Verfuegung.
       </p>
-      <p v-else-if="workingRound">
+      <p class="anm-procedure-copy anm-procedure-ui" v-else-if="workingRound">
         Arbeitsrunde: <strong>Runde {{ workingRound.runden_nummer }}</strong> ist aktuell fachlich aktiv.
       </p>
-      <p v-else>
+      <p class="anm-procedure-copy anm-procedure-ui" v-else>
         Es ist noch keine Arbeitsrunde gesetzt.
       </p>
-      <p v-if="selectedRound && selectedRound.id !== workingRound?.id">
+      <p class="anm-procedure-copy anm-procedure-ui" v-if="selectedRound && selectedRound.id !== workingRound?.id">
         Ausgewaehlt ist aktuell <strong>Runde {{ selectedRound.runden_nummer }}</strong> zur Ansicht oder Bearbeitung.
       </p>
-      <p v-if="nextRoundId">
+      <p class="anm-procedure-copy anm-procedure-ui" v-if="nextRoundId">
         Als naechster fachlicher Schritt kann nur die direkt folgende vorbereitete Runde gestartet werden.
       </p>
 
@@ -90,7 +90,7 @@ const selectedRound = computed<Anmelderunde | null>(
       Nach Auswahl eines Verfahrens erscheinen hier die zugehoerigen Anmelderunden.
     </div>
 
-    <div v-else-if="loading" class="anm-loading-state">Runden werden geladen...</div>
+    <div v-else-if="loading" class="anm-loading-state anm-alert anm-procedure-ui">Runden werden geladen...</div>
 
     <div v-else class="anm-table-wrap">
       <table class="anm-table">
@@ -234,6 +234,9 @@ const selectedRound = computed<Anmelderunde | null>(
 
 .anm-card-head h3 {
   margin: 0;
+}
+
+.anm-card-head h3:where(:not(.anm-procedure-ui)) {
   color: #19385e;
   font-size: 1.12rem;
   line-height: 1.25;
@@ -241,6 +244,9 @@ const selectedRound = computed<Anmelderunde | null>(
 
 .anm-card-head p {
   margin: 4px 0 0;
+}
+
+.anm-card-head p:where(:not(.anm-procedure-ui)) {
   color: #607794;
   font-size: 12px;
 }
@@ -256,7 +262,7 @@ const selectedRound = computed<Anmelderunde | null>(
   font-size: 12px;
 }
 
-.anm-head-btn {
+.anm-head-btn:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 0 14px;
   border: 1px solid transparent;
@@ -275,25 +281,28 @@ const selectedRound = computed<Anmelderunde | null>(
     color 0.18s ease;
 }
 
-.anm-head-btn:hover:not(:disabled) {
+.anm-head-btn:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px rgba(30, 68, 107, 0.12);
 }
 
 .anm-head-btn:disabled {
-  background: #f3f6fa;
-  color: #8ba0b8;
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-.anm-head-btn-primary {
+.anm-head-btn:disabled:where(:not(.anm-procedure-ui)) {
+  background: #f3f6fa;
+  color: #8ba0b8;
+  box-shadow: none;
+}
+
+.anm-head-btn-primary:where(:not(.anm-procedure-ui)) {
   border-color: #c8dbef;
   background: #ffffff;
 }
 
 .anm-empty-state,
-.anm-loading-state,
+.anm-loading-state:where(:not(.anm-procedure-ui)),
 .anm-empty-cell {
   padding: 14px;
   border: 1px dashed #cfdbeb;
@@ -315,6 +324,9 @@ const selectedRound = computed<Anmelderunde | null>(
 
 .anm-round-guidance p {
   margin: 0;
+}
+
+.anm-round-guidance p:where(:not(.anm-procedure-ui)) {
   color: #5f7693;
   font-size: 12px;
   line-height: 1.45;

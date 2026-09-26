@@ -52,36 +52,36 @@ function downloadGsPoolExample() {
       @dragover="handleDragOver"
       @drop.prevent="$emit('drop', $event.dataTransfer?.files?.[0])"
     >
-      <p class="upload-title">CSV-Datei auswählen</p>
-      <p class="upload-copy">Datei per Drag & Drop ablegen oder über den Dateidialog auswählen.</p>
-      <button class="btn-primary" type="button" :disabled="busy" @click="$emit('pick')">
+      <p class="upload-title anm-procedure-copy anm-procedure-ui">CSV-Datei auswählen</p>
+      <p class="upload-copy anm-procedure-copy anm-procedure-ui">Datei per Drag & Drop ablegen oder über den Dateidialog auswählen.</p>
+      <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="busy" @click="$emit('pick')">
         Datei auswählen
       </button>
-      <p v-if="fileName" class="upload-file">
+      <p v-if="fileName" class="upload-file anm-procedure-copy anm-procedure-ui">
         {{ fileName }}
       </p>
     </div>
 
     <div class="upload-options">
-      <label class="upload-option upload-option-compact">
-        <span>Trennzeichen</span>
-        <select :value="options.delimiter" @change="$emit('update:delimiter', ($event.target as HTMLSelectElement).value as 'auto' | ';' | ',' | '\t')">
+      <label class="upload-option upload-option-compact anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Trennzeichen</span>
+        <select class="anm-input anm-procedure-ui" :value="options.delimiter" @change="$emit('update:delimiter', ($event.target as HTMLSelectElement).value as 'auto' | ';' | ',' | '\t')">
           <option value="auto">Automatisch</option>
           <option value=";">Semikolon</option>
           <option value=",">Komma</option>
           <option :value="'\t'">Tab</option>
         </select>
       </label>
-      <label class="upload-option upload-option-binary">
-        <span>Erste Zeile enthält Spaltennamen</span>
-        <select :value="options.hasHeaders ? 'ja' : 'nein'" @change="$emit('update:hasHeaders', ($event.target as HTMLSelectElement).value === 'ja')">
+      <label class="upload-option upload-option-binary anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Erste Zeile enthält Spaltennamen</span>
+        <select class="anm-input anm-procedure-ui" :value="options.hasHeaders ? 'ja' : 'nein'" @change="$emit('update:hasHeaders', ($event.target as HTMLSelectElement).value === 'ja')">
           <option value="ja">Ja</option>
           <option value="nein">Nein</option>
         </select>
       </label>
-      <label class="upload-option upload-option-compact">
-        <span>Zeichensatz</span>
-        <input type="text" value="UTF-8 (mit Fallback)" disabled />
+      <label class="upload-option upload-option-compact anm-field anm-procedure-ui">
+        <span class="anm-label anm-procedure-ui">Zeichensatz</span>
+        <input class="anm-input anm-procedure-ui" type="text" value="UTF-8 (mit Fallback)" disabled />
       </label>
     </div>
 
@@ -90,7 +90,7 @@ function downloadGsPoolExample() {
         <div class="guide-heading">
           <button
             type="button"
-            class="guide-section-toggle"
+            class="guide-section-toggle anm-button anm-procedure-ui"
             :aria-expanded="isFileGuideExpanded ? 'true' : 'false'"
             aria-controls="gs-import-file-content"
             aria-label="Erklärungen ein- oder ausklappen"
@@ -103,13 +103,13 @@ function downloadGsPoolExample() {
             ></span>
           </button>
           <div>
-            <p class="guide-eyebrow">Vorbereitung</p>
-            <h4 id="gs-import-file-heading">Erklärungen zum Aufbau der Importdatei und dem weiteren Ablauf.</h4>
+            <p class="guide-eyebrow anm-procedure-copy anm-procedure-ui">Vorbereitung</p>
+            <h4 class="anm-procedure-title anm-procedure-ui" id="gs-import-file-heading">Erklärungen zum Aufbau der Importdatei und dem weiteren Ablauf.</h4>
           </div>
         </div>
 
         <div v-show="isFileGuideExpanded" id="gs-import-file-content" class="guide-section-content">
-        <p class="guide-intro">
+        <p class="guide-intro anm-procedure-copy anm-procedure-ui">
           Erwartet wird eine CSV-Datei oder eine aus EWO exportierte CSV-Datei. Die erste Zeile enthält
           die Spaltennamen. Die Reihenfolge der Spalten ist beliebig, da die Felder vor dem Import
           zugeordnet werden.
@@ -189,7 +189,7 @@ function downloadGsPoolExample() {
           </table>
         </div>
 
-        <p class="guide-detail">
+        <p class="guide-detail anm-procedure-copy anm-procedure-ui">
           Zusätzlich können – sofern benötigt – <code>ef</code>, <code>teilnahmestatus</code>,
           <code>quell_jahrgang</code> und <code>bemerkung</code> importiert werden. Bei der Empfehlung
           werden auch <code>H</code>, <code>R</code>, <code>H/R</code> und <code>R/GY</code> erkannt.
@@ -200,7 +200,7 @@ function downloadGsPoolExample() {
             <strong>Beispiel für eine gültige Datei</strong>
             <span>Die Werte der Musterdatei müssen vor einem Import ersetzt werden.</span>
           </div>
-          <button class="guide-download-button" type="button" @click="downloadGsPoolExample">
+          <button class="guide-download-button anm-button anm-procedure-ui" type="button" @click="downloadGsPoolExample">
             <i class="bi bi-download" aria-hidden="true"></i>
             Musterdatei herunterladen
           </button>
@@ -212,47 +212,47 @@ function downloadGsPoolExample() {
           
           <div>
             
-            <h4 id="gs-import-process-heading">Ablauf der Importroutine</h4>
+            <h4 class="anm-procedure-title anm-procedure-ui" id="gs-import-process-heading">Ablauf der Importroutine</h4>
           </div>
         </div>
 
         <ol class="process-list">
           <li>
             <span class="process-number">1</span>
-            <div><strong>Datei auswählen</strong><p>EWO-/CSV-Datei laden und Dateieinstellungen festlegen.</p></div>
+            <div><strong>Datei auswählen</strong><p class="anm-procedure-copy anm-procedure-ui">EWO-/CSV-Datei laden und Dateieinstellungen festlegen.</p></div>
           </li>
           <li>
             <span class="process-number">2</span>
-            <div><strong>Vorschau prüfen</strong><p>Erkannte Zeilen, Spalten und das Trennzeichen kontrollieren.</p></div>
+            <div><strong>Vorschau prüfen</strong><p class="anm-procedure-copy anm-procedure-ui">Erkannte Zeilen, Spalten und das Trennzeichen kontrollieren.</p></div>
           </li>
           <li>
             <span class="process-number">3</span>
-            <div><strong>Felder zuordnen</strong><p>Die Spalten der Datei den Feldern des Schülerpools zuweisen. Passende Namen werden automatisch erkannt.</p></div>
+            <div><strong>Felder zuordnen</strong><p class="anm-procedure-copy anm-procedure-ui">Die Spalten der Datei den Feldern des Schülerpools zuweisen. Passende Namen werden automatisch erkannt.</p></div>
           </li>
           <li>
             <span class="process-number">4</span>
-            <div><strong>Daten validieren</strong><p>Neue, geänderte, bereits vorhandene und fehlerhafte Zeilen kontrollieren und auswählen.</p></div>
+            <div><strong>Daten validieren</strong><p class="anm-procedure-copy anm-procedure-ui">Neue, geänderte, bereits vorhandene und fehlerhafte Zeilen kontrollieren und auswählen.</p></div>
           </li>
           <li>
             <span class="process-number">5</span>
-            <div><strong>Import starten</strong><p>Nur ausgewählte und gültige Zeilen werden übernommen. Anschließend erscheint eine Ergebnisübersicht.</p></div>
+            <div><strong>Import starten</strong><p class="anm-procedure-copy anm-procedure-ui">Nur ausgewählte und gültige Zeilen werden übernommen. Anschließend erscheint eine Ergebnisübersicht.</p></div>
           </li>
         </ol>
         
-        <h4 id="gs-import-process-heading">Bedeutung des Prüfstatus</h4>
+        <h4 class="anm-procedure-title anm-procedure-ui" id="gs-import-process-heading">Bedeutung des Prüfstatus</h4>
         <div class="status-explanation" aria-label="Bedeutung der Prüfstatus">
           
-          <div><span class="status-dot is-new"></span><strong>Neu</strong><p>Das Kind wird neu angelegt.</p></div>
-          <div><span class="status-dot is-update"></span><strong>Update</strong><p>Ein vorhandener Datensatz wird aktualisiert.</p></div>
-          <div><span class="status-dot is-existing"></span><strong>Vorhanden</strong><p>Es sind keine Änderungen notwendig.</p></div>
-          <div><span class="status-dot is-error"></span><strong>Fehler</strong><p>Die Zeile kann nicht importiert werden.</p></div>
+          <div><span class="status-dot is-new"></span><strong>Neu</strong><p class="anm-procedure-copy anm-procedure-ui">Das Kind wird neu angelegt.</p></div>
+          <div><span class="status-dot is-update"></span><strong>Update</strong><p class="anm-procedure-copy anm-procedure-ui">Ein vorhandener Datensatz wird aktualisiert.</p></div>
+          <div><span class="status-dot is-existing"></span><strong>Vorhanden</strong><p class="anm-procedure-copy anm-procedure-ui">Es sind keine Änderungen notwendig.</p></div>
+          <div><span class="status-dot is-error"></span><strong>Fehler</strong><p class="anm-procedure-copy anm-procedure-ui">Die Zeile kann nicht importiert werden.</p></div>
         </div>
 
         <div class="guide-warning">
           <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
           <div>
             <strong>Wichtig für Aktualisierungen</strong>
-            <p>
+            <p class="anm-procedure-copy anm-procedure-ui">
               Die Importspalte <code>externe_schueler_id</code> enthält die externe Schüler-ID. Vorhandene Kinder
               werden innerhalb des aktuellen Verfahrens über diese ID und die bestehenden Identitätsregeln erkannt. Zugeordnete Felder werden aktualisiert; nicht zugeordnete
               optionale Felder bleiben unverändert. Jede Schüler-ID darf in der Importdatei nur einmal vorkommen.
@@ -293,6 +293,9 @@ function downloadGsPoolExample() {
 
 .upload-title {
   margin: 0;
+}
+
+.upload-title:where(:not(.anm-procedure-ui)) {
   font-size: 18px;
   font-weight: 700;
   color: #19365b;
@@ -301,6 +304,10 @@ function downloadGsPoolExample() {
 .upload-copy,
 .upload-file {
   margin: 0;
+}
+
+.upload-copy:where(:not(.anm-procedure-ui)),
+.upload-file:where(:not(.anm-procedure-ui)) {
   color: #4f6483;
 }
 
@@ -333,14 +340,14 @@ function downloadGsPoolExample() {
   min-width: 210px;
 }
 
-.upload-options span {
+.upload-options span:where(:not(.anm-procedure-ui)) {
   font-size: 13px;
   font-weight: 700;
   color: #45617f;
 }
 
-.upload-options select,
-.upload-options input[type="text"] {
+.upload-options select:where(:not(.anm-procedure-ui)),
+.upload-options input[type="text"]:where(:not(.anm-procedure-ui)) {
   min-height: 42px;
   border: 1px solid #c8d6e8;
   border-radius: 14px;
@@ -393,30 +400,33 @@ function downloadGsPoolExample() {
   align-items: center;
   justify-content: center;
   width: 34px;
+  cursor: pointer;
+}
+
+.guide-section-toggle:where(:not(.anm-procedure-ui)) {
   height: 34px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   background: #eef4fd;
   color: #1459a8;
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.guide-section-toggle:hover {
+.guide-section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #dbeafe;
 }
 
-.guide-section-help .guide-section-toggle {
+.guide-section-help .guide-section-toggle:where(:not(.anm-procedure-ui)) {
   background: #dcfce7;
   color: #166534;
 }
 
-.guide-section-help .guide-section-toggle:hover {
+.guide-section-help .guide-section-toggle:hover:where(:not(.anm-procedure-ui)) {
   background: #bbf7d0;
 }
 
-.guide-section-help > .guide-heading h4 {
+.guide-section-help > .guide-heading h4:where(:not(.anm-procedure-ui)) {
   color: #14532d;
 }
 
@@ -455,15 +465,21 @@ function downloadGsPoolExample() {
 
 .guide-eyebrow {
   margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.guide-eyebrow:where(:not(.anm-procedure-ui)) {
   color: #6680a3;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .guide-heading h4 {
   margin: 0;
+}
+
+.guide-heading h4:where(:not(.anm-procedure-ui)) {
   color: #19365b;
   font-size: 20px;
 }
@@ -471,6 +487,10 @@ function downloadGsPoolExample() {
 .guide-intro,
 .guide-detail {
   margin: 0;
+}
+
+.guide-intro:where(:not(.anm-procedure-ui)),
+.guide-detail:where(:not(.anm-procedure-ui)) {
   color: #405978;
   line-height: 1.65;
 }
@@ -485,8 +505,8 @@ function downloadGsPoolExample() {
   color: #294b72;
 }
 
-.guide-callout span,
-.guide-example-head span {
+.guide-callout span:where(:not(.anm-procedure-ui)),
+.guide-example-head span:where(:not(.anm-procedure-ui)) {
   color: #526985;
   font-size: 13px;
 }
@@ -560,21 +580,24 @@ function downloadGsPoolExample() {
 }
 
 .guide-download-button {
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+}
+
+.guide-download-button:where(:not(.anm-procedure-ui)) {
+  min-height: 40px;
   padding: 0 14px;
   border: 1px solid #9bb3cf;
   border-radius: 999px;
   background: #ffffff;
   color: #254c78;
   font-weight: 700;
-  cursor: pointer;
   white-space: nowrap;
 }
 
-.guide-download-button:hover {
+.guide-download-button:hover:where(:not(.anm-procedure-ui)) {
   border-color: #2f6fb3;
   background: #eef6ff;
 }
@@ -623,6 +646,11 @@ function downloadGsPoolExample() {
 .status-explanation p,
 .guide-warning p {
   margin: 3px 0 0;
+}
+
+.process-list p:where(:not(.anm-procedure-ui)),
+.status-explanation p:where(:not(.anm-procedure-ui)),
+.guide-warning p:where(:not(.anm-procedure-ui)) {
   color: #526985;
   line-height: 1.5;
 }
@@ -644,6 +672,9 @@ function downloadGsPoolExample() {
 
 .status-explanation p {
   grid-column: 2;
+}
+
+.status-explanation p:where(:not(.anm-procedure-ui)) {
   font-size: 12px;
 }
 

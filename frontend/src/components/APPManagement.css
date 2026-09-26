@@ -1,66 +1,38 @@
 .app-management {
-  margin-top: 14px;
+  margin-top: var(--anm-space-4);
   display: grid;
-  gap: 12px;
+  gap: var(--anm-space-4);
+  min-width: 0;
 }
-
 .app-management-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 14px;
+  gap: var(--anm-space-6);
   flex-wrap: wrap;
-  padding: 4px 2px 0;
+  padding: var(--anm-space-6);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-card);
+  background: var(--anm-surface);
 }
-
-.app-management-side {
-  display: grid;
-  gap: 8px;
-  justify-items: end;
-}
-
-.app-management-session {
-  min-width: 220px;
-  text-align: left;
-}
-
+.app-management-header > :first-child { flex: 1 1 24rem; min-width: 0; }
+.app-management-side { min-width: 0; max-width: 100%; }
+.app-management-session { text-align: left; }
 .app-management-eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 var(--anm-space-2);
+  font-size: var(--anm-text-xs);
+  font-weight: var(--anm-weight-bold);
+  color: var(--anm-brand-hover);
 }
-
-.app-management-eyebrow:where(:not(.anm-migrated)) {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2457a6;
-}
-
 .app-management-header h2 {
-  margin: 0 0 4px;
+  margin: 0 0 var(--anm-space-2);
+  font-size: var(--anm-text-heading);
+  font-weight: var(--anm-weight-bold);
+  line-height: var(--anm-leading-heading);
+  color: var(--anm-text);
 }
-
-.app-management-header h2:where(:not(.anm-migrated)) {
-  font-size: 24px;
-  color: #173252;
-}
-
-.app-management-intro {
-  margin: 0;
-}
-
-.app-management-intro:where(:not(.anm-migrated)) {
-  color: #50627b;
-  line-height: 1.45;
-}
-
-.app-management-empty {
-  padding: 12px 14px;
-}
-
-.app-management-empty:where(:not(.anm-migrated)) {
-  border: 1px dashed #c9d7ea;
-  border-radius: 14px;
-  background: #f8fbff;
-  color: #50627b;
+.app-management-intro { margin: 0; color: var(--anm-text-muted); line-height: var(--anm-leading); max-width: 65ch; }
+@media (max-width: 40rem) {
+  .app-management-header { padding: var(--anm-space-4); }
+  .app-management-side { width: 100%; }
 }

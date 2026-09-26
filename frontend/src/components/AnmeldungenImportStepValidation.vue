@@ -52,7 +52,7 @@ function fieldTitle(row: Row, field: string) {
 </script>
 <template>
   <section class="wizard-step">
-    <div class="validation-toolbar"><button class="validation-toggle-button" type="button" :disabled="busy" @click="$emit('toggle-all')">Auswahl umschalten</button></div>
+    <div class="validation-toolbar"><button class="validation-toggle-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('toggle-all')">Auswahl umschalten</button></div>
     <div class="table-wrap">
       <table class="wizard-table">
         <thead><tr><th>Import</th><th>Zeile</th><th>ID</th><th>anmeldeschule_snr</th><th>Anmeldestatus</th><th>Vorname</th><th>Nachname</th><th>Geburtsdatum</th><th>Strasse</th><th>PLZ</th><th>Ort</th><th>Status</th><th>Hinweise</th></tr></thead>
@@ -90,7 +90,7 @@ function fieldTitle(row: Row, field: string) {
   </section>
 </template>
 <style scoped>
-.wizard-step{display:grid;gap:14px}.validation-toolbar{display:flex;justify-content:flex-end}.validation-toggle-button{min-height:38px;padding:0 14px;border:1px solid #cdd8e6;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#f4f8fc 100%);color:#355172;font-size:12px;font-weight:700;cursor:pointer}.table-wrap{overflow:auto;border:1px solid #dbe4f0;border-radius:18px;max-height:520px}.wizard-table{width:100%;border-collapse:collapse}.wizard-table th,.wizard-table td{padding:6px 10px;border-bottom:1px solid #e6eef7;text-align:left;line-height:1.25;font-size:13px}.wizard-table th{position:sticky;top:0;z-index:1;background:#f5f8fc;color:#19365b}.wizard-table tbody tr:hover td{background:#e8f2ff;box-shadow:inset 0 1px 0 #d3e5ff,inset 0 -1px 0 #d3e5ff}.status-chip{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}.status-chip-neu{background:#dcfce7;color:#166534}.status-chip-update,.status-chip-warnung{background:#fef3c7;color:#92400e}.status-chip-vorhanden{background:#dbeafe;color:#1d4ed8}.status-chip-fehler{background:#fee2e2;color:#991b1b}
+.wizard-step{display:grid;gap:14px}.validation-toolbar{display:flex;justify-content:flex-end}.validation-toggle-button{cursor:pointer}.validation-toggle-button:where(:not(.anm-procedure-ui)){min-height:38px;padding:0 14px;border:1px solid #cdd8e6;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#f4f8fc 100%);color:#355172;font-size:12px;font-weight:700}.table-wrap{overflow:auto;border:1px solid #dbe4f0;border-radius:18px;max-height:520px}.wizard-table{width:100%;border-collapse:collapse}.wizard-table th,.wizard-table td{padding:6px 10px;border-bottom:1px solid #e6eef7;text-align:left;line-height:1.25;font-size:13px}.wizard-table th{position:sticky;top:0;z-index:1;background:#f5f8fc;color:#19365b}.wizard-table tbody tr:hover td{background:#e8f2ff;box-shadow:inset 0 1px 0 #d3e5ff,inset 0 -1px 0 #d3e5ff}.status-chip{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}.status-chip-neu{background:#dcfce7;color:#166534}.status-chip-update,.status-chip-warnung{background:#fef3c7;color:#92400e}.status-chip-vorhanden{background:#dbeafe;color:#1d4ed8}.status-chip-fehler{background:#fee2e2;color:#991b1b}
 .wizard-table td{white-space:nowrap}
 .cell-changed-blue{background:#e0f2fe;color:#0c4a6e}
 .cell-changed-green{background:#dcfce7;color:#166534}

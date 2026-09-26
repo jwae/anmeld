@@ -1,28 +1,7 @@
-.btn-secondary:where(:not(.anm-migrated)) {
-  background: #fff;
-  color: #111;
-  border: 1px solid #ccc;
-}
-
-.btn-primary:where(:not(.anm-migrated)) {
-  background: #1d6ef5;
-  border-color: #1d6ef5;
-  color: #fff;
-}
-
-.btn-primary:hover:where(:not(.anm-migrated)) {
-  background: #1454c8;
-  border-color: #1454c8;
-}
-
-.btn-primary:disabled:where(:not(.anm-migrated)) {
-  background: #9fbef5;
-  border-color: #9fbef5;
-}
-
 button {
-  padding: 10px 12px;
   cursor: pointer;
+}button:where(:not(.anm-migrated)) {
+  padding: 10px 12px;
 }
 
 button:where(:not(.anm-migrated)) {
@@ -51,94 +30,6 @@ button:disabled:where(:not(.anm-migrated)) {
   color: #2457a6;
 }
 
-.field-label:where(:not(.anm-migrated)) {
-  font-size: 12px;
-  font-weight: 600;
-  color: #314561;
-}
-
-.field-block {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.field-block input,
-.field-block select {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 8px 10px;
-}
-
-.field-block input:where(:not(.anm-migrated)),
-.field-block select:where(:not(.anm-migrated)) {
-  border: 1px solid #d6d6d6;
-  border-radius: 10px;
-  font-size: 14px;
-}
-
-.feedback-panel {
-  position: relative;
-  margin: 10px 0 2px;
-  padding: 14px 16px 14px 44px;
-  overflow: hidden;
-}
-
-.feedback-panel:where(:not(.anm-migrated)) {
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(20, 63, 120, 0.08);
-}
-
-.feedback-panel::before {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.feedback-panel:where(:not(.anm-migrated))::before {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.feedback-panel-success:where(:not(.anm-migrated)) {
-  border: 1px solid #bfe5c9;
-  background: linear-gradient(180deg, #f4fcf6 0%, #e8f7ee 100%);
-  color: #1f5f37;
-}
-
-.feedback-panel-error:where(:not(.anm-migrated)) {
-  border: 1px solid #f0c2c8;
-  background: linear-gradient(180deg, #fff8f9 0%, #fff0f2 100%);
-}
-
-.feedback-title {
-  margin: 0 0 6px;
-}
-
-.feedback-title:where(:not(.anm-migrated)) {
-  font-weight: 700;
-}
-
-.feedback-panel .error {
-  margin: 0;
-}
-
-.feedback-panel .error:where(:not(.anm-migrated)) {
-  color: #8f2d3d;
-}
-
-.feedback-panel p {
-  margin: 0;
-}
-
-.feedback-panel p:where(:not(.anm-migrated)) {
-  line-height: 1.45;
-  font-weight: 600;
-}
-
 .feedback-fade-enter-active,
 .feedback-fade-leave-active {
   transition: opacity 0.35s ease, transform 0.35s ease;
@@ -162,8 +53,8 @@ button:disabled:where(:not(.anm-migrated)) {
 .user-management-card:where(:not(.anm-migrated)) {
   border: 1px solid #dbe4f0;
   border-radius: 16px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
-  box-shadow: 0 12px 28px rgba(20, 63, 120, 0.06);
+  background: var(--anm-surface-muted);
+  box-shadow: var(--anm-shadow-none);
 }
 
 .user-management-card-header {
@@ -253,7 +144,7 @@ button:disabled:where(:not(.anm-migrated)) {
 .user-management-summary {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(112px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -307,51 +198,9 @@ button:disabled:where(:not(.anm-migrated)) {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.user-management-tabs {
-  margin-top: 12px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px;
-}
-
-.user-management-tabs:where(:not(.anm-migrated)) {
-  border: 1px solid #dbe4f0;
-  border-radius: 16px;
-  background: #f4f8fc;
-}
-
-.user-management-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 120px;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.user-management-tab:where(:not(.anm-migrated)) {
-  border: 1px solid transparent;
-  background: transparent;
-  color: #51657f;
-  font-weight: 700;
-}
-
 .user-management-tab i:where(:not(.anm-migrated)) {
   font-size: 14px;
   line-height: 1;
-}
-
-.user-management-tab:hover:where(:not(.anm-migrated)) {
-  border-color: #bfd0e8;
-  background: #ffffff;
-}
-
-.user-management-tab.is-active:where(:not(.anm-migrated)) {
-  border-color: #c9d8ea;
-  background: #fff;
-  color: #1f2f45;
-  box-shadow: 0 6px 14px rgba(20, 63, 120, 0.08);
 }
 
 .user-management-tab-panel {
@@ -373,16 +222,6 @@ button:disabled:where(:not(.anm-migrated)) {
 .user-management-panel {
   display: grid;
   gap: 10px;
-}
-
-.user-management-panel .btn-primary,
-.user-management-panel .btn-secondary {
-  height: 38px;
-  min-height: 38px;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .user-management-panel-head {
@@ -440,14 +279,17 @@ button:disabled:where(:not(.anm-migrated)) {
 }
 
 .user-management-checkbox-card {
-  min-height: 40px;
-  width: 45%;
-  padding: 8px 10px;
   box-sizing: border-box;
   display: flex;
   justify-content: flex-start;
   align-items: center;
   text-align: left;
+}
+
+.user-management-checkbox-card:where(:not(.anm-migrated)) {
+  min-height: 40px;
+  width: 45%;
+  padding: 8px 10px;
 }
 
 .user-management-checkbox-card:where(:not(.anm-migrated)) {
@@ -480,19 +322,9 @@ button:disabled:where(:not(.anm-migrated)) {
   flex-wrap: wrap;
 }
 
-.user-management-user-actions .btn-primary,
-.user-management-user-actions .btn-secondary {
-  width: 100%;
-  max-width: 200px;
-}
-
-.user-management-panel .btn-primary {
-  max-width: 200px;
-}
-
 .user-management-checklist {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 200px));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 8px;
 }
 
@@ -505,6 +337,9 @@ button:disabled:where(:not(.anm-migrated)) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.user-management-checkitem:where(:not(.anm-migrated)) {
   padding: 6px 9px;
   max-width: 200px;
 }
@@ -614,15 +449,6 @@ button:disabled:where(:not(.anm-migrated)) {
   gap: 6px;
 }
 
-.user-management-user-card .user-management-list-actions .btn-secondary {
-  padding: 3px 7px;
-  min-height: 28px;
-}
-
-.user-management-user-card .user-management-list-actions .btn-secondary:where(:not(.anm-migrated)) {
-  font-size: 11px;
-}
-
 .user-management-user-card .user-management-state {
   padding: 3px 8px;
 }
@@ -659,14 +485,6 @@ button:disabled:where(:not(.anm-migrated)) {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
-}
-
-.user-management-list-actions .btn-secondary {
-  padding: 5px 9px;
-}
-
-.user-management-list-actions .btn-secondary:where(:not(.anm-migrated)) {
-  font-size: 12px;
 }
 
 .user-management-list-row {
@@ -729,15 +547,6 @@ button:disabled:where(:not(.anm-migrated)) {
   .user-management-card-title {
     display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .user-management-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .user-management-tab {
-    min-width: 0;
   }
 }
 

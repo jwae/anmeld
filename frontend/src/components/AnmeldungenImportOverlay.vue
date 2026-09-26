@@ -297,19 +297,19 @@ function handleBack() {
 
 <template>
   <div v-if="open" class="csv-import-overlay" @click.self="$emit('close')">
-    <section class="csv-import-dialog" role="dialog" aria-modal="true">
+    <section class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true">
       <div class="csv-import-head">
         <div>
-          <p class="csv-import-eyebrow">CSV-Import Wizard</p>
-          <h3>Anmeldungen importieren (CSV)</h3>
-          <p>Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
+          <p class="csv-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import Wizard</p>
+          <h3 class="anm-procedure-title anm-procedure-ui">Anmeldungen importieren (CSV)</h3>
+          <p class="anm-procedure-copy anm-procedure-ui">Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
         </div>
-        <button class="wizard-header-close-button" type="button" :disabled="busy" @click="$emit('close')">Schliessen</button>
+        <button class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('close')">Schliessen</button>
       </div>
 
-      <div v-if="error" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Fehler</p>
-        <p>{{ error }}</p>
+      <div v-if="error" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ error }}</p>
       </div>
 
       <div class="csv-import-content">
@@ -368,14 +368,14 @@ function handleBack() {
       </div>
 
       <div class="csv-import-footer">
-        <button class="wizard-close-button" type="button" :disabled="busy" @click="$emit('close')">
+        <button class="wizard-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('close')">
           {{ currentStep === 5 ? "Schliessen" : "Abbrechen" }}
         </button>
         <div class="csv-import-nav">
-          <button class="wizard-nav-icon-button" type="button" :disabled="busy || currentStep === 1 || currentStep === 5" @click="handleBack">
+          <button class="wizard-nav-icon-button anm-button anm-button--icon anm-procedure-ui" type="button" :disabled="busy || currentStep === 1 || currentStep === 5" @click="handleBack">
             <span class="wizard-nav-chevron wizard-nav-chevron-left" aria-hidden="true"></span>
           </button>
-          <button
+          <button class="anm-button anm-button--primary anm-procedure-ui"
             v-if="currentStep < 5"
             :class="currentStep === 4 ? 'wizard-submit-button' : 'wizard-nav-icon-button wizard-nav-icon-button-primary'"
             type="button"
@@ -395,28 +395,38 @@ function handleBack() {
 .csv-import-overlay{position:fixed;inset:0;z-index:1600;display:grid;place-items:center;padding:24px;background:rgba(15,23,42,.42);backdrop-filter:blur(4px)}
 .csv-import-dialog{width:min(1400px,90vw);height:min(90vh,960px);display:grid;grid-template-rows:auto auto 1fr auto;gap:16px;padding:24px;border-radius:28px;background:linear-gradient(180deg,#fbfdff 0%,#fff 100%);box-shadow:0 24px 60px rgba(15,23,42,.28)}
 .csv-import-head,.csv-import-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.csv-import-eyebrow{margin:0 0 8px;text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:700;color:#6680a3}
-.csv-import-head h3{margin:0 0 6px;color:#19365b}
-.csv-import-head p:last-child{margin:0;color:#526985}
+.csv-import-eyebrow{margin:0 0 8px;text-transform:uppercase}
+.csv-import-eyebrow:where(:not(.anm-procedure-ui)){letter-spacing:.14em;font-size:12px;font-weight:700;color:#6680a3}
+.csv-import-head h3{margin:0 0 6px}
+.csv-import-head h3:where(:not(.anm-procedure-ui)){color:#19365b}
+.csv-import-head p:last-child{margin:0}
+.csv-import-head p:last-child:where(:not(.anm-procedure-ui)){color:#526985}
 .csv-import-content{min-height:0;overflow:auto;padding-right:4px}
 .csv-import-nav{display:flex;gap:12px;align-items:center}
-.wizard-header-close-button{min-height:42px;padding:0 16px;border:1px solid #cdd8e6;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#f4f8fc 100%);color:#355172;font-weight:700;cursor:pointer}
-.wizard-close-button{min-height:44px;padding:0 18px;border:1px solid #cdd8e6;border-radius:999px;background:#fff;color:#355172;font-weight:700;cursor:pointer}
-.wizard-nav-icon-button{width:44px;height:44px;border:1px solid #cdd8e6;border-radius:14px;background:#fff;color:#355172;font-size:26px;line-height:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.wizard-header-close-button{cursor:pointer}
+.wizard-header-close-button:where(:not(.anm-procedure-ui)){min-height:42px;padding:0 16px;border:1px solid #cdd8e6;border-radius:999px;background:linear-gradient(180deg,#fff 0%,#f4f8fc 100%);color:#355172;font-weight:700}
+.wizard-close-button{cursor:pointer}
+.wizard-close-button:where(:not(.anm-procedure-ui)){min-height:44px;padding:0 18px;border:1px solid #cdd8e6;border-radius:999px;background:#fff;color:#355172;font-weight:700}
+.wizard-nav-icon-button{width:44px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.wizard-nav-icon-button:where(:not(.anm-procedure-ui)){height:44px;border:1px solid #cdd8e6;border-radius:14px;background:#fff;color:#355172;font-size:26px;line-height:1;font-weight:700}
 .wizard-nav-chevron{width:10px;height:10px;border-right:2px solid currentColor;border-bottom:2px solid currentColor}
 .wizard-nav-chevron-left{transform:rotate(135deg);margin-left:4px}
 .wizard-nav-chevron-right{transform:rotate(-45deg);margin-right:4px}
-.wizard-nav-icon-button-primary,.wizard-submit-button{border-color:#163b67;background:linear-gradient(180deg,#214f86 0%,#163b67 100%);color:#fff;box-shadow:0 10px 24px rgba(22,59,103,.22)}
-.wizard-submit-button{min-height:44px;padding:0 18px;border-radius:999px;font-weight:700;cursor:pointer}
+.wizard-nav-icon-button-primary:where(:not(.anm-procedure-ui)),
+.wizard-submit-button:where(:not(.anm-procedure-ui)){border-color:#163b67;background:linear-gradient(180deg,#214f86 0%,#163b67 100%);color:#fff;box-shadow:0 10px 24px rgba(22,59,103,.22)}
+.wizard-submit-button{cursor:pointer}
+.wizard-submit-button:where(:not(.anm-procedure-ui)){min-height:44px;padding:0 18px;border-radius:999px;font-weight:700}
 .hidden-input{display:none}
-.feedback-panel{padding:12px 14px;border-radius:14px;font-size:14px}
-.feedback-panel-error{border:1px solid #fca5a5;background:#fff5f5;color:#991b1b}
-.feedback-title{margin:0 0 4px;font-weight:700}
+.feedback-panel:where(:not(.anm-procedure-ui)){padding:12px 14px;border-radius:14px;font-size:14px}
+.feedback-panel-error:where(:not(.anm-procedure-ui)){border:1px solid #fca5a5;background:#fff5f5;color:#991b1b}
+.feedback-title{margin:0 0 4px}
+.feedback-title:where(:not(.anm-procedure-ui)){font-weight:700}
 .wizard-step-stack{display:grid;gap:18px}
 .wizard-section-card{display:grid;gap:14px;padding:16px 18px;border:1px solid #dbe4f0;border-radius:20px;background:#fff}
 .wizard-section-head{display:grid;gap:4px}
 .wizard-section-head h4{margin:0;color:#19365b}
-.wizard-section-head p{margin:0;color:#526985;font-size:13px}
+.wizard-section-head p{margin:0}
+.wizard-section-head p:where(:not(.anm-procedure-ui)){color:#526985;font-size:13px}
 .summary-inline-grid{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px}
 .summary-inline-card{display:grid;gap:4px;padding:10px 12px;border:1px solid #dbe4f0;border-radius:16px;background:#f8fbff}
 .summary-inline-card span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6680a3}

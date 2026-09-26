@@ -352,21 +352,21 @@ function handleClose() {
 
 <template>
   <div v-if="open" class="csv-import-overlay" @click.self="handleClose">
-    <section class="csv-import-dialog" role="dialog" aria-modal="true" aria-labelledby="csv-import-title">
+    <section class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="csv-import-title">
       <div class="csv-import-head">
         <div>
-          <p class="csv-import-eyebrow">CSV-Import Wizard</p>
-          <h3 id="csv-import-title">{{ title }}</h3>
-          <p>Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
+          <p class="csv-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import Wizard</p>
+          <h3 class="anm-procedure-title anm-procedure-ui" id="csv-import-title">{{ title }}</h3>
+          <p class="anm-procedure-copy anm-procedure-ui">Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
         </div>
-        <button class="wizard-header-close-button" type="button" :disabled="busy" @click="handleClose">
+        <button class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="handleClose">
           Schliessen
         </button>
       </div>
 
-      <div v-if="error" class="feedback-panel feedback-panel-error">
-        <p class="feedback-title">Fehler</p>
-        <p>{{ error }}</p>
+      <div v-if="error" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+        <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+        <p class="anm-procedure-copy anm-procedure-ui">{{ error }}</p>
       </div>
 
       <div class="csv-import-content">
@@ -378,9 +378,9 @@ function handleClose() {
           @change="handlePickedFile"
         />
 
-        <label v-if="currentStep === 1" class="csv-source-field">
-          <span>Quelle</span>
-          <select v-model="sourceArt" :disabled="busy">
+        <label v-if="currentStep === 1" class="csv-source-field anm-field anm-procedure-ui">
+          <span class="anm-label anm-procedure-ui">Quelle</span>
+          <select class="anm-input anm-procedure-ui" v-model="sourceArt" :disabled="busy">
             <option value="" disabled>Bitte auswählen</option>
             <option v-for="source in sourceOptions" :key="source.code" :value="source.code">
               {{ source.bezeichnung || source.code }}
@@ -433,12 +433,12 @@ function handleClose() {
       </div>
 
       <div class="csv-import-footer">
-        <button class="wizard-close-button" type="button" :disabled="busy" @click="handleClose">
+        <button class="wizard-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="handleClose">
           {{ currentStep === 5 ? "Schliessen" : "Abbrechen" }}
         </button>
         <div class="csv-import-nav">
           <button
-            class="wizard-nav-icon-button"
+            class="wizard-nav-icon-button anm-button anm-button--icon anm-procedure-ui"
             type="button"
             :disabled="busy || currentStep === 1 || currentStep === 5"
             aria-label="Vorheriger Schritt"
@@ -447,7 +447,7 @@ function handleClose() {
           >
             <span class="wizard-nav-chevron wizard-nav-chevron-left" aria-hidden="true"></span>
           </button>
-          <button
+          <button class="anm-button anm-button--primary anm-procedure-ui"
             v-if="currentStep < 5"
             :class="currentStep === 4 ? 'wizard-submit-button' : 'wizard-nav-icon-button wizard-nav-icon-button-primary'"
             type="button"
@@ -473,7 +473,7 @@ function handleClose() {
   max-width: 22rem;
 }
 
-.csv-source-field span {
+.csv-source-field span:where(:not(.anm-procedure-ui)) {
   font-weight: 600;
 }
 
@@ -511,6 +511,9 @@ function handleClose() {
 .csv-import-eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
+}
+
+.csv-import-eyebrow:where(:not(.anm-procedure-ui)) {
   letter-spacing: 0.14em;
   font-size: 12px;
   font-weight: 700;
@@ -519,11 +522,17 @@ function handleClose() {
 
 .csv-import-head h3 {
   margin: 0 0 6px;
+}
+
+.csv-import-head h3:where(:not(.anm-procedure-ui)) {
   color: #19365b;
 }
 
 .csv-import-head p:last-child {
   margin: 0;
+}
+
+.csv-import-head p:last-child:where(:not(.anm-procedure-ui)) {
   color: #526985;
 }
 
@@ -540,6 +549,10 @@ function handleClose() {
 }
 
 .wizard-header-close-button {
+  cursor: pointer;
+}
+
+.wizard-header-close-button:where(:not(.anm-procedure-ui)) {
   min-height: 42px;
   padding: 0 16px;
   border: 1px solid #cdd8e6;
@@ -547,16 +560,19 @@ function handleClose() {
   background: linear-gradient(180deg, #ffffff 0%, #f4f8fc 100%);
   color: #355172;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.wizard-header-close-button:hover:not(:disabled) {
+.wizard-header-close-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: linear-gradient(180deg, #fdfefe 0%, #edf4fb 100%);
 }
 
 .wizard-close-button {
+  cursor: pointer;
+}
+
+.wizard-close-button:where(:not(.anm-procedure-ui)) {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid #cdd8e6;
@@ -564,17 +580,23 @@ function handleClose() {
   background: #ffffff;
   color: #355172;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.wizard-close-button:hover:not(:disabled) {
+.wizard-close-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: #f8fbff;
 }
 
 .wizard-nav-icon-button {
   width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.wizard-nav-icon-button:where(:not(.anm-procedure-ui)) {
   height: 44px;
   border: 1px solid #cdd8e6;
   border-radius: 14px;
@@ -583,10 +605,6 @@ function handleClose() {
   font-size: 26px;
   line-height: 1;
   font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
@@ -608,24 +626,28 @@ function handleClose() {
   margin-right: 4px;
 }
 
-.wizard-nav-icon-button:hover:not(:disabled) {
+.wizard-nav-icon-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #9bb3cf;
   background: #f8fbff;
 }
 
-.wizard-nav-icon-button-primary {
+.wizard-nav-icon-button-primary:where(:not(.anm-procedure-ui)) {
   border-color: #163b67;
   background: linear-gradient(180deg, #214f86 0%, #163b67 100%);
   color: #ffffff;
   box-shadow: 0 10px 24px rgba(22, 59, 103, 0.22);
 }
 
-.wizard-nav-icon-button-primary:hover:not(:disabled) {
+.wizard-nav-icon-button-primary:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #102a49;
   background: linear-gradient(180deg, #1d4677 0%, #102a49 100%);
 }
 
 .wizard-submit-button {
+  cursor: pointer;
+}
+
+.wizard-submit-button:where(:not(.anm-procedure-ui)) {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid #163b67;
@@ -633,12 +655,11 @@ function handleClose() {
   background: linear-gradient(180deg, #214f86 0%, #163b67 100%);
   color: #ffffff;
   font-weight: 700;
-  cursor: pointer;
   box-shadow: 0 10px 24px rgba(22, 59, 103, 0.22);
   transition: all 0.2s ease;
 }
 
-.wizard-submit-button:hover:not(:disabled) {
+.wizard-submit-button:hover:not(:disabled):where(:not(.anm-procedure-ui)) {
   border-color: #102a49;
   background: linear-gradient(180deg, #1d4677 0%, #102a49 100%);
 }
@@ -649,6 +670,12 @@ function handleClose() {
 .wizard-submit-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.wizard-close-button:disabled:where(:not(.anm-procedure-ui)),
+.wizard-header-close-button:disabled:where(:not(.anm-procedure-ui)),
+.wizard-nav-icon-button:disabled:where(:not(.anm-procedure-ui)),
+.wizard-submit-button:disabled:where(:not(.anm-procedure-ui)) {
   box-shadow: none;
 }
 
@@ -656,13 +683,13 @@ function handleClose() {
   display: none;
 }
 
-.feedback-panel {
+.feedback-panel:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 14px;
   font-size: 14px;
 }
 
-.feedback-panel-error {
+.feedback-panel-error:where(:not(.anm-procedure-ui)) {
   border: 1px solid #fca5a5;
   background: #fff5f5;
   color: #991b1b;
@@ -670,6 +697,9 @@ function handleClose() {
 
 .feedback-title {
   margin: 0 0 4px;
+}
+
+.feedback-title:where(:not(.anm-procedure-ui)) {
   font-weight: 700;
 }
 

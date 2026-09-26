@@ -214,8 +214,8 @@ onMounted(() => void loadProtocol());
   <section class="app-protocol">
     <header class="app-protocol-toolbar">
       <div>
-        <h3>App-Protokoll</h3>
-        <p>Neueste {{ rows.length }} von insgesamt {{ total }} Einträgen.</p>
+        <h3 class="anm-managed-title anm-migrated">App-Protokoll</h3>
+        <p class="anm-managed-copy anm-migrated">Neueste {{ rows.length }} von insgesamt {{ total }} Einträgen.</p>
       </div>
       <button class="app-protocol-refresh anm-button anm-migrated" type="button" :disabled="loading" @click="loadProtocol" aria-label="Aktion ausführen">
         <i class="bi bi-arrow-clockwise" :class="{ 'is-spinning': loading }" aria-hidden="true"></i>
@@ -223,7 +223,7 @@ onMounted(() => void loadProtocol());
       </button>
       <div v-if="canDeleteProtocol" class="app-protocol-delete">
         <label>
-          <span>Eintraege vor</span>
+          <span class="anm-label anm-migrated">Eintraege vor</span>
           <input v-model="deleteBeforeDate" type="date" :disabled="deleting" class="anm-input anm-migrated" />
         </label>
         <button type="button" :disabled="!deleteBeforeDate || deleting" @click="deleteProtocolBeforeDate" class="anm-button anm-button--danger anm-migrated">
@@ -258,11 +258,11 @@ onMounted(() => void loadProtocol());
     <Teleport to="body">
       <div v-if="deleteConfirmOpen" class="app-protocol-confirm-backdrop" @click.self="cancelDeleteProtocol">
         <section class="app-protocol-confirm anm-managed-dialog anm-migrated" role="dialog" aria-modal="true" aria-labelledby="app-protocol-confirm-title">
-          <button class="app-protocol-confirm-x anm-button anm-button--danger anm-migrated" type="button" aria-label="Overlay schließen" :disabled="deleting" @click="cancelDeleteProtocol">×</button>
+          <button class="app-protocol-confirm-x anm-button anm-migrated" type="button" aria-label="Overlay schließen" :disabled="deleting" @click="cancelDeleteProtocol">×</button>
           <div class="app-protocol-confirm-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
           <div>
-            <h4 id="app-protocol-confirm-title">Protokolleinträge löschen?</h4>
-            <p>Alle Einträge vor dem <strong>{{ new Date(`${deleteBeforeDate}T00:00:00`).toLocaleDateString("de-DE") }}</strong> werden unwiderruflich gelöscht.</p>
+            <h4 id="app-protocol-confirm-title" class="anm-managed-title anm-migrated">Protokolleinträge löschen?</h4>
+            <p class="anm-managed-copy anm-migrated">Alle Einträge vor dem <strong>{{ new Date(`${deleteBeforeDate}T00:00:00`).toLocaleDateString("de-DE") }}</strong> werden unwiderruflich gelöscht.</p>
             <div v-if="deleteConfirmResult" class="app-protocol-confirm-result">
               <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
               <span>{{ deleteConfirmResult }}</span>
@@ -275,7 +275,7 @@ onMounted(() => void loadProtocol());
                 {{ deleting ? "Lösche..." : "Endgültig löschen" }}
               </button>
             </template>
-            <button v-else type="button" class="app-protocol-confirm-close anm-button anm-button--danger anm-migrated" @click="cancelDeleteProtocol">Schließen</button>
+            <button v-else type="button" class="app-protocol-confirm-close anm-button anm-migrated" @click="cancelDeleteProtocol">Schließen</button>
           </footer>
         </section>
       </div>

@@ -32,12 +32,12 @@ const emit = defineEmits<{
 
 <template>
   <section class="anm-form-shell">
-    <details class="anm-section" open>
+    <details class="anm-section anm-procedure-surface" open>
       <summary>Rundendaten</summary>
       <div class="anm-form-grid">
-        <label class="field-block anm-form-field">
-          <span class="field-label">Rundennummer</span>
-          <input
+        <label class="field-block anm-form-field anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Rundennummer</span>
+          <input class="anm-input anm-procedure-ui"
             type="number"
             min="1"
             step="1"
@@ -47,9 +47,9 @@ const emit = defineEmits<{
           />
         </label>
 
-        <label class="field-block anm-form-field">
-          <span class="field-label">Bezeichnung</span>
-          <input
+        <label class="field-block anm-form-field anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Bezeichnung</span>
+          <input class="anm-input anm-procedure-ui"
             :value="modelValue.bezeichnung"
             placeholder="Runde 2"
             :disabled="saving || !verfahren || mode === 'readonly'"
@@ -57,9 +57,9 @@ const emit = defineEmits<{
           />
         </label>
 
-        <label class="field-block anm-form-field">
-          <span class="field-label">Startdatum</span>
-          <input
+        <label class="field-block anm-form-field anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Startdatum</span>
+          <input class="anm-input anm-procedure-ui"
             type="date"
             :value="modelValue.startdatum"
             :disabled="saving || !verfahren || mode === 'readonly'"
@@ -67,9 +67,9 @@ const emit = defineEmits<{
           />
         </label>
 
-        <label class="field-block anm-form-field">
-          <span class="field-label">Enddatum</span>
-          <input
+        <label class="field-block anm-form-field anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Enddatum</span>
+          <input class="anm-input anm-procedure-ui"
             type="date"
             :value="modelValue.enddatum"
             :disabled="saving || !verfahren || mode === 'readonly'"
@@ -77,30 +77,30 @@ const emit = defineEmits<{
           />
         </label>
       </div>
-      <p v-if="mode === 'limited'" class="anm-inline-hint">
+      <p v-if="mode === 'limited'" class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
         Bei einer aktiven Runde koennen Bezeichnung und Zeitraum geaendert werden.
       </p>
-      <p v-else-if="mode === 'readonly'" class="anm-inline-hint">
+      <p v-else-if="mode === 'readonly'" class="anm-inline-hint anm-procedure-copy anm-procedure-ui">
         Diese Runde wird schreibgeschuetzt angezeigt.
       </p>
     </details>
 
-    <details class="anm-section" open>
+    <details class="anm-section anm-procedure-surface" open>
       <summary>Status</summary>
       <div class="anm-form-grid">
-        <label class="field-block anm-form-field">
-          <span class="field-label">Aktueller Status</span>
-          <input :value="modelValue.status" disabled />
+        <label class="field-block anm-form-field anm-field anm-procedure-ui">
+          <span class="field-label anm-label anm-procedure-ui">Aktueller Status</span>
+          <input class="anm-input anm-procedure-ui" :value="modelValue.status" disabled />
         </label>
       </div>
     </details>
 
     <div v-if="mode !== 'readonly'" class="anm-actions">
-      <button class="btn-secondary anm-form-secondary-btn" type="button" :disabled="saving" @click="emit('reset')">
+      <button class="anm-form-secondary-btn anm-button anm-procedure-ui" type="button" :disabled="saving" @click="emit('reset')">
         Reset
       </button>
       <button
-        class="btn-primary anm-form-primary-btn"
+        class="anm-form-primary-btn anm-button anm-button--primary anm-procedure-ui"
         type="button"
         :disabled="saving || !verfahren || (modelValue.id !== null && !hasChanges)"
         @click="emit('submit')"
@@ -145,7 +145,7 @@ const emit = defineEmits<{
   gap: 5px;
 }
 
-.anm-form-field :deep(input),
+.anm-form-field :deep(input:where(:not(.anm-procedure-ui))),
 .anm-form-field :deep(select) {
   min-height: 34px;
   padding: 6px 10px;
@@ -164,6 +164,9 @@ const emit = defineEmits<{
 
 .anm-inline-hint {
   margin: 4px 0 0;
+}
+
+.anm-inline-hint:where(:not(.anm-procedure-ui)) {
   color: #607794;
   font-size: 12px;
   line-height: 1.45;
@@ -171,13 +174,17 @@ const emit = defineEmits<{
 
 .anm-form-primary-btn,
 .anm-form-secondary-btn {
+  cursor: pointer;
+}
+
+.anm-form-primary-btn:where(:not(.anm-procedure-ui)),
+.anm-form-secondary-btn:where(:not(.anm-procedure-ui)) {
   min-height: 34px;
   padding: 10px 18px;
   border: 1px solid #cfdceb;
   border-radius: 999px;
   font-weight: 700;
   font-size: 12px;
-  cursor: pointer;
 }
 
 @media (max-width: 760px) {

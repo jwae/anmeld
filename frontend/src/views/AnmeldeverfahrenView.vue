@@ -37,12 +37,12 @@ function handleBereichSelectionUpdate(payload: {
 
 <template>
   <section class="anm-view">
-    <section class="anm-roadmap-card">
+    <section class="anm-roadmap-card anm-procedure-surface">
       <div class="anm-hero-grid">
         <div>
-          <p class="anm-roadmap-eyebrow">Schritt 1</p>
-          <h2>Grundlage des Schulanmeldeverfahrens</h2>
-          <p>
+          <p class="anm-roadmap-eyebrow anm-procedure-copy anm-procedure-ui">Schritt 1</p>
+          <h2 class="anm-procedure-title anm-procedure-ui">Grundlage des Schulanmeldeverfahrens</h2>
+          <p class="anm-procedure-copy anm-procedure-ui">
             Hier können Sie: Verfahren und Runde festlegen / Kapazitaeten aktualisieren / Schuelerpool /Anmeldungen holen / Koordinieren.
           </p>
         </div>
@@ -90,6 +90,9 @@ function handleBereichSelectionUpdate(payload: {
 .anm-roadmap-eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
+}
+
+.anm-roadmap-eyebrow:where(:not(.anm-procedure-ui)) {
   letter-spacing: 0.14em;
   font-size: 12px;
   font-weight: 700;
@@ -99,16 +102,23 @@ function handleBereichSelectionUpdate(payload: {
 .anm-roadmap-card h2,
 .anm-card h3 {
   margin: 0;
+}
+
+.anm-roadmap-card h2:where(:not(.anm-procedure-ui)),
+.anm-card h3 {
   color: #19385e;
 }
 
-.anm-roadmap-card h2 {
+.anm-roadmap-card h2:where(:not(.anm-procedure-ui)) {
   font-size: 1.2em;
 }
 
-.anm-roadmap-card p,
 .anm-roadmap-card p {
   margin: 8px 0 0;
+}
+
+.anm-roadmap-card p:where(:not(.anm-procedure-ui)),
+.anm-roadmap-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;
 }
