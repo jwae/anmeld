@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { onMounted, ref, watch } from "vue";
 import importService from "../services/importService";
 import AnmeldungenImportOverlay from "./AnmeldungenImportOverlay.vue";
@@ -194,7 +195,7 @@ onMounted(() => {
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="toggleExpanded"
           >
-            <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
+            <svg class="section-toggle-chevron anm-procedure-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
           </button>
           Schulanmeldungen importieren (CSV, Schild3)
         </h3>
@@ -285,7 +286,7 @@ onMounted(() => {
       @success="handleRueckmeldungenMgSuccess"
     />
 
-    <div
+    <div v-dialog-focus
       v-if="showSchildDiagnosticsOverlay"
       class="diagnostic-overlay"
       role="dialog"
@@ -344,7 +345,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="diagnostic-overlay-actions">
-          <button class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
             Schliessen
           </button>
         </div>

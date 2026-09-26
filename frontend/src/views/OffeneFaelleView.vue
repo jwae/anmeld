@@ -342,12 +342,12 @@ watch(
             <tr>
               <th>Nr.</th>
               <th>Fall</th>
+              <th>Verfahren</th>
               <th><button type="button" class="table-sort-btn" @click="setSort('externe_schueler_id')">Externe Schueler-ID{{ sortMarker('externe_schueler_id') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('nachname')">Name + Vorname{{ sortMarker('nachname') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('aktuelle_snr')">Aktuelle Schule{{ sortMarker('aktuelle_snr') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('fallgrund')">Fallgrund{{ sortMarker('fallgrund') }}</button></th>
               <th>Status</th>
-              <th><button type="button" class="table-sort-btn" @click="setSort('quelle')">Quelle{{ sortMarker('quelle') }}</button></th>
               <th><button type="button" class="table-sort-btn" @click="setSort('updated_at')">Aktualisiert{{ sortMarker('updated_at') }}</button></th>
               <th>Aktionen</th>
             </tr>
@@ -363,6 +363,10 @@ watch(
               <tr class="open-case-row">
                 <td>{{ index + 1 }}</td>
                 <td>#{{ row.fall_id }}</td>
+                <td>
+                  <strong>{{ context.verfahren || `Verfahren ${row.verfahren_id}` }}</strong><br />
+                  <small>{{ context.runde || `Runde ${row.runde_id}` }}</small>
+                </td>
                 <td>{{ row.externe_schueler_id || "-" }}</td>
                 <td>{{ [row.nachname, row.vorname].filter(Boolean).join(", ") || "-" }}</td>
                 <td>
@@ -373,7 +377,6 @@ watch(
                 <td>
                   <span :class="statusBadgeClass(row.fallstatus)">{{ row.fallstatus || "-" }}</span>
                 </td>
-                <td><span :class="quelleBadgeClass(row.quelle)">{{ row.quelle || "-" }}</span></td>
                 <td>{{ formatDateTime(row.updated_at || row.created_at) }}</td>
                 <td class="detail-actions-cell">
                   <button
@@ -677,8 +680,8 @@ watch(
 }
 
 .status-badge-without {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--anm-danger-soft);
+  color: var(--anm-danger);
 }
 
 .pool-icon-btn {

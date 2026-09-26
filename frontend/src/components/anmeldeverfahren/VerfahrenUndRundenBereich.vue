@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../../directives/dialogFocus";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AnmeldeverfahrenListe from "../AnmeldeverfahrenListe.vue";
 import AnmeldeverfahrenForm from "../AnmeldeverfahrenForm.vue";
@@ -816,7 +817,7 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showProcedureOverlay"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -829,7 +830,7 @@ onBeforeUnmount(() => {
           <h3 class="anm-procedure-title anm-procedure-ui" id="anm-procedure-overlay-title">
             {{ verfahrenForm.id ? "Verfahren bearbeiten" : "Verfahren anlegen" }}
           </h3>
-          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showProcedureOverlay = false">Schliessen</button>
+          <button data-dialog-close class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showProcedureOverlay = false">Schliessen</button>
         </div>
         <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error anm-alert anm-status--danger anm-procedure-ui">
           {{ errorMessage }}
@@ -849,7 +850,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showRoundOverlay"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -862,7 +863,7 @@ onBeforeUnmount(() => {
           <h3 class="anm-procedure-title anm-procedure-ui" id="anm-round-overlay-title">
             {{ rundenForm.id ? "Runde bearbeiten" : "Weitere Runde anlegen" }}
           </h3>
-          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showRoundOverlay = false">Schliessen</button>
+          <button data-dialog-close class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="showRoundOverlay = false">Schliessen</button>
         </div>
         <div v-if="errorMessage" class="anm-overlay-feedback anm-overlay-feedback-error anm-alert anm-status--danger anm-procedure-ui">
           {{ errorMessage }}
@@ -882,7 +883,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showStartRoundOverlay && pendingStartRound"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -895,7 +896,7 @@ onBeforeUnmount(() => {
           <h3 class="anm-procedure-title anm-procedure-ui" id="anm-start-round-overlay-title">
             Runde starten
           </h3>
-          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="closeStartRoundOverlay">Schliessen</button>
+          <button data-dialog-close class="anm-overlay-close anm-button anm-procedure-ui" type="button" @click="closeStartRoundOverlay">Schliessen</button>
         </div>
 
         <div class="anm-start-round-intro">
@@ -929,7 +930,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showDeleteRoundOverlay && pendingDeleteRound"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -940,7 +941,7 @@ onBeforeUnmount(() => {
       <section class="anm-overlay-card anm-delete-procedure-card anm-procedure-surface">
         <div class="anm-overlay-head">
           <h3 class="anm-procedure-title anm-procedure-ui" id="anm-delete-round-overlay-title">Runde endgueltig loeschen?</h3>
-          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
+          <button data-dialog-close class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingRundenId === pendingDeleteRound.id" @click="closeDeleteRoundOverlay">
             Schliessen
           </button>
         </div>
@@ -968,7 +969,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showDeleteProcedureOverlay && pendingDeleteProcedure"
       class="anm-overlay-backdrop"
       role="dialog"
@@ -979,7 +980,7 @@ onBeforeUnmount(() => {
       <section class="anm-overlay-card anm-delete-procedure-card anm-procedure-surface">
         <div class="anm-overlay-head">
           <h3 class="anm-procedure-title anm-procedure-ui" id="anm-delete-procedure-overlay-title">Verfahren endgueltig loeschen?</h3>
-          <button class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
+          <button data-dialog-close class="anm-overlay-close anm-button anm-procedure-ui" type="button" :disabled="deletingVerfahrenId === pendingDeleteProcedure.id" @click="closeDeleteProcedureOverlay">
             Schliessen
           </button>
         </div>

@@ -3,6 +3,8 @@
 const { assertWritableContext } = require("../lib/anmeldeWriteGuard");
 const { updateStudentMaster, upsertRoundState } = require("../lib/schuelerIdentityService");
 
+const EFFECTIVE_SCHOOL_COLUMN = "COALESCE(NULLIF(TRIM(sr.koordinierte_snr), ''), NULLIF(TRIM(sr.schul_nr), ''))";
+
 function sendError(res, statusCode, message, details) {
   const payload = { error: message };
   if (details) payload.details = details;
@@ -111,7 +113,7 @@ async function loadProcedureSchools(pool, verfahrenId) {
     .filter((row) => row.snr);
 }
 
-async function loadOpenCaseCountsByStudent(pool, verfahrenId) {
+async function loadOpenCaseCountsByStudent(pool, verfahrenId, rundeId) {
   if (!(await tableExists(pool, "anm_offener_fall"))) return new Map();
   const columns = await loadTableColumns(pool, "anm_offener_fall");
   if (!columns.has("schueler_id")) return new Map();
@@ -123,11 +125,12 @@ async function loadOpenCaseCountsByStudent(pool, verfahrenId) {
     LEFT JOIN anm_kat_fallstatus fs
       ON fs.id = f.fallstatus_id
     WHERE verfahren_id = ?
+      AND f.runde_id = ?
       AND f.schueler_id IS NOT NULL
       AND LOWER(TRIM(COALESCE(fs.code, fs.bezeichnung, ''))) <> 'erledigt'
     GROUP BY f.schueler_id
     `,
-    [verfahrenId],
+    [verfahrenId, rundeId],
   );
 
   return new Map(
@@ -461,7 +464,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
     ? await loadTableColumns(pool, "anm_kat_foerderbedarf")
     : new Set();
 
-  const schoolColumn = "NULLIF(TRIM(sr.schul_nr), '')";
+  const schoolColumn = EFFECTIVE_SCHOOL_COLUMN;
   const studentIdColumn = "COALESCE(x.externe_id, '')";
   const foerderCatalogKey = foerderbedarfColumns.has("foerder_id")
     ? "foerder_id"
@@ -477,7 +480,7 @@ async function loadSchuelerRows(pool, verfahrenId, rundeId) {
   const whereParts = ["sr.verfahren_id = ?", "sr.runde_id = ?"];
   const params = [verfahrenId, rundeId];
 
-  const openCaseCounts = await loadOpenCaseCountsByStudent(pool, verfahrenId);
+  const openCaseCounts = await loadOpenCaseCountsByStudent(pool, verfahrenId, rundeId);
 
   const [rows] = await pool.query(
     `
@@ -640,7 +643,7 @@ async function loadSchuelerCardSummary(pool, verfahrenId, rundeId) {
   const filters = ["sr.verfahren_id = ?", "sr.runde_id = ?"];
   const params = [verfahrenId, rundeId];
 
-  const schoolColumn = "NULLIF(TRIM(sr.schul_nr), '')";
+  const schoolColumn = EFFECTIVE_SCHOOL_COLUMN;
   const anmeldestatusExpr = "LOWER(TRIM(COALESCE(sr.anmeldestatus, '')))";
   const foerderbedarfExpr = columns.has("foerderbedarf")
     ? `
@@ -703,7 +706,7 @@ async function loadSchoolOverviewFromSchueler(pool, verfahrenId, rundeId) {
   const filters = ["sr.verfahren_id = ?", "sr.runde_id = ?"];
   const params = [verfahrenId, rundeId];
 
-  const schoolColumn = "NULLIF(TRIM(sr.schul_nr), '')";
+  const schoolColumn = EFFECTIVE_SCHOOL_COLUMN;
   const statusExpr = "LOWER(TRIM(COALESCE(sr.anmeldestatus, '')))";
   const foerderbedarfExpr = columns.has("foerderbedarf")
     ? `
@@ -951,6 +954,7 @@ function createAbgleichController({ getPool }) {
           `
           INSERT INTO anm_offener_fall (
             verfahren_id,
+            runde_id,
             schueler_pool_id,
             schueler_id,
             schueler_anmeldung_id,
@@ -960,9 +964,9 @@ function createAbgleichController({ getPool }) {
             bemerkung,
             created_at,
             updated_at
-          ) VALUES (?, NULL, ?, NULL, ?, ?, NULL, ?, NOW(), NOW())
+          ) VALUES (?, ?, NULL, ?, NULL, ?, ?, NULL, ?, NOW(), NOW())
           `,
-          [verfahrenId, schuelerId, fallgrundId, fallstatusId, bemerkung || null],
+          [verfahrenId, rundeId, schuelerId, fallgrundId, fallstatusId, bemerkung || null],
         );
 
         const student = studentRows[0] || {};

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 import { readXlsxFile } from "../utils/xlsx";
@@ -96,14 +97,14 @@ function formatGermanDate(value: unknown) {
 
 <template>
   <div v-if="open" class="mg-overlay" @click.self="emit('close')">
-    <section class="mg-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="mg-title">
+    <section v-dialog-focus class="mg-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="mg-title">
       <header class="mg-head">
         <div>
           <p class="mg-eyebrow anm-procedure-copy anm-procedure-ui">Excel-Import</p>
           <h3 class="anm-procedure-title anm-procedure-ui" id="mg-title">Rückmeldungen MG</h3>
           <p class="anm-procedure-copy anm-procedure-ui">Rückmeldungen prüfen, eindeutig zuordnen und in die aktuelle Runde übernehmen.</p>
         </div>
-        <button class="icon-button anm-button anm-button--icon anm-procedure-ui" type="button" aria-label="Dialog schließen" :disabled="loading" @click="emit('close')">×</button>
+        <button data-dialog-close class="icon-button anm-button anm-button--icon anm-procedure-ui" type="button" aria-label="Dialog schließen" :disabled="loading" @click="emit('close')">×</button>
       </header>
 
       <ol class="mg-steps" aria-label="Importschritte">

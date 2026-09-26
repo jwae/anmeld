@@ -131,11 +131,12 @@ async function buildOffeneFaelleReport(pool, verfahrenId, rundeId, options = {})
       ON expected.snr = COALESCE(NULLIF(TRIM(${expectedSchoolExpression}), ''), NULLIF(TRIM(f.zugewiesene_snr), ''))
     LEFT JOIN anm_schulen assign ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
+      AND f.runde_id = ?
       AND sr.runde_id = ?
       ${fallstatusFilter}
     ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), '') ASC
     `,
-    [rundeId, verfahrenId, rundeId, ...(fallstatusFilter ? [fallstatusCode] : [])],
+    [rundeId, verfahrenId, rundeId, rundeId, ...(fallstatusFilter ? [fallstatusCode] : [])],
   );
 
   return {

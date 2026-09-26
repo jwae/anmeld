@@ -1027,8 +1027,12 @@ function createAuthModule(poolProvider) {
   const revokedTokens = new Map();
   const schoolImportPreviewSessions = new Map();
 
+  function resolvePool() {
+    return typeof poolProvider === "function" ? poolProvider() : poolProvider;
+  }
+
   function getPool() {
-    const pool = typeof poolProvider === "function" ? poolProvider() : poolProvider;
+    const pool = resolvePool();
     if (!pool) {
       throw new Error("Keine Datenbankverbindung konfiguriert.");
     }
@@ -1036,8 +1040,11 @@ function createAuthModule(poolProvider) {
   }
 
   async function writeAuthProtokoll(req, payload) {
+    const pool = resolvePool();
+    if (!pool) return;
+
     try {
-      await writeProtokoll(getPool(), {
+      await writeProtokoll(pool, {
         ...payload,
         ipAdresse: getClientIp(req),
       });

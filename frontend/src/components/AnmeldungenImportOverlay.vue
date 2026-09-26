@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 import { parseCsvText, readCsvFileText, normalizeMappingKey, type ParsedCsvRow } from "../utils/csv";
@@ -297,14 +298,14 @@ function handleBack() {
 
 <template>
   <div v-if="open" class="csv-import-overlay" @click.self="$emit('close')">
-    <section class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true">
+    <section v-dialog-focus class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-label="Anmeldungen importieren (CSV)">
       <div class="csv-import-head">
         <div>
           <p class="csv-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import Wizard</p>
           <h3 class="anm-procedure-title anm-procedure-ui">Anmeldungen importieren (CSV)</h3>
           <p class="anm-procedure-copy anm-procedure-ui">Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
         </div>
-        <button class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('close')">Schliessen</button>
+        <button data-dialog-close class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="$emit('close')">Schliessen</button>
       </div>
 
       <div v-if="error" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">

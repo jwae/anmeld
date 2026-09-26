@@ -51,6 +51,8 @@ export function bindings(p, s) {
   walk(parse(template(p, s)), n => {
     for (const prop of n.props || []) {
       if (prop.type !== 7) continue;
+      // The presentation directive has no value or application-data binding.
+      if (prop.name === 'dialog-focus' && !prop.arg && !prop.exp && !prop.modifiers.length) continue;
       const arg = prop.arg?.content || '';
       if (prop.name === 'bind' && arg.startsWith('aria-')) continue;
       result.push([prop.name, arg, prop.exp?.content || '', prop.modifiers.map(m => m.content)]);

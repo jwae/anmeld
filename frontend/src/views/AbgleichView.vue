@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import abgleichService from "../services/abgleichService";
 import type { Anmeldeverfahrenstyp } from "../types";
@@ -651,7 +652,7 @@ function toggleSchuleFilter(schuleName: string) {
       </button>
     </div>
 
-    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-status--warning anm-procedure-ui">
       <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kontext unvollstaendig</p>
       <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit der Abgleich geladen werden kann.</p>
     </div>
@@ -667,23 +668,23 @@ function toggleSchuleFilter(schuleName: string) {
         <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
       </div>
 
-      <section class="summary-card">
+      <section class="summary-card anm-procedure-summary anm-procedure-surface">
         <div class="section-head">
           <div>
             
             <h3 class="anm-procedure-title anm-procedure-ui">Zusammenfassung</h3>
           </div>
-          <span class="summary-context">{{ context.verfahren }} | {{ context.runde }} | Datenquelle: anm_schueler</span>
+          <span class="summary-context anm-procedure-copy anm-procedure-ui">{{ context.verfahren }} | {{ context.runde }}</span>
         </div>
         <div class="summary-grid">
-          <div class="metric-card"><span>Schueler gesamt</span><strong>{{ summary.gesamt }}</strong></div>
-          <div class="metric-card"><span>Schulen</span><strong>{{ summary.schulen }}</strong></div>
-          <div class="metric-card"><span>Neuaufnahme</span><strong>{{ summary.neuaufnahme }}</strong></div>
-          <div class="metric-card"><span>Warteliste</span><strong>{{ summary.warteliste }}</strong></div>
-          <div class="metric-card"><span>Zuordnungen</span><strong>{{ summary.zugeordnet }}</strong></div>
-          <div class="metric-card metric-card-alert"><span>Ohne Anmeldung</span><strong>{{ summary.ohne }}</strong></div>
-          <div class="metric-card"><span>Foerderbedarf</span><strong>{{ summary.foerderbedarf }}</strong></div>
-          <div class="metric-card"><span>Zieldifferent</span><strong>{{ summary.zieldifferent }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Schueler gesamt</span><strong>{{ summary.gesamt }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Schulen</span><strong>{{ summary.schulen }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Neuaufnahme</span><strong>{{ summary.neuaufnahme }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Warteliste</span><strong>{{ summary.warteliste }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Zuordnungen</span><strong>{{ summary.zugeordnet }}</strong></div>
+          <div class="metric-card metric-card-alert anm-procedure-metric anm-procedure-ui anm-status--danger"><span>Ohne Anmeldung</span><strong>{{ summary.ohne }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Foerderbedarf</span><strong>{{ summary.foerderbedarf }}</strong></div>
+          <div class="metric-card anm-procedure-metric anm-procedure-ui"><span>Zieldifferent</span><strong>{{ summary.zieldifferent }}</strong></div>
         </div>
       </section>
 
@@ -945,7 +946,7 @@ function toggleSchuleFilter(schuleName: string) {
       </section>
 
       <div v-if="caseDialogOpen" class="dialog-backdrop" @click.self="resetCaseDialog">
-        <section class="case-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="offener-fall-dialog-title">
+        <section v-dialog-focus class="case-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="offener-fall-dialog-title">
           <div class="case-dialog-head">
             <div>
               <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Manueller Offener Fall</p>
@@ -954,7 +955,7 @@ function toggleSchuleFilter(schuleName: string) {
                 {{ selectedCaseRow ? ([selectedCaseRow.nachname, selectedCaseRow.vorname].filter(Boolean).join(", ") || "-") : "-" }}
               </p>
             </div>
-            <button type="button" class="case-dialog-close anm-button anm-procedure-ui" aria-label="Dialog schliessen" @click="resetCaseDialog">×</button>
+            <button data-dialog-close type="button" class="case-dialog-close anm-button anm-procedure-ui" aria-label="Dialog schliessen" @click="resetCaseDialog">×</button>
           </div>
 
           <div class="case-dialog-body">
@@ -986,7 +987,7 @@ function toggleSchuleFilter(schuleName: string) {
       </div>
 
       <div v-if="editDialogOpen" class="dialog-backdrop" @click.self="closeEditDialog">
-        <section class="case-dialog case-dialog-edit anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="schueler-edit-dialog-title">
+        <section v-dialog-focus class="case-dialog case-dialog-edit anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="schueler-edit-dialog-title">
           <div class="case-dialog-head">
             <div>
               <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Schuelerdatensatz</p>
@@ -1016,7 +1017,7 @@ function toggleSchuleFilter(schuleName: string) {
               >
                 <i class="bi bi-chevron-right" aria-hidden="true"></i>
               </button>
-              <button
+              <button data-dialog-close
                 type="button"
                 class="edit-dialog-nav-button anm-button anm-button--icon anm-procedure-ui"
                 :disabled="editDialogSaving || editDialogDeleting"
@@ -1141,7 +1142,7 @@ function toggleSchuleFilter(schuleName: string) {
       </div>
 
       <div v-if="deleteDialogOpen" class="dialog-backdrop delete-dialog-backdrop" @click.self="closeDeleteDialog()">
-        <section class="case-dialog delete-student-dialog anm-procedure-surface" role="alertdialog" aria-modal="true" aria-labelledby="delete-student-dialog-title">
+        <section v-dialog-focus class="case-dialog delete-student-dialog anm-procedure-surface" role="alertdialog" aria-modal="true" aria-labelledby="delete-student-dialog-title">
           <div class="delete-dialog-head">
             <div class="delete-dialog-icon" aria-hidden="true">
               <i class="bi bi-trash"></i>
@@ -1158,7 +1159,7 @@ function toggleSchuleFilter(schuleName: string) {
           </div>
 
           <div class="case-dialog-actions">
-            <button type="button" class="anm-button anm-procedure-ui" :disabled="editDialogDeleting" @click="closeDeleteDialog()">Abbrechen</button>
+            <button data-dialog-close type="button" class="anm-button anm-procedure-ui" :disabled="editDialogDeleting" @click="closeDeleteDialog()">Abbrechen</button>
             <button type="button" class="anm-button anm-button--danger anm-procedure-ui" :disabled="editDialogDeleting || isReadonly" @click="deleteSelectedStudent">
               {{ editDialogDeleting ? "Loesche..." : "Endgueltig loeschen" }}
             </button>

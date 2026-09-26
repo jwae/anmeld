@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref } from "vue";
 import importService from "../services/importService";
 import { can } from "../authStore";
@@ -118,8 +119,8 @@ async function handleDeleteAll() {
 
     <Teleport to="body">
       <div v-if="deleteAllConfirmOpen" class="delete-all-backdrop" @click.self="closeDeleteAllConfirm">
-        <section class="delete-all-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
-          <button class="delete-all-close anm-button anm-procedure-ui" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
+        <section v-dialog-focus class="delete-all-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
+          <button data-dialog-close class="delete-all-close anm-button anm-procedure-ui" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
           <div class="delete-all-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
           <div class="delete-all-copy">
             <h3 class="anm-procedure-title anm-procedure-ui" id="delete-all-title">Alle Schülerdaten löschen?</h3>

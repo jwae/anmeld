@@ -1238,7 +1238,7 @@ async function upsertAnmeldungenWizardImportV3(connection, payload) {
   });
   const unknownSchoolCase = unknownProcedureSchool
     ? await ensureOpenCaseForUnknownProcedureSchool(connection, {
-      verfahren_id: verfahrenId, schueler_id: Number(resolved.student.id),
+      verfahren_id: verfahrenId, runde_id: rundeId, schueler_id: Number(resolved.student.id),
     })
     : { created: false, updated: false };
   return {
@@ -2046,6 +2046,7 @@ async function upsertSchuelerForAnmeldungImport(pool, payload) {
     && normalizeTextLower(erwarteteSchulnummer) !== normalizeTextLower(importierteSchulnummer)) {
     const openCaseResult = await ensureOpenCaseForSchoolChange(pool, {
       verfahren_id: verfahrenId,
+      runde_id: rundeId,
       schueler_id: Number(resolved.student.id),
       erwartete_schulnummer: erwarteteSchulnummer,
       importierte_schulnummer: importierteSchulnummer,
@@ -2179,10 +2180,11 @@ function buildSek1ImportErrorNote(row) {
 
 async function ensureSek1OpenCaseByCode(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
   const schuelerId = Number(payload?.schueler_id || 0);
   const fallgrundCode = normalizeText(payload?.fallgrund_code);
   const noteText = normalizeText(payload?.note);
-  if (!verfahrenId || !fallgrundCode || !noteText) {
+  if (!verfahrenId || !rundeId || !fallgrundCode || !noteText) {
     return { created: false, updated: false };
   }
 
@@ -2204,8 +2206,8 @@ async function ensureSek1OpenCaseByCode(pool, payload) {
     openStatusId = Number(fallstatusByCode.get("offen")?.id || 0);
   }
 
-  const whereParts = ["verfahren_id = ?", "fallgrund_id = ?"];
-  const whereParams = [verfahrenId, Number(fallgrund.id)];
+  const whereParts = ["verfahren_id = ?", "runde_id = ?", "fallgrund_id = ?"];
+  const whereParams = [verfahrenId, rundeId, Number(fallgrund.id)];
   if (schuelerId && schuelerIdColumn) {
     whereParts.push("schueler_id = ?");
     whereParams.push(schuelerId);
@@ -2256,9 +2258,9 @@ async function ensureSek1OpenCaseByCode(pool, payload) {
     return { created: false, updated: true };
   }
 
-  const insertColumns = ["verfahren_id", "fallgrund_id"];
-  const placeholders = ["?", "?"];
-  const values = [verfahrenId, Number(fallgrund.id)];
+  const insertColumns = ["verfahren_id", "runde_id", "fallgrund_id"];
+  const placeholders = ["?", "?", "?"];
+  const values = [verfahrenId, rundeId, Number(fallgrund.id)];
   if (offenerFallColumns.has("schueler_pool_id")) {
     insertColumns.push("schueler_pool_id");
     placeholders.push("?");
@@ -2306,16 +2308,18 @@ async function ensureSek1OpenCaseByCode(pool, payload) {
 
 async function ensureOpenCaseForSchoolChange(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
   const schuelerId = Number(payload?.schueler_id || 0);
   const erwarteteSchulnummer = normalizeText(payload?.erwartete_schulnummer);
   const importierteSchulnummer = normalizeText(payload?.importierte_schulnummer);
-  if (!verfahrenId || !schuelerId || !erwarteteSchulnummer || !importierteSchulnummer) {
+  if (!verfahrenId || !rundeId || !schuelerId || !erwarteteSchulnummer || !importierteSchulnummer) {
     return { created: false, updated: false };
   }
 
   const bemerkung = `Schueler wurde an einer anderen Schule angemeldet als aufgrund der vorherigen Runde erwartet. Erwartete Schule: ${erwarteteSchulnummer}. Tatsaechliche Anmeldung: ${importierteSchulnummer}.`;
   return ensureSek1OpenCaseByCode(pool, {
     verfahren_id: verfahrenId,
+    runde_id: rundeId,
     schueler_id: schuelerId,
     fallgrund_code: "SCHULE_ABWEICHEND",
     zugewiesene_snr: erwarteteSchulnummer,
@@ -2325,13 +2329,15 @@ async function ensureOpenCaseForSchoolChange(pool, payload) {
 
 async function ensureOpenCaseForUnknownProcedureSchool(pool, payload) {
   const verfahrenId = Number(payload?.verfahren_id || 0);
+  const rundeId = Number(payload?.runde_id || 0);
   const schuelerId = Number(payload?.schueler_id || 0);
-  if (!verfahrenId || !schuelerId) {
+  if (!verfahrenId || !rundeId || !schuelerId) {
     return { created: false, updated: false };
   }
 
   return ensureSek1OpenCaseByCode(pool, {
     verfahren_id: verfahrenId,
+    runde_id: rundeId,
     schueler_id: schuelerId,
     fallgrund_code: "ANMELDEFEHLER",
     note: "Anmeldeschule existiert nicht im Verfahren.",
@@ -2871,6 +2877,7 @@ async function importAnmeldungenForSchool(connection, payload) {
         if (["WARTELISTE", "ABLEHNUNG"].includes(row.data.anmeldestatus_code)) {
           const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
             verfahren_id: verfahrenId,
+            runde_id: rundeId,
             schueler_id: Number(schuelerResult.id),
             fallgrund_code: row.data.anmeldestatus_code,
           });
@@ -3188,6 +3195,7 @@ function createImporteController({ getPool }) {
             : null;
           const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
             verfahren_id: verfahrenId,
+            runde_id: rundeId,
             schueler_id: Number(existingForError?.id || 0),
             fallgrund_code: "ANMELDEFEHLER",
             note: buildSek1ImportErrorNote(row),
@@ -3215,6 +3223,7 @@ function createImporteController({ getPool }) {
             if (hasStammdatenabweichung) {
               const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
                 verfahren_id: verfahrenId,
+                runde_id: rundeId,
                 schueler_id: Number(result?.id || 0),
                 fallgrund_code: "STAMMDATEN_ABWEICHUNG",
                 note: buildStammdatenabweichungNote(row, validation.file_name),
@@ -4354,6 +4363,7 @@ function createImporteController({ getPool }) {
           ].filter(Boolean);
           const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
             verfahren_id: verfahrenId,
+            runde_id: rundeId,
             schueler_id: studentId,
             fallgrund_code: fallgrundCode,
             note: noteParts.join(" | "),
@@ -4372,6 +4382,7 @@ function createImporteController({ getPool }) {
           if (importResult.action === "INSERT" && row.invalid_source_school_number) {
             const openCaseResult = await ensureSek1OpenCaseByCode(connection, {
               verfahren_id: verfahrenId,
+              runde_id: rundeId,
               schueler_id: importResult.id,
               fallgrund_code: "HERKUNFTSFEHLER",
               note: `Rueckmeldungen MG, Zeile ${Number(row.row_number || 0)} | ${row.data?.nachname || ""}, ${row.data?.vorname || ""} | Ungueltige Schulnummer der abgebenden Schule: ${row.data?.herkunftsschule_snr || "-"}`,

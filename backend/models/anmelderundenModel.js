@@ -135,6 +135,7 @@ async function countBlockingDependencies(pool, rundenId) {
   const checks = [
     { table: "anm_anmeldung", label: "importierte Anmeldungen" },
     { table: "anm_abgleich_protokoll", label: "Abrufprotokolle" },
+    { table: "anm_offener_fall", label: "offene Faelle" },
   ];
 
   for (const check of checks) {
@@ -162,6 +163,7 @@ async function countRoundWorkingData(pool, rundenId) {
     { table: "anm_abgleich_protokoll", column: "runde_id" },
     { table: "anm_schueler_abgleich", column: "runde_id" },
     { table: "anm_schueler_runde", column: "runde_id" },
+    { table: "anm_offener_fall", column: "runde_id" },
   ];
 
   let total = 0;

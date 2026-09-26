@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import koordinationService from "../services/koordinationService";
 
@@ -330,12 +331,12 @@ watch(
       </div>
     </div>
 
-    <div v-if="autoGeocodingMessage" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+    <div v-if="autoGeocodingMessage" class="feedback-panel feedback-panel-warning anm-alert anm-status--warning anm-procedure-ui">
       <p class="feedback-title anm-procedure-copy anm-procedure-ui">Geocodes im Hintergrund</p>
       <p class="anm-procedure-copy anm-procedure-ui">{{ autoGeocodingMessage }}</p>
     </div>
 
-    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+    <div v-if="!verfahrenId || !rundeId" class="feedback-panel feedback-panel-warning anm-alert anm-status--warning anm-procedure-ui">
       <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kontext unvollstaendig</p>
       <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit die Koordination geladen werden kann.</p>
     </div>
@@ -513,13 +514,13 @@ watch(
       class="koordination-modal-overlay"
       @click.self="closeGeocodeInfoOverlay"
     >
-      <section class="koordination-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
+      <section v-dialog-focus class="koordination-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-label="Info zur Geocodes-Berechnung">
         <div class="section-head">
           <div>
             <p class="section-eyebrow anm-procedure-copy anm-procedure-ui">Info</p>
             <h4 class="anm-procedure-title anm-procedure-ui">Info zur Geocodes-Berechnung</h4>
           </div>
-          <button class="anm-button anm-procedure-ui" type="button" @click="closeGeocodeInfoOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" @click="closeGeocodeInfoOverlay">
             Schliessen
           </button>
         </div>

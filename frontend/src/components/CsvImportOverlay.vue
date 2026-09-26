@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
 import CsvImportStepUpload from "./CsvImportStepUpload.vue";
@@ -352,14 +353,14 @@ function handleClose() {
 
 <template>
   <div v-if="open" class="csv-import-overlay" @click.self="handleClose">
-    <section class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="csv-import-title">
+    <section v-dialog-focus class="csv-import-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="csv-import-title">
       <div class="csv-import-head">
         <div>
           <p class="csv-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import Wizard</p>
           <h3 class="anm-procedure-title anm-procedure-ui" id="csv-import-title">{{ title }}</h3>
           <p class="anm-procedure-copy anm-procedure-ui">Schritt {{ currentStep }} von 5 | {{ stepTitle }}</p>
         </div>
-        <button class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="handleClose">
+        <button data-dialog-close class="wizard-header-close-button anm-button anm-procedure-ui" type="button" :disabled="busy" @click="handleClose">
           Schliessen
         </button>
       </div>

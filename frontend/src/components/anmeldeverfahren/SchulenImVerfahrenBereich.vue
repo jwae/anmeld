@@ -304,11 +304,11 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               :aria-expanded="showAbgebendeSchulenSection ? 'true' : 'false'"
               @click="showAbgebendeSchulenSection = !showAbgebendeSchulenSection"
             >
-              <span
-                class="anm-section-toggle-chevron"
+              <svg
+                class="anm-section-toggle-chevron anm-procedure-chevron"
                 :class="{ 'is-collapsed': !showAbgebendeSchulenSection }"
                 aria-hidden="true"
-              ></span>
+               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
             </button>
             <span>Abgebende Schulen im Verfahren</span>
           </h3>
@@ -423,11 +423,11 @@ watch(() => props.verfahrenId, async (nextVerfahrenId) => {
               :aria-expanded="showBeteiligteSchulenSection ? 'true' : 'false'"
               @click="showBeteiligteSchulenSection = !showBeteiligteSchulenSection"
             >
-              <span
-                class="anm-section-toggle-chevron"
+              <svg
+                class="anm-section-toggle-chevron anm-procedure-chevron"
                 :class="{ 'is-collapsed': !showBeteiligteSchulenSection }"
                 aria-hidden="true"
-              ></span>
+               viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
             </button>
             <span>Aufnehmende Schulen im Verfahren</span>
           </h3>

@@ -43,7 +43,7 @@ function handleBereichSelectionUpdate(payload: {
           <p class="anm-roadmap-eyebrow anm-procedure-copy anm-procedure-ui">Schritt 1</p>
           <h2 class="anm-procedure-title anm-procedure-ui">Grundlage des Schulanmeldeverfahrens</h2>
           <p class="anm-procedure-copy anm-procedure-ui">
-            Hier können Sie: Verfahren und Runde festlegen / Kapazitaeten aktualisieren / Schuelerpool /Anmeldungen holen / Koordinieren.
+            Hier werden Verfahren und Runden erstellt bzw. verwaltet.
           </p>
         </div>
       </div>
@@ -117,7 +117,6 @@ function handleBereichSelectionUpdate(payload: {
   margin: 8px 0 0;
 }
 
-.anm-roadmap-card p:where(:not(.anm-procedure-ui)),
 .anm-roadmap-card p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;

@@ -242,7 +242,7 @@ async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
       COALESCE(f.verfahren_id, 0) AS verfahren_id,
       COALESCE(f.fallstatus_id, 0) AS fallstatus_id,
       COALESCE(f.schueler_id, 0) AS interne_schueler_id,
-      COALESCE(sr.runde_id, 0) AS runde_id,
+      COALESCE(f.runde_id, 0) AS runde_id,
       COALESCE(NULLIF(TRIM(s.vorname), ''), '') AS vorname,
       COALESCE(NULLIF(TRIM(s.nachname), ''), '') AS nachname,
       DATE_FORMAT(s.geburtsdatum, '%Y-%m-%d') AS geburtsdatum,
@@ -283,10 +283,11 @@ async function loadOffeneFaelleRows(pool, verfahrenId, rundeId) {
     LEFT JOIN anm_schulen assign
       ON assign.snr = f.zugewiesene_snr
     WHERE f.verfahren_id = ?
+      AND f.runde_id = ?
       AND sr.runde_id = ?
     ORDER BY COALESCE(f.updated_at, f.created_at) DESC, COALESCE(NULLIF(TRIM(s.nachname), ''), '') ASC
     `,
-    [rundeId, verfahrenId, rundeId],
+    [rundeId, verfahrenId, rundeId, rundeId],
   );
 
   return (rows || []).map((row) => ({
@@ -862,9 +863,10 @@ function createKoordinationController({ getPool }) {
           FROM anm_offener_fall
           WHERE id = ?
             AND verfahren_id = ?
+            AND runde_id = ?
           LIMIT 1
           `,
-          [fallId, verfahrenId],
+          [fallId, verfahrenId, rundeId],
         );
         if (!Array.isArray(existingRows) || !existingRows.length) {
           return sendError(res, 404, "Der offene Fall wurde nicht gefunden.");
@@ -877,8 +879,10 @@ function createKoordinationController({ getPool }) {
               bemerkung = ?,
               updated_at = NOW()
           WHERE id = ?
+            AND verfahren_id = ?
+            AND runde_id = ?
           `,
-          [fallstatusId, bemerkung || null, fallId],
+          [fallstatusId, bemerkung || null, fallId, verfahrenId, rundeId],
         );
 
         return res.json({
@@ -892,6 +896,8 @@ function createKoordinationController({ getPool }) {
     },
 
     zuordnen: async (req, res) => {
+      let connection = null;
+      let transactionStarted = false;
       try {
         const verfahrenId = Number(req.body?.verfahren_id || 0);
         const rundeId = Number(req.body?.runde_id || 0);
@@ -908,36 +914,47 @@ function createKoordinationController({ getPool }) {
 
         if (!verfahrenId) return sendError(res, 400, "verfahren_id ist erforderlich.");
         if (!rundeId) return sendError(res, 400, "runde_id ist erforderlich.");
-        await assertWritableContext(getPool(), verfahrenId, rundeId);
         if (!rowIds.length) return sendError(res, 400, "interne_schueler_ids ist erforderlich.");
         if (!schulNr) return sendError(res, 400, "zugewiesene_schule_snr ist erforderlich.");
 
         const pool = getPool();
-        const schoolBySnr = await loadSchoolMapBySnr(pool);
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        transactionStarted = true;
+
+        await assertWritableContext(connection, verfahrenId, rundeId);
+        const schoolBySnr = await loadSchoolMapBySnr(connection);
         if (!schoolBySnr.has(schulNr)) {
-          return sendError(res, 404, "Die ausgewaehlte Schule wurde nicht gefunden.");
+          const error = new Error("Die ausgewaehlte Schule wurde nicht gefunden.");
+          error.statusCode = 404;
+          throw error;
         }
 
         const rowPlaceholders = rowIds.map(() => "?").join(", ");
         const whereParts = [`s.id IN (${rowPlaceholders})`, "s.verfahren_id = ?", "sr.runde_id = ?"];
         const params = [verfahrenId, rundeId];
 
-        const [existingRows] = await pool.query(
+        const [existingRows] = await connection.query(
           `
           SELECT s.id, COALESCE(s.vorname, '') AS vorname, COALESCE(s.nachname, '') AS nachname
           FROM anm_schueler s
           JOIN anm_schueler_runde sr ON sr.schueler_id = s.id AND sr.verfahren_id = s.verfahren_id
           WHERE ${whereParts.join(" AND ")}
           ORDER BY COALESCE(s.nachname, '') ASC, COALESCE(s.vorname, '') ASC, s.id ASC
+          FOR UPDATE
           `,
           [...rowIds, ...params],
         );
         const existing = Array.isArray(existingRows) ? existingRows : [];
-        if (!existing.length) {
-          return sendError(res, 404, "Die ausgewaehlten Schueler wurden nicht gefunden.");
+        if (existing.length !== rowIds.length) {
+          const error = new Error(
+            "Nicht alle ausgewaehlten Schueler wurden in diesem Verfahren und dieser Runde gefunden. Es wurde keine Zuordnung gespeichert.",
+          );
+          error.statusCode = 409;
+          throw error;
         }
 
-        const [updateResult] = await pool.query(
+        const [updateResult] = await connection.query(
           `
           UPDATE anm_schueler_runde sr
           JOIN anm_schueler s ON s.id = sr.schueler_id AND s.verfahren_id = sr.verfahren_id
@@ -949,11 +966,22 @@ function createKoordinationController({ getPool }) {
         );
 
         const updatedCount = Number(updateResult?.affectedRows || 0);
+        if (updatedCount !== rowIds.length) {
+          const error = new Error(
+            `Die Zuordnung wurde nicht vollstaendig gespeichert (${updatedCount} von ${rowIds.length}). Es wurde keine Zuordnung uebernommen.`,
+          );
+          error.statusCode = 409;
+          throw error;
+        }
+
         const assignedSchoolName = schoolBySnr.get(schulNr);
         const firstStudent = existing[0];
-        const message = updatedCount <= 1
+        const message = updatedCount === 1
           ? `${normalizeText(firstStudent?.nachname)}, ${normalizeText(firstStudent?.vorname)} wurde ${assignedSchoolName} zugeordnet.`
           : `${updatedCount} Schueler wurden ${assignedSchoolName} zugeordnet, beginnend mit ${normalizeText(firstStudent?.nachname)}, ${normalizeText(firstStudent?.vorname)}.`;
+
+        await connection.commit();
+        transactionStarted = false;
 
         return res.json({
           success: true,
@@ -962,8 +990,15 @@ function createKoordinationController({ getPool }) {
           message,
         });
       } catch (error) {
-        console.error("koordination assignment failed:", error);
+        if (transactionStarted && connection) {
+          await connection.rollback().catch(() => {});
+        }
+        if (!error?.statusCode || error.statusCode >= 500) {
+          console.error("koordination assignment failed:", error);
+        }
         return sendError(res, error?.statusCode || 500, error?.message || "Die Zuordnung konnte nicht gespeichert werden.");
+      } finally {
+        connection?.release();
       }
     },
   };

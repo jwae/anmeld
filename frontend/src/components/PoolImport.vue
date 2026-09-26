@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { formatGermanDate as formatDate } from "../utils/date";
 import { computed, onUnmounted, ref, watch } from "vue";
 import importService from "../services/importService";
@@ -633,7 +634,7 @@ onUnmounted(() => {
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="isExpanded = !isExpanded"
           >
-            <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
+            <svg class="section-toggle-chevron anm-procedure-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
           </button>
           {{ title || "Schuelerpool importieren (CSV, EWO-Datei)" }}
         </h3>
@@ -664,16 +665,16 @@ onUnmounted(() => {
       <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
     </div>
 
-    <div v-if="summary" class="import-summary">
-      <div><strong>Gelesen:</strong> {{ summary.rows_read }}</div>
-      <div><strong>Neu:</strong> {{ summary.imported_students }}</div>
-      <div><strong>Aktualisiert:</strong> {{ summary.updated_students }}</div>
-      <div><strong>Offene Faelle:</strong> {{ summary.created_open_cases }}</div>
-      <div><strong>Uebersprungen:</strong> {{ summary.skipped_rows }}</div>
-      <div><strong>Fehler:</strong> {{ summary.error_rows }}</div>
-      <div v-if="summary.le_count !== undefined"><strong>LE:</strong> {{ summary.le_count }}</div>
-      <div v-if="summary.zd_count !== undefined"><strong>ZD:</strong> {{ summary.zd_count }}</div>
-      <div v-if="summary.ef_count !== undefined"><strong>EF:</strong> {{ summary.ef_count }}</div>
+    <div v-if="summary" class="import-summary anm-procedure-summary">
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Gelesen:</strong> {{ summary.rows_read }}</div>
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Neu:</strong> {{ summary.imported_students }}</div>
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Aktualisiert:</strong> {{ summary.updated_students }}</div>
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Offene Faelle:</strong> {{ summary.created_open_cases }}</div>
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Uebersprungen:</strong> {{ summary.skipped_rows }}</div>
+      <div class="anm-procedure-result anm-procedure-ui"><strong>Fehler:</strong> {{ summary.error_rows }}</div>
+      <div class="anm-procedure-result anm-procedure-ui" v-if="summary.le_count !== undefined"><strong>LE:</strong> {{ summary.le_count }}</div>
+      <div class="anm-procedure-result anm-procedure-ui" v-if="summary.zd_count !== undefined"><strong>ZD:</strong> {{ summary.zd_count }}</div>
+      <div class="anm-procedure-result anm-procedure-ui" v-if="summary.ef_count !== undefined"><strong>EF:</strong> {{ summary.ef_count }}</div>
     </div>
 
     <div v-if="schildDiagnostics.length" class="pool-diagnostic-actions">
@@ -686,12 +687,12 @@ onUnmounted(() => {
       <div class="import-preview-head">
         <div>
           <strong>Schuelerpool</strong>
-          <span>{{ filteredPoolSchuelerRows.length }} Treffer | Datenquelle: anm_schueler</span>
+          <span>{{ filteredPoolSchuelerRows.length }} Treffer</span>
         </div>
       </div>
 
-      <div class="pool-metric-cards">
-        <article v-for="card in poolMetricCards" :key="card.label" class="pool-metric-card">
+      <div class="pool-metric-cards anm-procedure-summary anm-procedure-ui">
+        <article v-for="card in poolMetricCards" :key="card.label" class="pool-metric-card anm-procedure-metric anm-procedure-ui">
           <span>{{ card.label }}</span>
           <strong>{{ card.value }}</strong>
         </article>
@@ -836,7 +837,7 @@ onUnmounted(() => {
       @success="handleCsvImportSuccess"
     />
 
-    <div
+    <div v-dialog-focus
       v-if="showSchildImportOverlay"
       class="pool-import-overlay"
       role="dialog"
@@ -862,7 +863,7 @@ onUnmounted(() => {
           </p>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="anm-button anm-procedure-ui" type="button" :disabled="loading" @click="closeSchildImportOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" :disabled="loading" @click="closeSchildImportOverlay">
             Abbrechen
           </button>
           <button class="anm-button anm-button--primary anm-procedure-ui" type="button" :disabled="loading || isReadonly" @click="confirmSchildImport">
@@ -872,7 +873,7 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showEditPoolOverlay"
       class="pool-import-overlay"
       role="dialog"
@@ -904,7 +905,7 @@ onUnmounted(() => {
             >
               <i class="bi bi-chevron-right" aria-hidden="true"></i>
             </button>
-            <button
+            <button data-dialog-close
               type="button"
               class="head-icon-button pool-edit-close-button anm-button anm-button--icon anm-procedure-ui"
               :disabled="savingEditPool || deletingPoolRow"
@@ -1032,7 +1033,7 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showDeletePoolOverlay"
       class="pool-import-overlay"
       role="dialog"
@@ -1058,7 +1059,7 @@ onUnmounted(() => {
         </div>
 
         <div class="pool-import-overlay-actions">
-          <button class="anm-button anm-procedure-ui" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" :disabled="deletingPoolRow" @click="closeDeletePoolOverlay">
             Abbrechen
           </button>
           <button class="pool-delete-confirm-button anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="deletingPoolRow || isReadonly" @click="confirmDeletePoolRow">
@@ -1068,7 +1069,7 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showDuplicateConflictsOverlay"
       class="pool-import-overlay"
       role="dialog"
@@ -1093,14 +1094,14 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="anm-button anm-procedure-ui" type="button" @click="closeDuplicateConflictsOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" @click="closeDuplicateConflictsOverlay">
             Schliessen
           </button>
         </div>
       </section>
     </div>
 
-    <div
+    <div v-dialog-focus
       v-if="showSchildDiagnosticsOverlay"
       class="pool-import-overlay"
       role="dialog"
@@ -1145,7 +1146,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="pool-import-overlay-actions">
-          <button class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
+          <button data-dialog-close class="anm-button anm-procedure-ui" type="button" @click="closeSchildDiagnosticsOverlay">
             Schliessen
           </button>
         </div>

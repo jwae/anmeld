@@ -123,3 +123,42 @@ benutzte Altregeln schließen migrierte Elemente mit
 Tabellenregeln nicht. Diese Regeln nicht pauschal löschen. Vor weiteren Änderungen
 `node scripts/check-management-migration.mjs` ausführen; Details und Grenzen der
 Prüfung stehen in `TODO_CODEX.md` im Projektverzeichnis.
+
+## Anmeldeverfahren: Fortsetzung
+
+`procedure.css` wird durch `LoginCredentialsPage.vue` geladen (trotz des Namens
+ist dies der angemeldete Fachbereich). `anm-procedure-ui` aktiviert zentrale
+Steuerelemente; `anm-procedure-surface` ersetzt nur die Dekoration vorhandener
+Flächen. Keine globale Typografie auf Tabelleneltern setzen. Die neue Darstellung
+der Sitzungskarte ist auf `anm-procedure-session` begrenzt.
+
+Die Auswertungsansicht verwendet dieselben Bausteine. Ergänzende Regeln sind auf
+`.auswertungen-view` beschränkt. Native Radios bleiben sichtbar, Auswahl und
+Tastaturfokus werden kenntlich gemacht. Tabellen-/Filterregionen sowie das
+Fachskript einschließlich Druck-HTML und Export bleiben gegen `93a98dc` geschützt.
+
+Prüfung aus `frontend`: `node scripts/check-management-migration.mjs` führt beide
+Migrationsprüfungen aus; anschließend `npm test` und `npm run build`. Backendtests aus `backend`:
+`npm test`. Die feste Vergleichsbasis und die geschützten Hashes nicht erneuern,
+um fehlgeschlagene Prüfungen zu umgehen.
+
+Eine eng begrenzte CSS-Ausnahme erlaubt das Entfernen von `.btn-secondary` nur
+in `AuswertungenView.vue`; die Prüfung verlangt dort gleichzeitig, dass die Klasse
+im aktuellen Template nicht vorkommt. Andere Altregeln bleiben erhalten, solange
+ihre Nichtverwendung nicht belegt ist. Der redundante Roadmap-Selektor wurde
+ebenfalls entfernt. `.migrate-procedure.mjs` ist ein einmaliges Hilfsskript, das
+Dateien aus der ursprünglichen Git-Basis rekonstruiert: nicht auf bereits manuell
+verfeinerte Bereiche erneut anwenden, da sonst diese Änderungen verloren gehen.
+
+`v-dialog-focus` ergänzt die 21 vorhandenen nicht nativen Fachdialoge um initialen
+Fokus auf den Dialog, Tab-Begrenzung, Fokusrückgabe und Escape. Escape klickt den
+mit `data-dialog-close` markierten bestehenden Button und respektiert dessen
+Deaktivierung. Vorhandene Fachaktionen bleiben unverändert. Die einzige erlaubte
+Skriptergänzung ist der exakte Direktivenimport; die wertlose Direktive wird beim
+Vergleich der Fachbindungen ausgenommen. Keine Hash-Basis wurde verändert.
+Sechs Verhaltenstests mit kleinem DOM-Adapter laufen über `npm test` (Node 22.20
+oder neuer mit TypeScript-Type-Stripping); sie ersetzen keinen echten Browser.
+
+Browserabnahme bleibt offen: Das UI-Werkzeug meldete bei der Fortsetzung keine
+Browser; auch das Öffnen des integrierten Browsers war nicht verfügbar. Fokus,
+Screenreader-Verhalten und Dialoggeometrie nicht als visuell abgenommen markieren.

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from 'vue';
 import KapazitaetenListe from '../components/KapazitaetenListe.vue';
 import KapazitaetForm from '../components/KapazitaetForm.vue';
@@ -353,7 +354,7 @@ watch(() => props.verfahrenId, () => {
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="isExpanded = !isExpanded"
           >
-            <span class="section-toggle-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true"></span>
+            <svg class="section-toggle-chevron anm-procedure-chevron" :class="{ 'is-collapsed': !isExpanded }" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
           </button>
           
           Kapazitäten der aufnehmenden Schulen verwalten
@@ -385,7 +386,7 @@ watch(() => props.verfahrenId, () => {
       <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
     </div>
 
-    <div v-if="!verfahrenId" class="feedback-panel feedback-panel-warning anm-alert anm-procedure-ui">
+    <div v-if="!verfahrenId" class="feedback-panel feedback-panel-warning anm-alert anm-status--warning anm-procedure-ui">
       <p class="feedback-title anm-procedure-copy anm-procedure-ui">Kein Verfahren ausgewählt</p>
       <p class="anm-procedure-copy anm-procedure-ui">Wähle zuerst ein Anmeldeverfahren in „Verfahren und Runden“, damit die Kapazitäten geladen werden können.</p>
     </div>
@@ -420,7 +421,7 @@ watch(() => props.verfahrenId, () => {
       class="kapazitaeten-modal-overlay"
       @click.self="closeKapazitaetenImportPreview"
     >
-      <section class="kapazitaeten-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="kapazitaeten-import-title">
+      <section v-dialog-focus class="kapazitaeten-modal anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="kapazitaeten-import-title">
         <div class="kapazitaeten-modal-head">
           <div>
             <p class="kapazitaeten-import-eyebrow anm-procedure-copy anm-procedure-ui">CSV-Import</p>
@@ -430,7 +431,7 @@ watch(() => props.verfahrenId, () => {
               {{ kapazitaetenImportStep === 1 ? "Datei auswaehlen" : kapazitaetenImportStep === 2 ? "Vorschau pruefen" : "Ergebnis" }}
             </p>
           </div>
-          <button class="kapazitaeten-wizard-header-close anm-button anm-procedure-ui" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
+          <button data-dialog-close class="kapazitaeten-wizard-header-close anm-button anm-procedure-ui" type="button" @click="closeKapazitaetenImportPreview" :disabled="importSaving">
             Schliessen
           </button>
         </div>

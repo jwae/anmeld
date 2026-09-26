@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vDialogFocus } from "../directives/dialogFocus";
 import { computed, ref, watch } from "vue";
 import auswertungenService, {
   type AuswertungFormat,
@@ -908,11 +909,11 @@ watch(
 
 <template>
   <section class="auswertungen-view">
-    <header class="auswertungen-header">
+    <header class="auswertungen-header anm-procedure-surface">
       <div>
-        <p class="auswertungen-eyebrow">Auswertungen</p>
-        <h2>Zentrale Ausgabe- und Druckzentrale</h2>
-        <p class="auswertungen-intro">
+        <p class="auswertungen-eyebrow anm-procedure-copy anm-procedure-ui">Auswertungen</p>
+        <h2 class="anm-procedure-title anm-procedure-ui">Zentrale Ausgabe- und Druckzentrale</h2>
+        <p class="auswertungen-intro anm-procedure-copy anm-procedure-ui">
           Alle Auswertungen beziehen sich auf
           <strong>{{ context.verfahren }}</strong>
           und
@@ -921,44 +922,44 @@ watch(
       </div>
     </header>
 
-    <div v-if="errorMessage" class="feedback-panel feedback-panel-error">
-      <p class="feedback-title">Fehler</p>
-      <p>{{ errorMessage }}</p>
+    <div v-if="errorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ errorMessage }}</p>
     </div>
 
-    <div v-if="successMessage" class="feedback-panel feedback-panel-success">
-      <p class="feedback-title">Status</p>
-      <p>{{ successMessage }}</p>
+    <div v-if="successMessage" class="feedback-panel feedback-panel-success anm-alert anm-status--success anm-procedure-ui">
+      <p class="feedback-title anm-procedure-copy anm-procedure-ui">Status</p>
+      <p class="anm-procedure-copy anm-procedure-ui">{{ successMessage }}</p>
     </div>
 
-    <section v-if="!canLoad" class="auswertungen-placeholder">
-      <p>Waehle zuerst ein Verfahren und eine Runde, damit die Auswertungen bereitgestellt werden koennen.</p>
+    <section v-if="!canLoad" class="auswertungen-placeholder anm-procedure-surface">
+      <p class="anm-procedure-copy anm-procedure-ui">Waehle zuerst ein Verfahren und eine Runde, damit die Auswertungen bereitgestellt werden koennen.</p>
     </section>
 
-    <section v-else-if="loading" class="auswertungen-placeholder">
-      <p>Auswertungen werden geladen...</p>
+    <section v-else-if="loading" class="auswertungen-placeholder anm-procedure-surface">
+      <p class="anm-procedure-copy anm-procedure-ui">Auswertungen werden geladen...</p>
     </section>
 
     <section v-else class="auswertungen-grid">
       <article
         v-for="(card, cardIndex) in cards"
         :key="card.id"
-        class="auswertung-card"
+        class="auswertung-card anm-procedure-surface"
         :class="{ 'is-expanded': isExpanded(card.id), 'is-disabled': card.disabled }"
       >
         <button
           type="button"
-          class="auswertung-card-head"
+          class="auswertung-card-head anm-button anm-procedure-ui"
           :aria-expanded="isExpanded(card.id) ? 'true' : 'false'"
           :disabled="card.disabled"
           @click="toggleCard(card.id)"
         >
           <div class="auswertung-card-copy">
-            <h3>
+            <h3 class="anm-procedure-title anm-procedure-ui">
               <span class="auswertung-title-index">{{ formatListNumber(cardIndex) }}</span>
               <span>{{ card.title }}</span>
             </h3>
-            <p>{{ card.description }}</p>
+            <p class="anm-procedure-copy anm-procedure-ui">{{ card.description }}</p>
             <span v-if="card.disabled" class="auswertung-disabled-note">Derzeit nicht verfügbar</span>
           </div>
           <span
@@ -974,20 +975,20 @@ watch(
             <label
               v-for="(option, optionIndex) in card.options"
               :key="`${card.id}-${option.key}`"
-              class="auswertung-option"
+              class="auswertung-option anm-check anm-procedure-ui"
               :class="{
                 'is-implemented': isImplementedOption(card.id, option.key),
                 'is-selected': selectedOptions[card.id] === option.key,
               }"
             >
-              <input
+              <input class="anm-procedure-check-input anm-procedure-ui"
                 v-model="selectedOptions[card.id]"
                 type="radio"
                 :name="`auswertung-${card.id}`"
                 :value="option.key"
               />
-              <span class="auswertung-option-index">{{ formatListNumber(optionIndex) }}</span>
-              <span class="auswertung-option-label">{{ option.label }}</span>
+              <span class="auswertung-option-index anm-label anm-procedure-ui">{{ formatListNumber(optionIndex) }}</span>
+              <span class="auswertung-option-label anm-label anm-procedure-ui">{{ option.label }}</span>
             </label>
           </fieldset>
 
@@ -995,7 +996,7 @@ watch(
             <button
               v-if="shouldShowPreviewButton(card.id)"
               type="button"
-              class="btn-primary auswertung-action-btn auswertung-preview-btn"
+              class="auswertung-action-btn auswertung-preview-btn anm-button anm-button--primary anm-procedure-ui"
               :disabled="actionLoadingKey === actionKey(card.id, 'preview')"
               @click="openPreview(card)"
             >
@@ -1005,7 +1006,7 @@ watch(
               v-for="format in isPreviewOnlyCard(card.id) ? [] : (shouldShowPreviewButton(card.id) ? [] : card.formats)"
               :key="`${card.id}-${format}`"
               type="button"
-              class="btn-primary auswertung-action-btn"
+              class="auswertung-action-btn anm-button anm-button--primary anm-procedure-ui"
               :disabled="actionLoadingKey === actionKey(card.id, format)"
               @click="runPlaceholder(card, format)"
             >
@@ -1025,29 +1026,29 @@ watch(
       class="auswertungen-preview-overlay"
       @click.self="closePreviewOverlay"
     >
-      <section class="auswertungen-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="auswertungen-preview-title">
+      <section v-dialog-focus class="auswertungen-preview-dialog anm-procedure-surface" role="dialog" aria-modal="true" aria-labelledby="auswertungen-preview-title">
         <div class="auswertungen-preview-head">
           <div>
-            <p class="auswertungen-eyebrow">Auswertung</p>
-            <h3 id="auswertungen-preview-title">{{ previewData?.title || "Auswertungsvorschau" }}</h3>
-            <p class="auswertungen-preview-intro">
+            <p class="auswertungen-eyebrow anm-procedure-copy anm-procedure-ui">Auswertung</p>
+            <h3 class="anm-procedure-title anm-procedure-ui" id="auswertungen-preview-title">{{ previewData?.title || "Auswertungsvorschau" }}</h3>
+            <p class="auswertungen-preview-intro anm-procedure-copy anm-procedure-ui">
               <strong>{{ previewData?.verfahrenLabel || context.verfahren }}</strong>
               <span v-if="previewData?.rundeLabel">{{ previewData?.rundeLabel }}</span>
               <span>{{ previewData?.total ?? 0 }} Datensaetze</span>
             </p>
           </div>
-          <button class="btn-secondary auswertungen-preview-close" type="button" @click="closePreviewOverlay">
+          <button data-dialog-close class="auswertungen-preview-close anm-button anm-procedure-ui" type="button" @click="closePreviewOverlay">
             Schliessen
           </button>
         </div>
 
-        <div v-if="previewErrorMessage" class="feedback-panel feedback-panel-error">
-          <p class="feedback-title">Fehler</p>
-          <p>{{ previewErrorMessage }}</p>
+        <div v-if="previewErrorMessage" class="feedback-panel feedback-panel-error anm-alert anm-status--danger anm-procedure-ui">
+          <p class="feedback-title anm-procedure-copy anm-procedure-ui">Fehler</p>
+          <p class="anm-procedure-copy anm-procedure-ui">{{ previewErrorMessage }}</p>
         </div>
 
         <section v-if="previewLoading" class="auswertungen-preview-placeholder">
-          <p>Daten fuer die Vorschau werden geladen...</p>
+          <p class="anm-procedure-copy anm-procedure-ui">Daten fuer die Vorschau werden geladen...</p>
         </section>
 
         <section v-else-if="previewData" class="auswertungen-preview-body">
@@ -1058,7 +1059,7 @@ watch(
           </div>
 
           <div v-if="!(previewData?.rows || []).length" class="auswertungen-preview-placeholder">
-            <p>{{ previewData?.emptyMessage || "Keine Daten vorhanden." }}</p>
+            <p class="anm-procedure-copy anm-procedure-ui">{{ previewData?.emptyMessage || "Keine Daten vorhanden." }}</p>
           </div>
 
           <div v-else class="auswertungen-preview-table-wrap">
@@ -1093,12 +1094,12 @@ watch(
         </section>
 
         <div class="auswertungen-preview-actions">
-          <button class="btn-secondary" type="button" @click="closePreviewOverlay">
+          <button class="anm-button anm-procedure-ui" type="button" @click="closePreviewOverlay">
             Schliessen
           </button>
           <button
             v-if="previewData?.key === 'statistiken:entwicklung-ueber-die-runden'"
-            class="btn-primary auswertung-action-btn"
+            class="auswertung-action-btn anm-button anm-button--primary anm-procedure-ui"
             type="button"
             :disabled="actionLoadingKey === actionKey(previewData.key, 'print')"
             @click="printRoundOverview"
@@ -1107,7 +1108,7 @@ watch(
           </button>
           <button
             v-if="supportsPreviewExport('excel')"
-            class="btn-primary auswertung-action-btn"
+            class="auswertung-action-btn anm-button anm-button--primary anm-procedure-ui"
             type="button"
             :disabled="actionLoadingKey === actionKey(previewData?.exportBereich || 'preview', 'overlay-excel')"
             @click="exportPreview('excel')"
@@ -1116,7 +1117,7 @@ watch(
           </button>
           <button
             v-if="supportsPreviewExport('pdf')"
-            class="btn-primary auswertung-action-btn"
+            class="auswertung-action-btn anm-button anm-button--primary anm-procedure-ui"
             type="button"
             :disabled="actionLoadingKey === actionKey(previewData?.exportBereich || 'preview', 'overlay-pdf')"
             @click="exportPreview('pdf')"
@@ -1153,20 +1154,29 @@ watch(
 
 .auswertungen-eyebrow {
   margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.auswertungen-eyebrow:where(:not(.anm-procedure-ui)) {
   color: #6680a3;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .auswertungen-header h2 {
   margin: 0;
+}
+
+.auswertungen-header h2:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
 .auswertungen-intro {
   margin: 8px 0 0;
+}
+
+.auswertungen-intro:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.55;
 }
@@ -1187,11 +1197,14 @@ watch(
   justify-content: space-between;
   align-items: start;
   gap: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.auswertung-card-head:where(:not(.anm-procedure-ui)) {
   padding: 20px 22px;
   border: 0;
   background: transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
 .auswertung-card.is-disabled {
@@ -1215,6 +1228,9 @@ watch(
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.auswertung-card-copy h3:where(:not(.anm-procedure-ui)) {
   color: #17385f;
   font-size: 1.08rem;
   line-height: 1.25;
@@ -1237,6 +1253,9 @@ watch(
 
 .auswertung-card-copy p {
   margin: 8px 0 0;
+}
+
+.auswertung-card-copy p:where(:not(.anm-procedure-ui)) {
   color: #4a607e;
   line-height: 1.5;
 }
@@ -1285,22 +1304,25 @@ watch(
   display: flex;
   gap: 10px;
   align-items: center;
+  cursor: pointer;
+}
+
+.auswertung-option:where(:not(.anm-procedure-ui)) {
   padding: 9px 12px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.8);
   color: #214061;
-  cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.auswertung-option.is-selected {
+.auswertung-option.is-selected:where(:not(.anm-procedure-ui)) {
   border-color: #7fb1eb;
   background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
   box-shadow: 0 10px 22px rgba(24, 89, 168, 0.12);
 }
 
-.auswertung-option:hover {
+.auswertung-option:hover:where(:not(.anm-procedure-ui)) {
   border-color: #c6d9f0;
   background: #ffffff;
 }
@@ -1317,6 +1339,9 @@ watch(
   justify-content: center;
   flex: 0 0 28px;
   width: 28px;
+}
+
+.auswertung-option-index:where(:not(.anm-procedure-ui)) {
   height: 28px;
   border-radius: 999px;
   border: 1px solid #cad9eb;
@@ -1326,7 +1351,7 @@ watch(
   font-weight: 500;
 }
 
-.auswertung-option.is-selected .auswertung-option-index {
+.auswertung-option.is-selected .auswertung-option-index:where(:not(.anm-procedure-ui)) {
   border-color: #1559b7;
   background: #1559b7;
   color: #fff;
@@ -1334,17 +1359,20 @@ watch(
 
 .auswertung-option-label {
   min-width: 0;
+}
+
+.auswertung-option-label:where(:not(.anm-procedure-ui)) {
   color: #000;
   font-weight: 400;
   line-height: 1.3;
 }
 
-.auswertung-option.is-implemented .auswertung-option-label {
+.auswertung-option.is-implemented .auswertung-option-label:where(:not(.anm-procedure-ui)) {
   color: #000;
   font-weight: 400;
 }
 
-.auswertung-option.is-selected .auswertung-option-label {
+.auswertung-option.is-selected .auswertung-option-label:where(:not(.anm-procedure-ui)) {
   color: #0c4e98;
 }
 
@@ -1354,7 +1382,7 @@ watch(
   gap: 10px;
 }
 
-.auswertung-action-btn {
+.auswertung-action-btn:where(:not(.anm-procedure-ui)) {
   min-height: 42px;
   border: 0;
   border-radius: 999px;
@@ -1368,25 +1396,28 @@ watch(
 .auswertung-action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.auswertung-action-btn:disabled:where(:not(.anm-procedure-ui)) {
   box-shadow: none;
 }
 
-.auswertung-preview-btn {
+.auswertung-preview-btn:where(:not(.anm-procedure-ui)) {
   background: linear-gradient(135deg, #1559b7 0%, #0d7bdc 100%);
 }
 
-.feedback-panel {
+.feedback-panel:where(:not(.anm-procedure-ui)) {
   padding: 12px 14px;
   border-radius: 14px;
 }
 
-.feedback-panel-error {
+.feedback-panel-error:where(:not(.anm-procedure-ui)) {
   border: 1px solid #f2c2c2;
   background: #fff5f5;
   color: #a61b1b;
 }
 
-.feedback-panel-success {
+.feedback-panel-success:where(:not(.anm-procedure-ui)) {
   border: 1px solid #cde8d1;
   background: #f3fff4;
   color: #166534;
@@ -1394,22 +1425,15 @@ watch(
 
 .feedback-title {
   margin: 0 0 4px;
+}
+
+.feedback-title:where(:not(.anm-procedure-ui)) {
   font-weight: 700;
 }
 
 .feedback-panel p:last-child,
 .auswertungen-placeholder p {
   margin: 0;
-}
-
-.btn-secondary {
-  min-height: 42px;
-  border: 1px solid #ccd8e6;
-  border-radius: 999px;
-  padding: 0 16px;
-  background: #ffffff;
-  color: #23415f;
-  font-weight: 700;
 }
 
 .auswertungen-preview-overlay {
@@ -1448,6 +1472,9 @@ watch(
 
 .auswertungen-preview-head h3 {
   margin: 0;
+}
+
+.auswertungen-preview-head h3:where(:not(.anm-procedure-ui)) {
   color: #17385f;
 }
 
@@ -1457,6 +1484,10 @@ watch(
   gap: 14px;
   flex-wrap: wrap;
   margin: 8px 0 0;
+}
+
+.auswertungen-preview-intro:where(:not(.anm-procedure-ui)),
+.auswertungen-preview-meta {
   color: #4a607e;
 }
 

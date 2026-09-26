@@ -17,6 +17,28 @@
 }
 .anm-procedure-ui.anm-button { white-space: normal; }
 .anm-procedure-ui.anm-button--icon { width: var(--anm-control-height); }
+/* Section toggles in Verfahrensdaten: down opens, up closes. */
+.anm-procedure-ui.anm-button:is(.section-toggle, .anm-section-toggle) {
+  width: var(--anm-control-height);
+  padding: 0;
+  flex-shrink: 0;
+}
+.anm-procedure-ui.anm-button > svg.anm-procedure-chevron {
+  display: block;
+  width: var(--anm-icon-size);
+  height: var(--anm-icon-size);
+  flex-shrink: 0;
+  margin: 0;
+  border: 0;
+  transform: rotate(0deg);
+  transition: transform var(--anm-duration) var(--anm-easing);
+}
+.anm-procedure-ui.anm-button[aria-expanded="true"] > svg.anm-procedure-chevron {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anm-procedure-ui.anm-button > svg.anm-procedure-chevron { transition: none; }
+}
 .anm-procedure-ui.anm-input { font-size: var(--anm-text-button); }
 .anm-procedure-ui.anm-check { color: var(--anm-text); font-size: var(--anm-text-button); }
 .anm-procedure-ui.anm-procedure-check-input {
@@ -40,8 +62,76 @@
   background: var(--anm-surface);
   box-shadow: var(--anm-shadow-none);
 }
-.anm-procedure-surface:is([role="dialog"], .anm-overlay-card, .modal-content) {
+.anm-procedure-surface.anm-procedure-surface.anm-procedure-surface:is([role="dialog"], .anm-overlay-card, .modal-content) {
   box-shadow: var(--anm-shadow-dialog);
+}
+
+/* Explicit summary classes never apply to tables, filters or their ancestors. */
+.anm-procedure-summary.summary-card {
+  padding: var(--anm-space-3);
+}
+.anm-procedure-summary.summary-card .section-head {
+  margin-bottom: var(--anm-space-2);
+}
+.anm-procedure-summary.summary-card .summary-grid,
+.anm-procedure-summary.pool-metric-cards.anm-procedure-ui {
+  display: grid;
+  gap: var(--anm-space-1);
+  /* Keep equal tracks even when the pool has fewer metrics than the comparison. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
+}
+.anm-procedure-summary.import-summary {
+  gap: var(--anm-space-1);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+.anm-procedure-summary .anm-procedure-metric.anm-procedure-ui,
+.anm-procedure-summary .anm-procedure-result.anm-procedure-ui {
+  min-width: 0;
+  padding: var(--anm-space-2);
+  border: var(--anm-border-width) solid var(--anm-border);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface-muted);
+  box-shadow: var(--anm-shadow-none);
+  color: var(--anm-text);
+  font-size: var(--anm-text-xs);
+  line-height: var(--anm-leading);
+  overflow-wrap: anywhere;
+}
+.anm-procedure-summary .anm-procedure-metric.anm-procedure-ui {
+  display: grid;
+  align-content: start;
+  gap: var(--anm-space-1);
+}
+.anm-procedure-summary .anm-procedure-metric.anm-procedure-ui > span {
+  color: var(--anm-text-muted);
+  font-size: var(--anm-text-xs);
+  font-weight: var(--anm-weight-medium);
+  line-height: var(--anm-leading);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.anm-procedure-summary .anm-procedure-metric.anm-procedure-ui > strong {
+  margin: 0;
+  color: var(--anm-text);
+  font-size: var(--anm-text-lg);
+  font-weight: var(--anm-weight-bold);
+  line-height: var(--anm-leading-heading);
+  font-variant-numeric: tabular-nums;
+}
+.anm-procedure-summary .anm-procedure-metric.anm-status--danger {
+  background: var(--anm-danger-soft);
+  border-color: var(--anm-danger);
+}
+.anm-procedure-summary .anm-procedure-metric.anm-status--danger > :is(span, strong) {
+  color: var(--anm-danger);
+}
+.anm-procedure-summary .anm-procedure-copy.anm-procedure-ui {
+  color: var(--anm-text-muted);
+  font-size: var(--anm-text-xs);
+  font-weight: var(--anm-weight-normal);
+  line-height: var(--anm-leading);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 /* Shared session implementation and all its bindings remain unchanged. */
@@ -87,4 +177,83 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .anm-procedure-ui { transition: none; animation: none; }
+}
+
+/* Report controls only: preview tables and their ancestors' typography stay intact. */
+.auswertungen-view .auswertung-card-copy { min-width: 0; }
+.auswertungen-view .auswertung-card-head.anm-procedure-ui {
+  padding: var(--anm-space-4);
+  border: 0;
+  border-radius: 0;
+}
+.auswertungen-view .auswertung-card-head.anm-procedure-ui:focus-visible {
+  outline-offset: calc(-1 * var(--anm-focus-width));
+}
+.auswertungen-view .auswertung-title-index {
+  flex-shrink: 0;
+  background: var(--anm-brand);
+  color: var(--anm-onbrand);
+  border-radius: var(--anm-radius-control);
+  box-shadow: none;
+}
+.auswertungen-view .auswertung-disabled-note { color: var(--anm-text-muted); }
+.auswertungen-view .auswertung-chevron {
+  flex-shrink: 0;
+  border-color: var(--anm-brand);
+  transition-duration: var(--anm-duration);
+}
+.auswertungen-view .auswertung-options {
+  min-width: 0;
+  padding: var(--anm-space-3);
+  border-color: var(--anm-border);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface-muted);
+}
+.auswertungen-view .auswertung-options legend {
+  color: var(--anm-text-muted);
+  font-size: var(--anm-text-xs);
+}
+.auswertungen-view .auswertung-option.anm-procedure-ui {
+  padding: var(--anm-space-2);
+  border: var(--anm-border-width) solid transparent;
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface);
+}
+.auswertungen-view .auswertung-option.anm-procedure-ui:is(:hover, .is-selected) {
+  border-color: var(--anm-brand);
+  background: var(--anm-selected);
+}
+.auswertungen-view .auswertung-option.anm-procedure-ui:focus-within {
+  outline: var(--anm-focus-width) solid var(--anm-focus);
+  outline-offset: var(--anm-focus-offset);
+}
+/* Undo legacy hidden radios: preserve native keyboard selection and visible state. */
+.auswertungen-view .auswertung-option input.anm-procedure-ui {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+}
+.auswertungen-view .auswertung-option-label.anm-procedure-ui {
+  overflow-wrap: anywhere;
+  font-size: var(--anm-text-button);
+  font-weight: var(--anm-weight-normal);
+}
+.auswertungen-view .auswertungen-preview-overlay {
+  background: var(--anm-overlay);
+  backdrop-filter: none;
+}
+.auswertungen-view .auswertungen-preview-dialog {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.auswertungen-view .auswertungen-preview-placeholder {
+  border-color: var(--anm-border);
+  border-radius: var(--anm-radius-control);
+  background: var(--anm-surface-muted);
+  color: var(--anm-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .auswertungen-view .auswertung-chevron { transition: none; }
 }
