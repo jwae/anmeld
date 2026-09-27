@@ -1,5 +1,8 @@
 -- Schulanmeldungs-App: Neuinitialisierung aus dem aktuellen Sollzustand
--- Quelle: laufende MariaDB-Datenbank anmeld
+-- Basis: MariaDB-Datenbank anmeld; mit Migrationen 001-034 abgeglichen.
+-- Nur fuer leere Datenbanken. Keine Uebernahme bestehender Daten.
+-- Aktueller Endzustand: historische/ersetzte Strukturen werden nicht neu angelegt.
+-- Nach dem Import keine der Migrationen 001-034 erneut ausfuehren (siehe DB/README.md).
 -- Enthaltene Daten: anm_kat_*, anm_schulen, Berechtigungskatalog und ausschliesslich Admin aus app_user
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -176,29 +179,6 @@ CREATE TABLE `anm_runde` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE `anm_schueler_pool` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `vorname` varchar(100) NOT NULL,
-  `nachname` varchar(100) NOT NULL,
-  `geburtsdatum` date DEFAULT NULL,
-  `adresse` varchar(255) DEFAULT NULL,
-  `erzieher` varchar(255) DEFAULT NULL,
-  `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
-  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
-  `empfehlung_id` bigint(20) DEFAULT NULL,
-  `notiz` text DEFAULT NULL,
-  `quelle` varchar(50) DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `fk_anm_schueler_empfehlung` (`empfehlung_id`),
-  KEY `idx_anm_schueler_name` (`nachname`,`vorname`),
-  KEY `idx_anm_schueler_geburtsdatum` (`geburtsdatum`),
-  CONSTRAINT `fk_anm_schueler_pool_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=900023 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `anm_schulen` (
   `snr` varchar(50) NOT NULL,
   `name` varchar(255) NOT NULL,
@@ -222,9 +202,42 @@ CREATE TABLE `anm_schulen` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`snr`),
+  KEY `idx_anm_schulen_is_active` (`is_active`),
   KEY `fk_anm_schulen_sf` (`sf_id`),
   CONSTRAINT `fk_anm_schulen_sf` FOREIGN KEY (`sf_id`) REFERENCES `anm_kat_sf` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `anm_schueler_pool` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `verfahren_id` bigint(20) DEFAULT NULL,
+  `snr` varchar(50) DEFAULT NULL,
+  `schueler_schul_id` varchar(100) DEFAULT NULL,
+  `vorname` varchar(100) NOT NULL,
+  `nachname` varchar(100) NOT NULL,
+  `geburtsdatum` date DEFAULT NULL,
+  `adresse` varchar(255) DEFAULT NULL,
+  `erzieher` varchar(255) DEFAULT NULL,
+  `foerderbedarf` tinyint(1) NOT NULL DEFAULT 0,
+  `zieldifferent` tinyint(1) NOT NULL DEFAULT 0,
+  `empfehlung_id` bigint(20) DEFAULT NULL,
+  `notiz` text DEFAULT NULL,
+  `quelle` varchar(50) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_anm_schueler_empfehlung` (`empfehlung_id`),
+  KEY `idx_anm_schueler_name` (`nachname`,`vorname`),
+  KEY `idx_anm_schueler_geburtsdatum` (`geburtsdatum`),
+  KEY `idx_anm_schueler_pool_verfahren` (`verfahren_id`),
+  KEY `idx_anm_schueler_pool_snr` (`snr`),
+  KEY `idx_anm_schueler_pool_schul_id` (`schueler_schul_id`),
+  KEY `idx_anm_schueler_pool_abgleich` (`verfahren_id`, `snr`, `schueler_schul_id`),
+  CONSTRAINT `fk_anm_schueler_pool_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_pool_schule` FOREIGN KEY (`snr`) REFERENCES `anm_schulen` (`snr`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_anm_schueler_pool_empfehlung` FOREIGN KEY (`empfehlung_id`) REFERENCES `anm_kat_empfehlung` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=900023 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -540,6 +553,7 @@ CREATE TABLE `anm_merkzettel` (
 CREATE TABLE `anm_offener_fall` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `verfahren_id` bigint(20) NOT NULL,
+  `runde_id` bigint(20) NOT NULL,
   `schueler_pool_id` bigint(20) DEFAULT NULL,
   `schueler_id` bigint(20) DEFAULT NULL,
   `schueler_anmeldung_id` bigint(20) DEFAULT NULL,
@@ -553,6 +567,7 @@ CREATE TABLE `anm_offener_fall` (
   KEY `fk_anm_offener_fall_grund` (`fallgrund_id`),
   KEY `fk_anm_offener_fall_status` (`fallstatus_id`),
   KEY `idx_anm_offener_fall_verfahren` (`verfahren_id`),
+  KEY `idx_anm_offener_fall_runde_verfahren` (`runde_id`, `verfahren_id`),
   KEY `idx_anm_offener_fall_schueler` (`schueler_pool_id`),
   KEY `idx_anm_offener_fall_zugewiesene_snr` (`zugewiesene_snr`),
   KEY `fk_anm_offener_fall_schueler_anmeldung` (`schueler_anmeldung_id`),
@@ -563,6 +578,7 @@ CREATE TABLE `anm_offener_fall` (
   CONSTRAINT `fk_anm_offener_fall_schueler_anmeldung` FOREIGN KEY (`schueler_anmeldung_id`) REFERENCES `anm_schueler_anmeldung` (`id`),
   CONSTRAINT `fk_anm_offener_fall_schule` FOREIGN KEY (`zugewiesene_snr`) REFERENCES `anm_schulen` (`snr`),
   CONSTRAINT `fk_anm_offener_fall_status` FOREIGN KEY (`fallstatus_id`) REFERENCES `anm_kat_fallstatus` (`id`),
+  CONSTRAINT `fk_anm_offener_fall_runde_verfahren` FOREIGN KEY (`runde_id`, `verfahren_id`) REFERENCES `anm_runde` (`id`, `verfahren_id`) ON DELETE CASCADE ON UPDATE RESTRICT,
   CONSTRAINT `fk_anm_offener_fall_verfahren` FOREIGN KEY (`verfahren_id`) REFERENCES `anm_verfahren` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
