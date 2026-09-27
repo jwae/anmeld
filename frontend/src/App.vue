@@ -8,6 +8,7 @@ import { authService } from "./services/apiService";
 import appStructureImage from "./assets/app_struktur.png";
 
 import LoginIcon from "./components/LoginIcon.vue";
+import ManagementSessionCard from "./components/ManagementSessionCard.vue";
 import APPManagement from "./components/APPManagement.vue";
 import LoginCredentialsPage from "./components/LoginCredentialsPage.vue";
 
@@ -21,7 +22,7 @@ const {
 
 const {
   loginUsername, loginPassword, loginLoading, loginError, pendingLogin,
-  isAuthenticated, currentUserLabel, pendingLoginUser, pendingLoginUserLabel, canPendingManageApp, canPendingViewProcedures,
+  isAuthenticated, currentUserLabel, pendingLoginUser, canPendingManageApp, canPendingViewProcedures,
   login: performLogin, continueAfterLogin: performContinueAfterLogin, logout: performLogout,
   testLoginPassword,
 } = useAuth();

@@ -4,6 +4,7 @@
 
 export interface User {
   user_id?: string | number;
+  user_fullname?: string | null;
   username: string;
   group_name: string;
   permissions: string[];

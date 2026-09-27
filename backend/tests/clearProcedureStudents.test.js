@@ -78,3 +78,36 @@ test("verfahren_id ist fuer die Loeschung verpflichtend", async () => {
   assert.equal(response.statusCode, 400);
   assert.equal(response.payload.error, "verfahren_id ist erforderlich.");
 });
+
+for (const completedRounds of [1, 2]) {
+  test(`${completedRounds} beendete Runde(n) blockieren die gesamte Schuelerloeschung`, async () => {
+    let released = false;
+    const connection = {
+      async query(sql, params = []) {
+        const normalized = String(sql).replace(/\s+/g, " ").trim();
+        if (normalized.startsWith("SELECT id, status FROM anm_verfahren")) {
+          assert.deepEqual(params, [17]);
+          return [[{ id: 17, status: "In Bearbeitung" }]];
+        }
+        if (normalized.startsWith("SELECT COUNT(*) AS beendete_runden")) {
+          assert.match(normalized, /WHERE verfahren_id = \? AND status = 'Beendet'$/);
+          assert.deepEqual(params, [17]);
+          return [[{ beendete_runden: completedRounds }]];
+        }
+        assert.fail(`Nach abgeschlossener Runde darf keine weitere Abfrage erfolgen: ${normalized}`);
+      },
+      async beginTransaction() { assert.fail("Die Loeschtransaktion darf nicht starten."); },
+      async commit() { assert.fail("Es darf keine Loeschung bestaetigt werden."); },
+      async rollback() {},
+      release() { released = true; },
+    };
+    const controller = createImporteController({ getPool: () => ({ getConnection: async () => connection }) });
+    const response = createResponse();
+
+    await controller.clearSchuelerDaten({ query: { verfahren_id: "17", runde_id: "99" } }, response);
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.payload.error, "Die Schuelerdaten koennen nicht geloescht werden, weil das Verfahren beendete Runden enthaelt.");
+    assert.equal(released, true);
+  });
+}

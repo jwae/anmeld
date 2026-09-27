@@ -35,6 +35,7 @@ withDefaults(defineProps<{
   isReviewMode?: boolean;
   user?: any;
   userLabel?: string;
+  userTitle?: string;
   connectedHost?: string;
   connectedPort?: string | number;
   connectedDatabase?: string;

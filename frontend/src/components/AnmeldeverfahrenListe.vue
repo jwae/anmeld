@@ -43,7 +43,10 @@ function formatTimestamp(value: string) {
   <section class="anm-card anm-procedure-surface">
     <div class="anm-card-head">
       <div>
-        <h3 class="anm-procedure-title anm-procedure-ui">Anmeldeverfahren</h3>
+        <div class="anm-card-title-row">
+          <h3 class="anm-procedure-title anm-procedure-ui">Anmeldeverfahren</h3>
+          <span class="anm-badge">{{ items.length }}</span>
+        </div>
         <p class="anm-procedure-copy anm-procedure-ui">Alle vorhandenen Verfahren, sortiert nach Schuljahr.</p>
       </div>
       <div class="anm-card-head-actions">
@@ -66,7 +69,6 @@ function formatTimestamp(value: string) {
             Verfahren beenden
           </button>
         </template>
-        <span class="anm-badge">{{ items.length }}</span>
       </div>
     </div>
 
@@ -151,6 +153,12 @@ function formatTimestamp(value: string) {
   justify-content: space-between;
   align-items: start;
   gap: 12px;
+}
+
+.anm-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .anm-card-head-actions {

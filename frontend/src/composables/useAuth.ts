@@ -15,10 +15,7 @@ export function useAuth() {
 
   const isAuthenticated = computed<boolean>(() => !!authStore.token);
   const currentUserLabel = computed<string>(() => {
-    const name = (authStore.username || "").trim();
-    const group = (authStore.groupName || "").trim();
-    if (!name) return "";
-    return group ? `${name} (${group})` : name;
+    return authStore.userFullname.trim() || "Nutzer";
   });
 
   const pendingLoginUser = computed<User | null>(() => pendingLogin.value?.user || null);
@@ -81,7 +78,7 @@ export function useAuth() {
     const groupName = user.group_name || "";
     const permissions = Array.isArray(user.permissions) ? user.permissions : [];
 
-    setToken(token, username, groupName, user.user_id || "", permissions);
+    setToken(token, username, groupName, user.user_id || "", permissions, user.user_fullname || "");
     pendingLogin.value = null;
     return true;
   }

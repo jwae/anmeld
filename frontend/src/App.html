@@ -22,10 +22,16 @@
             {{ pendingLogin ? 'Wähle den gewünschten Bereich.' : 'Melde dich mit deinem Benutzerkonto an.' }}
           </p>
         </div>
-        <div v-if="pendingLogin" class="anm-badge anm-status--success login-status-chip">
-          <LoginIcon name="user" />
-          <strong>{{ pendingLoginUserLabel }}</strong>
-        </div>
+        <ManagementSessionCard
+          v-if="pendingLogin"
+          :user="pendingLoginUser"
+          :connected-host="connectedHost || host"
+          :connected-port="connectedPort || port"
+          :connected-database="connectedDatabase || database"
+          action-label="Logout"
+          :action-disabled="managementSessionLoading"
+          @action="logoutFromAreaSelection"
+        />
       </div>
 
       <form v-if="!pendingLogin" class="app-login-form" :aria-busy="loginBusy" @submit.prevent="login">
@@ -120,7 +126,7 @@
         <p v-if="!canPendingViewProcedures && !canPendingManageApp" role="status">
           Für dieses Konto ist kein Anwendungsbereich freigeschaltet.
         </p>
-        <div class="anm-actions login-actions">
+        <div class="anm-actions area-selection-actions">
           <button
             v-if="canPendingViewProcedures"
             class="anm-button anm-button--primary"
@@ -135,12 +141,6 @@
             :disabled="managementSessionLoading"
             @click="openAppManagement"
           ><LoginIcon name="settings" /> App-Verwaltung</button>
-          <button
-            class="anm-button anm-button--secondary"
-            type="button"
-            :disabled="managementSessionLoading"
-            @click="logoutFromAreaSelection"
-          ><LoginIcon name="logout" /> Abmelden</button>
         </div>
       </div>
 
@@ -158,6 +158,7 @@
   <template v-else-if="isAnmRoute && canViewProcedures">
     <LoginCredentialsPage
       :user-label="currentUserLabel"
+      :user-title="[authStore.username, authStore.groupName].filter(Boolean).join(' · ')"
       :connected-host="connectedHost || host"
       :connected-port="connectedPort || port"
       :connected-database="connectedDatabase || database"

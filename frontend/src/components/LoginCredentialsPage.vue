@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const props = defineProps<{
   user?: any;
   userLabel?: string;
+  userTitle?: string;
   loginUserLabel?: string;
   connectedHost?: string;
   connectedPort?: string | number;

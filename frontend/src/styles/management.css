@@ -58,8 +58,8 @@
 .anm-migrated.user-management-tab { min-width: 7.5rem; }
 .anm-migrated.app-protocol-confirm { padding-top: var(--anm-space-12); }
 .anm-migrated.app-protocol-confirm-x {
-  width: var(--anm-control-height);
-  height: var(--anm-control-height);
+  width: var(--anm-button-height);
+  height: var(--anm-button-height);
   padding: 0;
   font-size: var(--anm-text-heading);
 }
@@ -79,7 +79,7 @@
 .anm-management-help .help-overlay-copy p,
 .anm-management-help .help-overlay-content { color: var(--anm-text-muted); }
 .anm-management-help .help-overlay-close {
-  min-height: var(--anm-control-height);
+  min-height: var(--anm-button-height);
   border-color: var(--anm-border-control);
   border-radius: var(--anm-radius-control);
   background: var(--anm-surface);

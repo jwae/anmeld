@@ -29,8 +29,8 @@ import UserSessionCard from "./UserSessionCard.vue";
   overflow-wrap: anywhere;
 }
 .management-session-card :deep(.user-session-card-action) {
-  min-height: var(--anm-control-height);
-  padding: var(--anm-space-2) var(--anm-space-3);
+  min-height: var(--anm-button-height);
+  padding: 0.375rem var(--anm-space-3);
   border: var(--anm-border-width) solid var(--anm-border-control);
   border-radius: var(--anm-radius-control);
   background: var(--anm-surface);

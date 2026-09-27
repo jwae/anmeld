@@ -16,10 +16,10 @@
   overflow-wrap: anywhere;
 }
 .anm-procedure-ui.anm-button { white-space: normal; }
-.anm-procedure-ui.anm-button--icon { width: var(--anm-control-height); }
+.anm-procedure-ui.anm-button--icon { width: var(--anm-button-height); }
 /* Section toggles in Verfahrensdaten: down opens, up closes. */
 .anm-procedure-ui.anm-button:is(.section-toggle, .anm-section-toggle) {
-  width: var(--anm-control-height);
+  width: var(--anm-button-height);
   padding: 0;
   flex-shrink: 0;
 }
@@ -158,8 +158,8 @@
   overflow-wrap: anywhere;
 }
 .anm-procedure-session.user-session-card .user-session-card-action {
-  min-height: var(--anm-control-height);
-  padding: var(--anm-space-2) var(--anm-space-3);
+  min-height: var(--anm-button-height);
+  padding: 0.375rem var(--anm-space-3);
   border: var(--anm-border-width) solid var(--anm-border-control);
   border-radius: var(--anm-radius-control);
   background: var(--anm-surface);

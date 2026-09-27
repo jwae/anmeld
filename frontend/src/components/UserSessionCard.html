@@ -1,11 +1,12 @@
 <div class="user-session-card">
   <div class="user-session-card-summary">
     <div class="user-session-card-topline">
-      <p class="user-session-card-user">{{ resolvedUserLabel || emptyUserLabel }}</p>
+      <p class="user-session-card-user" :title="resolvedUserTitle"><LoginIcon name="user" /><span>{{ resolvedUserLabel || emptyUserLabel }}</span></p>
       <button
         v-if="actionLabel"
         class="btn-secondary user-session-card-action"
         type="button"
+        :disabled="actionDisabled"
         @click="emit('action')"
       >
         {{ actionLabel }}

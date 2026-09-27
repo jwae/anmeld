@@ -296,8 +296,8 @@ watch(
     </section>
 
     <section v-else class="offene-faelle-panel">
-      <div class="pool-metric-cards">
-        <article v-for="card in metricCards" :key="card.label" class="pool-metric-card">
+      <div class="pool-metric-cards anm-procedure-summary anm-procedure-ui">
+        <article v-for="card in metricCards" :key="card.label" class="pool-metric-card anm-procedure-metric anm-procedure-ui">
           <span>{{ card.label }}</span>
           <strong>{{ card.value }}</strong>
         </article>
@@ -381,12 +381,13 @@ watch(
                 <td class="detail-actions-cell">
                   <button
                     type="button"
-                    class="btn-secondary pool-icon-btn"
+                    class="anm-section-toggle anm-button anm-procedure-ui"
                     :title="isExpanded(row.fall_id) ? 'Details schliessen' : 'Details oeffnen'"
                     :aria-label="isExpanded(row.fall_id) ? 'Details schliessen' : 'Details oeffnen'"
+                    :aria-expanded="isExpanded(row.fall_id)"
                     @click="toggleExpanded(row.fall_id)"
                   >
-                    {{ isExpanded(row.fall_id) ? "−" : "+" }}
+                    <svg class="anm-procedure-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m6 9 6 6 6-6" /></svg>
                   </button>
                 </td>
               </tr>

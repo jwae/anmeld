@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { vDialogFocus } from "../directives/dialogFocus";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import importService from "../services/importService";
+import { anmelderundenService } from "../services/anmelderundenService";
 import { can } from "../authStore";
 import KapazitaetenView from "./KapazitaetenView.vue";
 import PoolImport from "../components/PoolImport.vue";
@@ -25,11 +26,46 @@ const errorMessage = ref("");
 const successMessage = ref("");
 const refreshVersion = ref(0);
 const deleteAllConfirmOpen = ref(false);
+const checkingRounds = ref(false);
+const hasCompletedRounds = ref(false);
+const roundCheckError = ref("");
+let roundCheckVersion = 0;
+const deleteBlockedReason = computed(() => {
+  if (hasCompletedRounds.value) return "Das Verfahren enthält bereits beendete Runden. Deshalb können keine Schülerdaten aus diesem Verfahren gelöscht werden.";
+  if (roundCheckError.value) return roundCheckError.value;
+  if (props.isReadonly) return "Der ausgewählte Kontext ist schreibgeschützt. Schülerdaten können nicht gelöscht werden.";
+  return "";
+});
 const canDeleteStudentData = computed(() => can("verfahren.bearbeiten"));
 
-function openDeleteAllConfirm() {
-  if (!canDeleteStudentData.value || props.isReadonly || !props.verfahrenId) return;
+watch(() => props.verfahrenId, () => {
+  errorMessage.value = "";
+  successMessage.value = "";
+  deleteAllConfirmOpen.value = false;
+  roundCheckVersion += 1;
+  checkingRounds.value = false;
+  hasCompletedRounds.value = false;
+  roundCheckError.value = "";
+});
+
+async function openDeleteAllConfirm() {
+  if (!canDeleteStudentData.value || !props.verfahrenId || loading.value) return;
+  const version = ++roundCheckVersion;
+  const verfahrenId = props.verfahrenId;
+  hasCompletedRounds.value = false;
+  roundCheckError.value = "";
+  checkingRounds.value = true;
   deleteAllConfirmOpen.value = true;
+  try {
+    const rounds = await anmelderundenService.listByVerfahren(verfahrenId, props.token);
+    if (version !== roundCheckVersion) return;
+    hasCompletedRounds.value = rounds.some((round) => round.status === "Beendet");
+  } catch {
+    if (version !== roundCheckVersion) return;
+    roundCheckError.value = "Der Rundenstatus konnte nicht geprüft werden. Das Löschen ist gesperrt. Bitte schließen Sie den Dialog und versuchen Sie es erneut.";
+  } finally {
+    if (version === roundCheckVersion) checkingRounds.value = false;
+  }
 }
 
 function closeDeleteAllConfirm() {
@@ -37,7 +73,7 @@ function closeDeleteAllConfirm() {
 }
 
 async function handleDeleteAll() {
-  if (!canDeleteStudentData.value || props.isReadonly || !props.verfahrenId || loading.value) return;
+  if (!canDeleteStudentData.value || !deleteAllConfirmOpen.value || checkingRounds.value || deleteBlockedReason.value || !props.verfahrenId || loading.value) return;
   try {
     errorMessage.value = "";
     successMessage.value = "";
@@ -99,18 +135,19 @@ async function handleDeleteAll() {
 
     <section v-if="canDeleteStudentData" class="importe-danger-zone">
       <div class="importe-danger-zone-copy">
-        <p class="importe-eyebrow anm-procedure-copy anm-procedure-ui">Gefahrenbereich</p>
         <h3 class="anm-procedure-title anm-procedure-ui">
           <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
           <span>Schülerdaten löschen</span>
         </h3>
         <p class="anm-procedure-copy anm-procedure-ui">Diese Aktion löscht aus dem aktivierten Verfahren alle Schülerdaten aus den Import-, Abgleich- und Falltabellen.</p>
+        <p v-if="errorMessage" class="anm-alert anm-status--danger" role="alert">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="anm-alert anm-status--success" role="status">{{ successMessage }}</p>
       </div>
 
       <button
         class="anm-button anm-button--danger anm-procedure-ui"
         type="button"
-        :disabled="loading || isReadonly || !verfahrenId"
+        :disabled="loading || !verfahrenId"
         @click="openDeleteAllConfirm"
       >
         {{ loading ? "Loesche..." : "Alle Schuelerdaten loeschen" }}
@@ -123,12 +160,17 @@ async function handleDeleteAll() {
           <button data-dialog-close class="delete-all-close anm-button anm-procedure-ui" type="button" aria-label="Overlay schließen" :disabled="loading" @click="closeDeleteAllConfirm">×</button>
           <div class="delete-all-icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></div>
           <div class="delete-all-copy">
-            <h3 class="anm-procedure-title anm-procedure-ui" id="delete-all-title">Alle Schülerdaten löschen?</h3>
+            <h3 class="anm-procedure-title anm-procedure-ui" id="delete-all-title">{{ checkingRounds ? "Löschbarkeit wird geprüft" : deleteBlockedReason ? "Schülerdaten können nicht gelöscht werden" : "Alle Schülerdaten löschen?" }}</h3>
+            <p v-if="checkingRounds" class="anm-procedure-copy anm-procedure-ui" role="status">Die Runden des Verfahrens werden geprüft …</p>
+            <p v-else-if="deleteBlockedReason" class="anm-alert anm-status--danger" role="alert">{{ deleteBlockedReason }}</p>
+            <template v-else>
             <p class="anm-procedure-copy anm-procedure-ui">Alle Schülerdaten des Verfahrens <strong>{{ context?.verfahren || "Aktuelles Verfahren" }}</strong> werden aus den Import-, Abgleich- und Falltabellen gelöscht.</p>
             <p class="delete-all-warning anm-procedure-copy anm-procedure-ui">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            </template>
           </div>
           <footer>
-            <button class="delete-all-submit anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="loading" @click="handleDeleteAll">
+            <button v-if="checkingRounds || deleteBlockedReason" class="anm-button anm-procedure-ui" type="button" @click="closeDeleteAllConfirm">Schließen</button>
+            <button v-else class="delete-all-submit anm-button anm-button--danger anm-procedure-ui" type="button" :disabled="loading" @click="handleDeleteAll">
               <i class="bi bi-trash3" aria-hidden="true"></i>
               {{ loading ? "Lösche..." : "Endgültig löschen" }}
             </button>
@@ -162,12 +204,10 @@ async function handleDeleteAll() {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  border: 1px solid #fecaca;
+  border: 1px solid #f87171;
   border-radius: 22px;
   padding: 20px 22px;
-  background:
-    radial-gradient(circle at top right, rgba(252, 165, 165, 0.18), transparent 34%),
-    linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+  background: #fee2e2;
   box-shadow: 0 18px 42px rgba(153, 27, 27, 0.08);
 }
 

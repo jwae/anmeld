@@ -24,6 +24,9 @@
 }
 
 .user-session-card-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: 15px;
   font-weight: 700;

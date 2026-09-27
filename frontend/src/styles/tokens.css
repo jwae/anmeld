@@ -55,6 +55,8 @@
   --anm-focus-width: 2px;
   --anm-focus-offset: 3px;
   --anm-control-height: 2.75rem;
+  --anm-button-height: 2.25rem;
+  --anm-input-height: 2.25rem;
   --anm-icon-size: 1.125rem;
   --anm-dialog-sm: 28rem;
   --anm-dialog-md: 58rem;

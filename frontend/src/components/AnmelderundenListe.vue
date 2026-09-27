@@ -49,7 +49,10 @@ const selectedRound = computed<Anmelderunde | null>(
   <section class="anm-card anm-procedure-surface">
     <div class="anm-card-head">
       <div>
-        <h3 class="anm-procedure-title anm-procedure-ui">Anmelderunden</h3>
+        <div class="anm-card-title-row">
+          <h3 class="anm-procedure-title anm-procedure-ui">Anmelderunden</h3>
+          <span v-if="verfahren" class="anm-badge">{{ items.length }}</span>
+        </div>
         <p class="anm-procedure-copy anm-procedure-ui" v-if="verfahren">Runden fuer {{ verfahren.bezeichnung }}.</p>
         <p class="anm-procedure-copy anm-procedure-ui" v-else>Bitte zuerst ein Verfahren auswaehlen.</p>
       </div>
@@ -63,7 +66,6 @@ const selectedRound = computed<Anmelderunde | null>(
         >
           Neue Runde
         </button>
-        <span v-if="verfahren" class="anm-badge">{{ items.length }}</span>
       </div>
     </div>
 
@@ -218,6 +220,12 @@ const selectedRound = computed<Anmelderunde | null>(
   justify-content: space-between;
   align-items: start;
   gap: 12px;
+}
+
+.anm-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .anm-card-head-actions {
